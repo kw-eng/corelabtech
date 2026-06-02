@@ -16,21 +16,9 @@ def seed_postgres_db():
             "sex": None,
             "age": None,
             "weight": None,
-            "password": "Admin123!",
+            "password": "CHANGE_ME_ADMIN_PASSWORD",
             "role": "admin",
             "notes": "Default admin account"
-        },
-
-        {
-            "user_id": "operator_demo",
-            "email": "operator@corelabtech.local",
-            "subject_id": "HBOT_DEMO_001",
-            "sex": "M",
-            "age": 46,
-            "weight": 83,
-            "password": "Operator123!",
-            "role": "operator",
-            "notes": "Demo operator account"
         },
 
         {
@@ -40,22 +28,36 @@ def seed_postgres_db():
             "sex": None,
             "age": None,
             "weight": None,
-            "password": "Researcher123!",
+            "password": "CHANGE_ME_RESEARCHER_PASSWORD",
             "role": "researcher",
             "notes": "Demo researcher account"
         },
 
-        {
-            "user_id": "viewer_demo",
-            "email": "viewer@corelabtech.local",
-            "subject_id": "VIEWER",
-            "sex": None,
-            "age": None,
-            "weight": None,
-            "password": "Viewer123!",
-            "role": "viewer",
-            "notes": "Demo viewer account"
-        }
+        # Enable only for local testing if needed.
+        # {
+        #     "user_id": "operator_demo",
+        #     "email": "operator@corelabtech.local",
+        #     "subject_id": "HBOT_DEMO_001",
+        #     "sex": "M",
+        #     "age": 46,
+        #     "weight": 83,
+        #     "password": "CHANGE_ME_OPERATOR_PASSWORD",
+        #     "role": "operator",
+        #     "notes": "Demo operator account"
+        # },
+
+        # Enable only for local testing if needed.
+        # {
+        #     "user_id": "viewer_demo",
+        #     "email": "viewer@corelabtech.local",
+        #     "subject_id": "VIEWER",
+        #     "sex": None,
+        #     "age": None,
+        #     "weight": None,
+        #     "password": "CHANGE_ME_VIEWER_PASSWORD",
+        #     "role": "viewer",
+        #     "notes": "Demo viewer account"
+        # }
 
     ]
 
@@ -116,17 +118,13 @@ def seed_postgres_db():
     print("PostgreSQL seed completed")
     print("========================================")
 
-    print("Admin:")
-    print("  admin@corelabtech.local / Admin123!")
+    print("Active production/demo accounts:")
+    print("  admin@corelabtech.local / CHANGE_ME_ADMIN_PASSWORD")
+    print("  researcher@corelabtech.local / CHANGE_ME_RESEARCHER_PASSWORD")
 
-    print("Operator:")
-    print("  operator@corelabtech.local / Operator123!")
-
-    print("Researcher:")
-    print("  researcher@corelabtech.local / Researcher123!")
-
-    print("Viewer:")
-    print("  viewer@corelabtech.local / Viewer123!")
+    print("")
+    print("Operator/viewer examples are commented out in seed_postgres_db.py")
+    print("Enable them only for local testing if needed.")
 
     print("========================================")
 
