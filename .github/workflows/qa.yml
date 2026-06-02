@@ -1,4 +1,4 @@
-name: AI QA Pipeline
+name: CoreLabTech QA
 
 on:
   push:
@@ -47,33 +47,49 @@ jobs:
           name: playwright-report
           path: playwright-report/
 
-performance:
-  runs-on: ubuntu-latest
+  performance:
+    runs-on: ubuntu-latest
 
-  steps:
-    - uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: "21"
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
-    - uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-    - name: Install backend dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Start Flask
-      run: |
-        python app.py &
-        sleep 10
+      - name: Start Flask
+        env:
+          FLASK_ENV: production
+          APP_ENV: production
+          PERFORMANCE_TESTING: "true"
+          SESSION_COOKIE_SECURE: "False"
+          DATABASE_URL: sqlite:///ci_test.db
+        run: |
+          python app.py &
+          sleep 10
 
-    - name: Run Gatling performance tests
-      working-directory: tests/performance/gatling
-      run: |
-        mvn gatling:test -Dgatling.simulationClass=corelabtech.SessionsSimulation
-        mvn gatling:test -Dgatling.simulationClass=corelabtech.RunAnalysisSimulation
+      - name: Run Gatling performance tests
+        working-directory: tests/performance/gatling
+        run: |
+          mvn gatling:test -Dgatling.simulationClass=corelabtech.SessionsSimulation
+          mvn gatling:test -Dgatling.simulationClass=corelabtech.RunAnalysisSimulation
+
+      - name: Upload Gatling reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatling-report
+          path: tests/performance/gatling/target/gatling/
