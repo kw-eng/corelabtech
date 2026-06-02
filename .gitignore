@@ -109,3 +109,4 @@ secrets/
 
 research/*.pdf
 data/performance/*.json
+change_demo_passwords.py
