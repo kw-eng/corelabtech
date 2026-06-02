@@ -1,0 +1,20 @@
+Finalny RBAC który polecam
+Operator + Admin
+save_phase
+save_full_session
+during_merge
+run_analysis
+upload_fit
+upload_csv
+Researcher + Admin
+ai_lab
+reports
+datasets
+advanced_ai
+trends
+Admin only
+delete_user
+delete_sessions
+performance
+debug_db
+system config

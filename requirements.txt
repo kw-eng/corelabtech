@@ -1,0 +1,17 @@
+flask
+flask-cors
+flask-login
+flask-wtf
+flask-limiter
+email-validator
+fitparse
+scikit-learn
+numpy
+pandas
+python-dotenv
+matplotlib
+reportlab
+psycopg2-binary
+werkzeug
+gunicorn
+prometheus-flask-exporter

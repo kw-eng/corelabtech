@@ -1,0 +1,93 @@
+services:
+
+  web:
+    build: .
+
+    container_name: corelabtech_web
+
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql://corelabtech_user:corelabtech_password@db:5432/corelabtech
+      APP_ENV: production 
+      FLASK_ENV: production
+      PERFORMANCE_TESTING: "true"
+      # Produkcja/VPS:
+      # PERFORMANCE_TESTING: "false"
+      PLAYWRIGHT_BASE_URL: "http://127.0.0.1:5000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+      - ./tests/performance/gatling/target:/app/tests/performance/gatling/target
+
+      # Produkcja/VPS:--workers 3
+      # Lokalnie/testy:--workers 1
+      
+    command: >
+      gunicorn app:app
+      --workers 2
+      --threads 4
+      --worker-class gthread
+      --bind 0.0.0.0:5000
+      --timeout 300
+
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+    networks:
+      - corelabtech_network
+
+
+  db:
+    image: postgres:16
+
+    container_name: corelabtech_postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: corelabtech
+      POSTGRES_USER: corelabtech_user
+      POSTGRES_PASSWORD: corelabtech_password
+
+    ports:
+      - "5432:5432"
+      # Produkcja/VPS: usuń ports, jeśli baza nie ma być dostępna z zewnątrz.
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U corelabtech_user -d corelabtech"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - corelabtech_network
+
+
+networks:
+  corelabtech_network:
+    driver: bridge
+
+
+volumes:
+  postgres_data:

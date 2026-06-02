@@ -1,0 +1,26 @@
+odpala:
+
+npx playwright test
+/api/run_qa_loop
+
+odpala:
+
+AI LOOP
+   ↓
+generate tests
+   ↓
+run tests
+   ↓
+analyze flaky
+   ↓
+AI refactor
+   ↓
+retry
+Finalna architektura QA
+routes/qa_routes.py
+        ↓
+core/qa/qa_loop.py
+        ↓
+playwright_runner.py
+        ↓
+tests/

@@ -1,0 +1,412 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/chamber_testing.css') }}"
+>
+
+<h1>HBOT Testing Session</h1>
+
+<!-- PROGRESS -->
+<div class="steps-wrapper">
+
+    <div id="step_pre" class="step active">
+        PRE
+    </div>
+
+    <div id="step_during" class="step locked">
+        DURING
+    </div>
+
+    <div id="step_post" class="step locked">
+        POST
+    </div>
+
+</div>
+
+<div class="progress-wrapper">
+    <div id="progressFill"></div>
+</div>
+
+<div id="progressText">
+    Progress: 0%
+</div>
+
+<hr>
+
+<!-- USER -->
+<h3>Subject Profile</h3>
+
+<div class="panel">
+
+    <input id="subject_id" placeholder="Subject ID">
+
+    <select id="sex">
+        <option value="">Sex</option>
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+    </select>
+
+    <input id="age" type="number" placeholder="Age">
+    <input id="weight" type="number" placeholder="Weight (kg)">
+    <input id="notes" placeholder="Notes">
+
+    <div style="margin-top:10px;">
+
+        <button onclick="createUser()">
+            Create User
+        </button>
+
+        <button
+            onclick="deleteUser()"
+            style="background:red;color:white;"
+        >
+            Delete User
+        </button>
+
+    </div>
+
+</div>
+
+<hr>
+
+<label>Select User</label>
+
+<select
+    id="user_id"
+    onchange="generateSession()"
+></select>
+
+<label>Session ID</label>
+
+<input id="session_id" readonly>
+
+<hr>
+
+<!-- PRE -->
+<div id="panel_pre" class="panel">
+
+    <h2>PRE</h2>
+
+    <input
+        id="pre_spo2"
+        type="number"
+        placeholder="SpO2"
+    >
+
+    <input
+        id="pre_pulse"
+        type="number"
+        placeholder="Pulse"
+    >
+
+    <button onclick="savePRE()">
+        Save PRE
+    </button>
+
+    <div id="preview_pre"></div>
+
+</div>
+
+<!-- DURING -->
+<div
+    id="panel_during"
+    class="panel"
+    style="display:none;"
+>
+
+    <h2>DURING</h2>
+
+    <input
+        id="during_pressure"
+        type="number"
+        placeholder="Pressure kPa"
+    >
+
+    <div id="ata_preview"></div>
+
+    <input
+        id="during_temp"
+        type="number"
+        placeholder="Chamber Temp °C"
+    >
+
+    <input
+        id="during_body_temp"
+        type="number"
+        placeholder="Body Temp °C"
+    >
+
+    <input
+        id="during_humidity"
+        type="number"
+        placeholder="Humidity %"
+    >
+
+    <hr>
+
+    <h3>Oxygen Control</h3>
+
+    <input
+        id="during_oxygen_lpm"
+        type="number"
+        step="0.1"
+        placeholder="Oxygen Flow LPM"
+    >
+
+    <input
+        id="during_oxygen_percent"
+        type="number"
+        step="0.1"
+        placeholder="Mask O2 %"
+    >
+
+    <div id="oxygen_preview"></div>
+
+    <hr>
+
+    <h3>Data Sources</h3>
+
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+        <!-- FIT -->
+        <div class="panel" style="flex:1; min-width:300px;">
+
+            <h4>FIT / Garmin HR Stream</h4>
+
+            <input type="file" id="fitFile">
+
+            <button onclick="uploadFIT()">
+                Upload FIT
+            </button>
+
+            <div id="fitStatus"></div>
+
+            <div style="max-height:220px; overflow:auto; border:1px solid #ccc; margin-top:10px;">
+
+                <table
+                    id="fitDataTable"
+                    border="1"
+                    style="width:100%;"
+                >
+
+                    <thead>
+                        <tr>
+                            <th title="Timestamp from FIT file">Time</th>
+                            <th title="Heart rate from Garmin / FIT">HR</th>
+                            <th title="RR interval from FIT">RR</th>
+                            <th title="HRV calculated from RR interval">HRV</th>
+                        </tr>
+                    </thead>
+
+                    <tbody></tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+        <!-- CSV -->
+        <div class="panel" style="flex:1; min-width:300px;">
+
+            <h4>CSV / SpO2 External Sensor</h4>
+
+            <input type="file" id="csvFile">
+
+            <button onclick="uploadCSV()">
+                Upload CSV
+            </button>
+
+            <div id="csvStatus"></div>
+
+            <div style="max-height:220px; overflow:auto; border:1px solid #ccc; margin-top:10px;">
+
+                <table
+                    id="csvDataTable"
+                    border="1"
+                    style="width:100%;"
+                >
+
+                    <thead>
+                        <tr>
+                            <th title="Timestamp from CSV">Time</th>
+                            <th title="Pulse from pulseox / external sensor">Pulse</th>
+                            <th title="Blood oxygen saturation">SpO2</th>
+                        </tr>
+                    </thead>
+
+                    <tbody></tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <hr>
+
+    <!-- MERGE -->
+    <button onclick="mergeDuring()">
+        Merge FIT + CSV
+    </button>
+
+    <div id="mergeStatus"></div>
+
+    <h3>Merged DURING Data</h3>
+
+    <div style="max-height:250px; overflow:auto; border:1px solid #ccc;">
+
+        <table
+            id="mergedDataTable"
+            border="1"
+            style="width:100%;"
+        >
+
+            <thead>
+                <tr>
+                    <th title="Timestamp used to align FIT and CSV rows">Time</th>
+                    <th title="Heart rate from Garmin FIT">HR</th>
+                    <th title="Pulse from CSV / pulseox / external sensor">Pulse</th>
+                    <th title="RR interval from FIT, beat-to-beat interval">RR</th>
+                    <th title="HRV calculated from RR intervals, usually RMSSD">HRV</th>
+                    <th title="Blood oxygen saturation from CSV / pulseox">SpO2</th>
+                    <th title="Data source after merge">Source</th>
+                </tr>
+            </thead>
+
+            <tbody></tbody>
+
+        </table>
+
+    </div>
+
+    <hr>
+
+    <div class="chart-box">
+        <canvas id="fitChart"></canvas>
+    </div>
+
+    <hr>
+
+    <button onclick="saveDURING()">
+        Save DURING
+    </button>
+
+    <div id="preview_during"></div>
+
+</div>
+
+<hr>
+
+<!-- POST -->
+<div
+    id="panel_post"
+    class="panel"
+    style="display:none;"
+>
+
+    <h2>POST</h2>
+
+    <input
+        id="post_spo2"
+        type="number"
+        placeholder="SpO2"
+    >
+
+    <input
+        id="post_pulse"
+        type="number"
+        placeholder="Pulse"
+    >
+
+    <button onclick="savePOST()">
+        Save POST
+    </button>
+
+    <div id="preview_post"></div>
+
+</div>
+
+<hr>
+
+<button onclick="saveFullSession()">
+    Save Full Session
+</button>
+
+<div id="preview_full"></div>
+
+<hr>
+
+<h2>Saved Sessions</h2>
+
+<table
+    id="sessionsTable"
+    border="1"
+    style="width:100%;"
+>
+
+    <thead>
+        <tr>
+            <th>
+                <input
+                    type="checkbox"
+                    onclick="toggleAll(this)"
+                >
+            </th>
+
+            <th>Session</th>
+            <th>User</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+
+    <tbody></tbody>
+
+</table>
+
+<button onclick="deleteSessions()">
+    Delete Selected
+</button>
+
+<hr>
+
+<h2>AI Visualization</h2>
+
+<div
+    id="chartsContainer"
+    style="display:grid; gap:20px;"
+></div>
+
+<hr>
+
+<h2>AI Result</h2>
+
+<div id="ai-summary"></div>
+<div id="ai-score"></div>
+<div id="ai-anomaly"></div>
+
+<div class="panel">
+
+    <h3>Realtime AI Score</h3>
+
+    <div id="liveScore">
+        Waiting for telemetry...
+    </div>
+
+</div>
+
+<!-- SCRIPTS -->
+
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/fit_chart.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/chamber_form.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/realtime_monitor.js') }}"></script>
+
+{% endblock %}

@@ -1,0 +1,25 @@
+4. Test ręczny
+
+Z terminala:
+
+cd /d/corelabtech_final_clean/tests/performance/gatling
+mvn clean test-compile
+
+Jeśli to przejdzie, uruchom:
+
+mvn gatling:test -Dgatling.simulationClass=corelabtech.SessionsSimulation
+
+Dopiero potem klikaj przycisk z UI.
+
+5. Ważne
+
+Komunikaty:
+
+Warning: Unknown option -rsf
+Warning: Unknown argument ... src\test\resources
+
+nie są głównym problemem. Główny problem to:
+
+ClassNotFoundException: corelabtech.SessionsSimulation
+
+czyli Maven nie znalazł skompilowanej klasy symulacji. Po poprawieniu struktury, package corelabtech i pom.xml, powinno ruszyć.

@@ -1,0 +1,132 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="auth-wrapper">
+
+    <div class="auth-panel">
+
+        <h1 class="auth-title">
+            CoreLabTech Login
+        </h1>
+
+        <p class="auth-subtitle">
+            Secure access to HBOT Research Platform
+        </p>
+
+        <!-- FLASH MESSAGES -->
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+
+                <div class="auth-messages">
+
+                    {% for message in messages %}
+                        <div class="auth-message">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+
+                </div>
+
+            {% endif %}
+        {% endwith %}
+
+        <!-- LOGIN FORM -->
+
+        <form
+            method="POST"
+            action="{{ url_for('auth.login') }}"
+            class="auth-form"
+        >
+
+            <!-- CSRF -->
+
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ csrf_token() }}"
+            >
+
+            <!-- EMAIL -->
+
+            <label for="email">
+                Email
+            </label>
+
+            <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="admin@corelabtech.local"
+                required
+                autocomplete="email"
+            >
+
+            <!-- PASSWORD -->
+
+            <label for="password">
+                Password
+            </label>
+
+            <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="Password"
+                required
+                autocomplete="current-password"
+            >
+
+            <!-- SUBMIT -->
+
+            <button
+                type="submit"
+                class="auth-button"
+            >
+                Login
+            </button>
+
+        </form>
+
+        <!-- DEMO ACCOUNTS -->
+
+        <div class="demo-accounts">
+
+            <h3>Demo Accounts</h3>
+
+            <div class="demo-box">
+
+                <p>
+                    <strong>Admin:</strong><br>
+                    admin@corelabtech.local<br>
+                    Admin123!
+                </p>
+
+                <p>
+                    <strong>Researcher:</strong><br>
+                    researcher@corelabtech.local<br>
+                    Researcher123!
+                </p>
+
+                <p>
+                    <strong>Operator:</strong><br>
+                    operator@corelabtech.local<br>
+                    Operator123!
+                </p>
+
+                <p>
+                    <strong>Viewer:</strong><br>
+                    viewer@corelabtech.local<br>
+                    Viewer123!
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

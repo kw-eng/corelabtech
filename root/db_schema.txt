@@ -1,0 +1,94 @@
+import sqlite3
+
+DB_PATH = "data/database.db"
+
+# =========================
+# SCHEMA DEFINICJA (JEDYNE ŹRÓDŁO PRAWDY)
+# =========================
+EXPECTED_COLUMNS = {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"user_id": "TEXT",
+"session_id": "TEXT",
+"phase": "TEXT",
+"device": "TEXT",
+
+"spo2": "REAL",
+"pulse": "REAL",
+"hrv": "REAL",
+
+"pressure_kpa": "REAL",
+"pressure_ata": "REAL",
+
+"body_temperature": "REAL",
+"chamber_temperature": "REAL",
+"humidity": "REAL",
+
+"timestamp": "TEXT",
+"date": "TEXT", # alias dla UI
+
+"status": "TEXT"
+}
+
+# =========================
+# GET CURRENT COLUMNS
+# =========================
+def get_columns(cursor, table):
+cursor.execute(f"PRAGMA table_info({table})")
+return [col[1] for col in cursor.fetchall()]
+
+# =========================
+# AUTO FIX
+# =========================
+def auto_fix_db():
+
+print("\n🔧 Checking DB schema...")
+
+con = sqlite3.connect(DB_PATH)
+c = con.cursor()
+
+# jeśli tabela nie istnieje → utwórz
+c.execute("""
+CREATE TABLE IF NOT EXISTS tests (
+id INTEGER PRIMARY KEY AUTOINCREMENT
+)
+""")
+
+existing = get_columns(c, "tests")
+
+# =========================
+# ADD MISSING COLUMNS
+# =========================
+for col, col_type in EXPECTED_COLUMNS.items():
+
+if col not in existing:
+try:
+print(f"[ADD] {col}")
+c.execute(f"ALTER TABLE tests ADD COLUMN {col} {col_type}")
+except Exception as e:
+print(f"[ERROR] {col}: {e}")
+else:
+print(f"[OK] {col}")
+
+# =========================
+# INDEXES
+# =========================
+print("\n🔧 Creating indexes...")
+
+indexes = [
+"CREATE INDEX IF NOT EXISTS idx_session ON tests(session_id)",
+"CREATE INDEX IF NOT EXISTS idx_user ON tests(user_id)",
+"CREATE INDEX IF NOT EXISTS idx_phase ON tests(phase)",
+"CREATE INDEX IF NOT EXISTS idx_time ON tests(timestamp)"
+]
+
+for idx in indexes:
+try:
+c.execute(idx)
+print("[INDEX OK]")
+except Exception as e:
+print("[INDEX ERROR]", e)
+
+con.commit()
+con.close()
+
+print("\n✅ DB READY\n")

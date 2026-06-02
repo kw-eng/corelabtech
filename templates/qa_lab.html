@@ -1,0 +1,213 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}"
+>
+
+<div class="qa-hero">
+    <h1>Software QA Lab</h1>
+
+    <p class="section-desc">
+        Overview of the CoreLabTech automated QA architecture: Playwright, API validation,
+        AI contract testing and HBOT telemetry pipeline checks.
+    </p>
+</div>
+
+<div class="qa-actions">
+    <a href="/ai-qa-lab">
+        <button>
+            Open AI QA Lab
+        </button>
+    </a>
+
+    <a href="/chamber">
+        <button>
+            Open Chamber Testing
+        </button>
+    </a>
+
+    <a href="/research">
+        <button>
+            Open Mission Control
+        </button>
+    </a>
+</div>
+
+<hr>
+
+<h2>Current QA Architecture</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>UI Automation</h3>
+        <p>
+            Playwright validates Chamber Testing, AI QA Lab, sessions list,
+            telemetry flow and AI analysis rendering.
+        </p>
+    </div>
+
+    <div class="qa-card">
+    <h3>Performance Testing</h3>
+    <p>Gatling-ready performance testing for API, AI and telemetry pipeline.</p>
+
+    <a href="/performance-tests">
+        <button>Open Performance Testing</button>
+    </a>
+</div>
+
+    <div class="qa-card">
+        <h3>API Contract Testing</h3>
+        <p>
+            Active endpoints are validated against the current full_sessions pipeline.
+        </p>
+    </div>
+
+    <div class="qa-card">
+        <h3>AI Validation</h3>
+        <p>
+            AI score, risk_level, anomaly, summary, features and timeline are checked
+            after session creation.
+        </p>
+    </div>
+
+</div>
+
+<hr>
+
+<h2>Active Endpoints</h2>
+
+<div class="qa-card">
+
+    <table border="1" style="width:100%;">
+        <thead>
+            <tr>
+                <th>Area</th>
+                <th>Endpoint</th>
+                <th>Purpose</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td>Sessions</td>
+                <td><code>/api/sessions</code></td>
+                <td>Load completed HBOT sessions</td>
+            </tr>
+
+            <tr>
+                <td>CSV Upload</td>
+                <td><code>/upload_csv</code></td>
+                <td>Upload pulseox CSV telemetry</td>
+            </tr>
+
+            <tr>
+                <td>FIT Upload</td>
+                <td><code>/upload_fit</code></td>
+                <td>Upload Garmin FIT telemetry</td>
+            </tr>
+
+            <tr>
+                <td>Merge</td>
+                <td><code>/api/during_merge</code></td>
+                <td>Merge Garmin FIT and pulseox CSV timeline</td>
+            </tr>
+
+            <tr>
+                <td>AI Analysis</td>
+                <td><code>/api/run_analysis</code></td>
+                <td>Run AI research risk score and anomaly logic</td>
+            </tr>
+
+            <tr>
+                <td>Latest AI</td>
+                <td><code>/api/ai_latest</code></td>
+                <td>Load latest completed session AI summary</td>
+            </tr>
+
+            <tr>
+                <td>User Trends</td>
+                <td><code>/api/user_trends/&lt;user_id&gt;</code></td>
+                <td>Analyze multiple sessions for one user</td>
+            </tr>
+
+            <tr>
+                <td>Playwright</td>
+                <td><code>/api/run_playwright</code></td>
+                <td>Run automated UI/API/E2E tests</td>
+            </tr>
+        </tbody>
+    </table>
+
+</div>
+
+<hr>
+
+<h2>Validated E2E Flow</h2>
+
+<div class="qa-card">
+    <ol>
+        <li>Open Chamber Testing page</li>
+        <li>Upload pulseox CSV telemetry</li>
+        <li>Merge telemetry timeline</li>
+        <li>Save full PRE / DURING / POST session</li>
+        <li>Run AI analysis</li>
+        <li>Validate score, risk level, anomaly flag, features and timeline</li>
+        <li>Validate user trend endpoint</li>
+    </ol>
+</div>
+
+<hr>
+
+<h2>Playwright Test Coverage</h2>
+
+<div class="qa-card">
+
+<pre class="qa-code">
+tests/e2e/ai_qa.spec.ts
+- AI QA Lab page loads
+- /api/sessions returns JSON
+- /api/ai_latest returns JSON or 404
+- AI QA buttons are visible
+
+tests/e2e/chamber_flow.spec.ts
+- Chamber page loads
+- CSV upload works
+- Timeline merge works
+- Full session save works
+- AI analysis works
+- User trend works
+</pre>
+
+</div>
+
+<hr>
+
+<h2>Status</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>Local Playwright</h3>
+        <div class="qa-kpi">PASS</div>
+        <p>11 tests passing locally.</p>
+    </div>
+
+    <div class="qa-card">
+        <h3>AI Contract</h3>
+        <div class="qa-kpi">ACTIVE</div>
+        <p>Validates score, anomaly, risk_level, features and timeline.</p>
+    </div>
+
+    <div class="qa-card">
+        <h3>CI/CD</h3>
+        <div class="qa-kpi">READY</div>
+        <p>Ready for GitHub Actions via <code>.github/workflows/qa.yml</code>.</p>
+    </div>
+
+</div>
+
+{% endblock %}

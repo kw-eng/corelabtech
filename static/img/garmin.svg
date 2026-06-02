@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- background -->
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#0b1220" stroke="#00ffcc" stroke-width="2"/>
+
+  <!-- watch strap top -->
+  <rect x="26" y="4" width="12" height="8" rx="2" fill="#00ffcc"/>
+
+  <!-- watch strap bottom -->
+  <rect x="26" y="52" width="12" height="8" rx="2" fill="#00ffcc"/>
+
+  <!-- watch body -->
+  <circle cx="32" cy="32" r="14" fill="#0b1220" stroke="#00ffcc" stroke-width="2"/>
+
+  <!-- screen -->
+  <circle cx="32" cy="32" r="9" fill="none" stroke="#00ffcc" stroke-width="1.5"/>
+
+  <!-- data lines -->
+  <polyline points="24,34 28,30 32,34 36,28 40,32"
+            fill="none" stroke="#00ffcc" stroke-width="1.5"/>
+
+  <!-- side buttons -->
+  <rect x="46" y="24" width="4" height="4" rx="1" fill="#00ffcc"/>
+  <rect x="46" y="32" width="4" height="4" rx="1" fill="#00ffcc"/>
+</svg>

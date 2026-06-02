@@ -1,0 +1,79 @@
+name: AI QA Pipeline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Node dependencies
+        run: |
+          npm install
+          npm install --save-dev @playwright/test
+
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: |
+          npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+performance:
+  runs-on: ubuntu-latest
+
+  steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "21"
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install backend dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Start Flask
+      run: |
+        python app.py &
+        sleep 10
+
+    - name: Run Gatling performance tests
+      working-directory: tests/performance/gatling
+      run: |
+        mvn gatling:test -Dgatling.simulationClass=corelabtech.SessionsSimulation
+        mvn gatling:test -Dgatling.simulationClass=corelabtech.RunAnalysisSimulation

@@ -1,0 +1,95 @@
+<!--Landing page-->
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h1>CoreLabTech</h1>
+
+<p>
+Research & AI Testing Laboratory
+</p>
+
+<section>
+
+<h2>Research Platform</h2>
+<p>
+Manage HBOT sessions, collect physiological data and control
+the full research workflow in a centralized environment.
+</p>
+
+<a href="/platform">
+<button class="action-btn">Open Platform</button>
+</a>
+
+</section>
+
+
+<section>
+
+<h2>Mission Control</h2>
+<p>
+Monitor real-time telemetry including SpO2, HRV, pressure and
+temperature with AI-assisted insights.
+</p>
+
+<a href="/research">
+<button class="action-btn">Open Dashboard</button>
+</a>
+
+</section>
+
+
+<section>
+
+<h2>AI Lab</h2>
+<p>
+Analyze HBOT session data using AI models to detect anomalies,
+generate scores and evaluate physiological response.
+</p>
+
+<a href="/ai_lab">
+<button class="action-btn">Run AI Analysis</button>
+</a>
+
+</section>
+
+
+<section>
+
+<h2>Session Input</h2>
+<p>
+Initialize and record a full HBOT session with physiological
+and chamber telemetry.
+</p>
+
+<a href="/chamber">
+<button class="action-btn">Start Session</button>
+</a>
+
+</section>
+
+<section>
+
+<h2>Software QA Lab</h2>
+<p>Automation, performance and system reliability testing for backend and UI workflows.</p>
+
+<a href="/qa">
+    <button class="action-btn">Open QA Lab</button>
+</a>
+
+</section>
+
+<section>
+
+<h2>AI QA Lab</h2>
+<p>
+AI-driven test generation, flaky test detection,<br>
+and validation of data pipelines and system behavior.
+</p>
+
+<a href="/ai-qa-lab">
+    <button class="action-btn">Open AI QA Lab</button>
+</a>
+
+</section>
+{% endblock %}

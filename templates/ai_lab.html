@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/ai_lab.css') }}"
+>
+
+<h1>AI Lab</h1>
+
+<p class="section-desc">
+    Analyze completed HBOT sessions from chamber_testing.html.
+</p>
+
+<div style="margin-bottom:20px;">
+    <button onclick="runSelectedAnalysis()" class="action-btn">
+        Run Analysis Selected
+    </button>
+
+    <button onclick="runLatestSession()" class="action-btn">
+        Run Latest Session
+    </button>
+
+    <button onclick="loadSessions()" class="action-btn">
+        Refresh Sessions
+    </button>
+</div>
+
+<h3>Realtime AI Score</h3>
+
+<div
+    id="telemetryBox"
+    style="padding:10px; background:#111; color:#0f0; margin-bottom:20px;"
+>
+    Waiting for latest completed session...
+</div>
+
+<hr>
+
+<h3>Sessions</h3>
+
+<table border="1" cellpadding="10" cellspacing="0" style="width:100%;">
+    <thead>
+        <tr>
+            <th>
+                <input type="checkbox" onclick="toggleAll(this)">
+            </th>
+            <th>Session</th>
+            <th>User</th>
+            <th>Date</th>
+            <th>Completed</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+
+    <tbody id="sessionsBody"></tbody>
+</table>
+
+<hr>
+
+<h3>AI Visualization</h3>
+
+<div
+    id="chartsContainer"
+    style="display:grid; gap:20px;"
+></div>
+
+<hr>
+
+<h3>AI Result</h3>
+
+<div
+    id="ai-result"
+    style="margin-top:20px; padding:20px; background:#111; color:#0f0;"
+>
+    <p id="ai-summary">No analysis yet</p>
+    <div id="ai-score"></div>
+    <div id="ai-anomaly"></div>
+</div>
+
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_lab.js') }}"></script>
+
+{% endblock %}

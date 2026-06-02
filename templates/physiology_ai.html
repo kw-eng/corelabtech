@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h1>Physiology AI Analysis</h1>
+
+<p>
+AI analyzes pulse, SpO2 and HRV patterns.
+</p>
+
+<button onclick="runAI()">Run AI</button>
+
+<pre id="output"></pre>
+
+<script>
+
+async function runAI(){
+
+const res = await fetch("/ai/physiology")
+const data = await res.json()
+
+document.getElementById("output").innerText =
+JSON.stringify(data,null,2)
+
+}
+
+</script>
+
+{% endblock %}

@@ -1,0 +1,1 @@
+python tools/generate_csv_from_fit.py data/uploads/temp/twoj_plik.fit data/uploads/csv/merge_test.csv

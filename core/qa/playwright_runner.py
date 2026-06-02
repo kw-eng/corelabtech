@@ -1,0 +1,49 @@
+import subprocess
+import os
+import json
+from datetime import datetime
+
+RESULT_LOG = "data/playwright_runs.json"
+
+os.makedirs("data", exist_ok=True)
+os.makedirs("playwright-report", exist_ok=True)
+
+
+def run_playwright_tests():
+    cmd = [
+        "npx.cmd" if os.name == "nt" else "npx",
+        "playwright",
+        "test"
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+
+        output = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": "success" if result.returncode == 0 else "error",
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "command": " ".join(cmd),
+            "report_path": "playwright-report/index.html"
+        }
+
+    except Exception as e:
+        output = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": "error",
+            "returncode": None,
+            "error": str(e),
+            "command": " ".join(cmd)
+        }
+
+    with open(RESULT_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(output, ensure_ascii=False) + "\n")
+
+    return output

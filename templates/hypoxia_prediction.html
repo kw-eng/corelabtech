@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h1>Hypoxia Prediction</h1>
+
+<p>
+AI model analyzes physiological parameters and predicts hypoxia risk.
+</p>
+
+<button onclick="runPrediction()">Run Analysis</button>
+
+<h3>Result</h3>
+
+<pre id="result"></pre>
+
+<script>
+
+async function runPrediction(){
+
+const res = await fetch("/ai/hypoxia")
+const data = await res.json()
+
+document.getElementById("result").innerText =
+JSON.stringify(data,null,2)
+
+}
+
+</script>
+
+{% endblock %}

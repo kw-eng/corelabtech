@@ -1,0 +1,125 @@
+# import Flask framework
+from flask import Flask, render_template, jsonify, request, redirect
+
+from ai_analysis import analyze
+from qa_tests import api_test, performance_test
+from physiology_ai import analyze_physiology
+
+#import blueprintów (modułów z endpointami)
+from routes.main_routes import main_bp
+from routes.research_routes import research_bp
+from routes.qa_routes import qa_bp
+
+#tworzymy instancje aplikacji Flask
+app = Flask(__name__)
+app.config.from_pyfile('config.py')
+
+app.register_blueprint(main_bp)
+app.register_blueprint(research_bp)
+app.register_blueprint(qa_bp)
+
+def db():
+    return sqlite3.connect("data/database.db")
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
+
+@app.route("/reports")
+def reports():
+    return render_template("reports.html")
+
+@app.route("/ai")
+def ai():
+    results = analyze()
+    return render_template("ai.html", results = results)
+
+@app.route("/physiology")
+def physiology():
+    results = analyze_physiology()
+    return render_template("physiology.html", results=results)
+
+@app.route("/publish", methods=["GET","POST"])
+def publish():
+
+    if request.method == "POST":
+
+       file=request.files["paper"]
+
+       path="research/papers/" + file.filename
+
+       file.save(path)
+
+       return redirect("/papers")
+
+       return render_template("publish.html")
+
+@app.route("/qa")
+def qa():
+
+    api = api_test()
+    time = performance_test()
+
+    return render_template("qa.html", api=api, time=time)
+
+@app.route("/api/research")
+
+def research_api():
+
+    con=db()
+    c=con.cursor()
+
+    c.execute("SELECT date, pressure, oxygen FROM tests")
+
+    rows=c.fetchall()
+
+    data=[]
+
+    for r in rows:
+
+        data.append({
+
+            "date":r[0],
+            "pressure":r[1],
+            "oxygen":r[2]
+
+        })
+
+    return jsonify(data)
+
+@app.route("/papers")
+def papers():
+
+    files=os.listdir("research/papers")
+
+    return render_template("papers.html", papers=files)
+
+@app.route("/api/tests")
+def api_tests():
+   
+   con = db()
+   c=con.cursor()
+
+   c.execute("SELECT date,pressure FROM tests")
+
+   rows = c.fetchall()
+
+   data=[]
+
+   for r in rows:
+
+       data.append({
+
+           "date":r[0],
+           "pressure":r[1]
+
+       })
+
+   return jsonify(data)
+#uruchomienie alikacji
+if __name__ == "__main__":
+    app.run(debug=True)

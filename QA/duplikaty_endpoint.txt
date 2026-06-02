@@ -1,0 +1,93 @@
+W Git Bash użyj grep, nie findstr.
+
+Uruchom:
+
+grep -RIn "save_full_session" .
+
+Potem znajdź endpoint zwracający "success": true:
+
+grep -RIn "success.*true\|success.*True\|\"success\"" .
+
+Jeśli wyników będzie za dużo, ogranicz do folderów z backendem:
+
+grep -RIn "save_full_session" routes services core app.py
+
+oraz:
+
+grep -RIn "\"success\"" routes services core app.py
+
+Szukasz czegoś w stylu:
+
+return jsonify({
+    "success": True,
+    "session_id": session_id
+})
+
+To jest aktualnie odpalany endpoint, który trzeba podmienić.
+
+Answer:
+dostałem ThinkPad@DESKTOP-7REQJVH MINGW64 /d/corelabtech_final_clean
+$ grep -RIn "save_full_session" .
+./routes/main_routes.py:163:@main_bp.route("/api/save_full_session", methods=["POST"])
+./routes/main_routes.py:164:def save_full_session():
+./routes/research_routes.py:499:@research_bp.route("/api/save_full_session", methods=["POST"])
+./routes/research_routes.py:500:def save_full_session():
+./static/js/chamber_form.js:1301:        const res = await fetch("/api/save_full_session", {
+
+ThinkPad@DESKTOP-7REQJVH MINGW64 /d/corelabtech_final_clean
+$ grep -RIn "success.*true\|success.*True\|\"success\"" .
+./core/qa/playwright_runner.py:38:            "status": "success" if result.returncode == 0 else "failed",
+./routes/main_routes.py:142:            "success": True
+./routes/main_routes.py:325:            "success": True,
+
+Masz znalezioną przyczynę.
+
+Aktywny endpoint jest w:
+
+routes/main_routes.py
+
+bo tam masz:
+
+/api/save_full_session
+"success": True
+
+To on zwraca:
+
+{"session_id":"...","success":true}
+
+a nie research_routes.py.
+
+Co zrobić
+
+W routes/main_routes.py musisz usunąć albo zakomentować endpoint:
+
+@main_bp.route("/api/save_full_session", methods=["POST"])
+def save_full_session():
+
+czyli fragment od linii około:
+
+163
+
+Najbezpieczniej zakomentuj cały endpoint w main_routes.py, żeby został tylko ten w:
+
+routes/research_routes.py
+Potem restart
+CTRL + C
+python app.py
+Sprawdź jeszcze raz
+grep -RIn "save_full_session" routes
+
+Powinno zostać tylko:
+
+./routes/research_routes.py:499:@research_bp.route("/api/save_full_session", methods=["POST"])
+
+Po tym kliknij Save Full Session. Alert powinien już pokazać:
+
+{
+  "status": "ok",
+  "session_id": "...",
+  "user_id": "...",
+  "saved_count": 1
+}
+
+I wtedy Saved Sessions zacznie się uzupełniać.

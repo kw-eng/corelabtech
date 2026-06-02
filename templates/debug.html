@@ -1,0 +1,16 @@
+<h1>DB DEBUG</h1>
+
+<button onclick="loadDebug()">Load DB</button>
+
+<pre id="out"></pre>
+
+<script>
+function loadDebug(){
+fetch("/debug/db")
+.then(res=>res.json())
+.then(data=>{
+document.getElementById("out").innerText =
+JSON.stringify(data, null, 2)
+})
+}
+</script>

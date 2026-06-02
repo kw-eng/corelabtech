@@ -1,0 +1,16 @@
+print("[INFO] ...")
+print("[OK] ...")
+print("[ERROR] ...")
+print("[WARN] ...")
+
+szczególnie w:
+init_db.py
+migrations/*.py
+pipeline_runner.py
+playwright_runner.py
+
+przykład finalny:
+con.commit()
+con.close()
+
+print("[OK] FINAL DATABASE INITIALIZED")

@@ -1,0 +1,98 @@
+flow:
+Create User
+Save PRE
+zapisuje ręczny pomiar spo2 + pulse do tests
+Upload FIT
+zapisuje surowe dane do fit_data
+Upload CSV
+zapisuje surowe dane do csv_data
+Merge FIT + CSV
+tworzy timeline DURING na podstawie timestamp
+Save DURING
+zapisuje marker fazy DURING + info o komorze, a nie same średnie
+Save POST
+Save Full Session
+zapisuje pakiet do full_sessions
+Run AI Analysis
+Run Playwright / QA pipeline
+
+PRE
+Save PRE
+↓
+DURING
+Upload FIT
+Upload CSV
+Merge DURING
+Save DURING
+↓
+POST
+Save POST
+↓
+Save Full Session
+↓
+Run AI
+↓
+Run Automated Tests
+------------------------------------------------------
+FIT:
+timestamp + HR + RR + HRV
+
+CSV:
+timestamp + SpO2 + pulse
+
+MERGED:
+timestamp + HR + pulse + RR + HRV + SpO2
+------------------------------------
+Czyli FIT zostaje źródłem dla:
+
+heart_rate / hr
+rr_interval
+hrv
+
+CSV zostaje źródłem dla:
+
+spo2
+pulse
+--------------
+Najważniejsze, żeby parser FIT zwracał pola:
+
+{
+  timestamp,
+  heart_rate,
+  pulse,
+  hr,
+  rr_interval,
+  hrv
+}
+
+A merged table powinna pokazywać np.:
+
+<th>Time</th>
+<th>HR</th>
+<th>Pulse</th>
+<th>RR</th>
+<th>HRV</th>
+<th>SpO2</th>
+<th>Source</th>
+
+
+Najlepszy model dla Twojego HBOT systemu
+Tryb	Zastosowanie
+FIT only	Garmin / HRV / RR
+CSV only	medyczny pulsoksymetr
+FIT + CSV	pełna analiza HBOT
+PRE/POST only	szybki screening
+
+Dzięki temu:
+
+AI może:
+
+analizować pełne sesje
+wykrywać anomaly
+generować Playwright tests
+robić scoring
+robić trend analysis
+
+nawet gdy brakuje części sensorów.
+
+To bardzo ważne w realnym systemie medycznym/research.

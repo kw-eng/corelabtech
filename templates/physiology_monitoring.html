@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>AI Physiology Analysis</h1>
+<h3>Select Data</h3>
+
+<label><input type="checkbox" id="selectAll"> All Data</label>
+
+<div id="data-list"></div>
+
+<button onclick="runAILab()" class="report-btn">
+Run Analysis
+</button>
+
+<div class="panel" style="margin-top:30px">
+
+<h2>AI Results</h2>
+
+<div id="ai-result">
+Waiting for analysis...
+</div>
+
+</div>
+
+<script>
+
+async function runAILab(){
+
+try{
+
+let r = await fetch("/api/ai_lab_analysis")
+let data = await r.json()
+
+document.getElementById("ai-result").innerHTML = `
+
+<h3>Anomaly Detection</h3>
+<p>${data.anomalies}</p>
+
+<h3>HBOT Prediction</h3>
+<p>Score: ${data.hbot.score}</p>
+<p>${data.hbot.prediction}</p>
+
+<h3>Physiology Analysis</h3>
+<p>Risk: ${data.physiology.risk}</p>
+<p>${data.physiology.message}</p>
+
+`
+
+}catch(e){
+
+document.getElementById("ai-result").innerHTML =
+"Error loading AI analysis"
+
+}
+
+}
+
+</script>
+
+{% endblock %}

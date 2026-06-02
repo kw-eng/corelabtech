@@ -1,0 +1,1387 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ai_qa_lab.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="qa-hero">
+    <h1>Performance Testing</h1>
+
+    <p class="section-desc">
+        Gatling-ready performance testing layer for validating HBOT telemetry ingestion,
+        API latency, merge engine response time and AI analysis throughput.
+    </p>
+</div>
+
+<div class="qa-actions">
+
+    {% if current_user.is_authenticated and current_user.role in ["researcher", "admin"] %}
+    <a href="/ai-qa-lab">
+        <button>Open AI QA Lab</button>
+    </a>
+    {% endif %}
+
+    <a href="/qa">
+        <button>Open QA Overview</button>
+    </a>
+
+    <a href="/technology">
+        <button>Open Technology</button>
+    </a>
+
+    {% if current_user.is_authenticated %}
+    <a href="/research">
+        <button>Open Mission Control</button>
+    </a>
+    {% endif %}
+
+</div>
+
+<hr>
+
+{% if current_user.is_authenticated and current_user.role == "admin" %}
+
+<h2>Run Performance Simulations</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>Sessions API</h3>
+        <p>
+            Validates how fast the platform can load saved HBOT sessions
+            used by dashboards, selectors and QA panels.
+        </p>
+
+        <button onclick="runPerf('sessions')">
+            Run Sessions Load Test
+        </button>
+    </div>
+
+    <div class="qa-card">
+        <h3>Merge Engine</h3>
+        <p>
+            Validates the performance of the DURING phase merge engine
+            responsible for aligning telemetry timelines.
+        </p>
+
+        <button onclick="runPerf('merge')">
+            Run Merge Load Test
+        </button>
+    </div>
+
+    <div class="qa-card">
+        <h3>AI Analysis</h3>
+        <p>
+            Measures response time of AI scoring, feature extraction,
+            anomaly detection and timeline analysis.
+        </p>
+
+        <button onclick="runPerf('analysis')">
+            Run AI Analysis Load Test
+        </button>
+    </div>
+
+    <div class="qa-card">
+        <h3>CSV Upload</h3>
+
+        <p>
+            Measures pulseox CSV ingestion performance,
+            SpO₂ parsing, pulse extraction and telemetry pipeline stability.
+        </p>
+
+        <button onclick="runPerf('csv')">
+            Run CSV Upload Load Test
+        </button>
+    </div>
+
+    <div class="qa-card">
+        <h3>FIT Upload</h3>
+        <p>
+            Measures Garmin FIT ingestion performance,
+            HR extraction, RR interval parsing and HRV readiness.
+        </p>
+
+        <button onclick="runPerf('fit')">
+            Run FIT Upload Load Test
+        </button>
+    </div>
+
+</div>
+
+<hr>
+
+<h2>Live Performance Results</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>Last Result</h3>
+        <div id="perfStatus" class="qa-kpi">-</div>
+        <p id="perfSummary">No performance test executed yet.</p>
+    </div>
+
+    <div class="qa-card">
+        <h3>Simulation</h3>
+        <div id="perfSimulation" class="qa-kpi">-</div>
+        <p>Currently executed Gatling scenario.</p>
+    </div>
+
+    <div class="qa-card">
+        <h3>Return Code</h3>
+        <div id="perfReturnCode" class="qa-kpi">-</div>
+        <p>0 means Maven/Gatling execution passed.</p>
+    </div>
+
+</div>
+
+<div class="qa-card">
+
+    <pre id="perfResult" class="qa-code">
+No performance test executed yet.
+    </pre>
+
+</div>
+
+<hr>
+
+<h2>Performance Analytics</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>Response Time Chart</h3>
+        <canvas id="responseTimeChart"></canvas>
+    </div>
+
+    <div class="qa-card">
+        <h3>History Trend</h3>
+        <canvas id="historyTrendChart"></canvas>
+    </div>
+
+</div>
+
+<div class="qa-card">
+    <h3>Latency Heatmap</h3>
+
+    <div id="latencyHeatmap" class="latency-heatmap">
+        No latency data yet.
+    </div>
+</div>
+
+<div class="qa-card">
+    <h3>Compare Last Runs</h3>
+
+    <table border="1" style="width:100%;">
+        <thead>
+            <tr>
+                <th>Run</th>
+                <th>Simulation</th>
+                <th>Status</th>
+                <th>Mean</th>
+                <th>P95</th>
+                <th>P99</th>
+                <th>Requests</th>
+            </tr>
+        </thead>
+
+        <tbody id="compareRunsBody">
+            <tr>
+                <td colspan="7">No history loaded.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="qa-actions">
+    <button onclick="loadPerformanceHistory()">
+        Refresh History
+    </button>
+
+    <button onclick="exportPerformancePDF()">
+        Export PDF
+    </button>
+
+    <button onclick="openGatlingReport()">
+        Open Gatling Report
+    </button>
+</div>
+
+{% else %}
+
+<h2>Run Performance Simulations</h2>
+
+<div class="qa-card">
+    <h3>Performance execution locked</h3>
+
+    <p>
+        This page publicly documents the CoreLabTech performance testing architecture.
+        Running Gatling simulations, viewing live results and opening internal reports
+        is restricted to administrator accounts.
+    </p>
+
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('auth.login') }}">
+        <button>Login as Admin</button>
+    </a>
+    {% endif %}
+</div>
+
+{% endif %}
+
+<hr>
+
+<h2>Performance Simulation Details</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>SessionsSimulation.scala</h3>
+
+        <p>
+            Load test for the session retrieval API.
+            This endpoint is used by AI QA Lab, Research Dashboard,
+            Admin Panel and session selectors.
+        </p>
+
+        <table border="1" style="width:100%;">
+            <tbody>
+                <tr>
+                    <td>Endpoint</td>
+                    <td><code>GET /api/sessions</code></td>
+                </tr>
+
+                <tr>
+                    <td>Purpose</td>
+                    <td>Validate session list loading and database read performance.</td>
+                </tr>
+
+                <tr>
+                    <td>Load model</td>
+                    <td>Ramp users + constant requests per second.</td>
+                </tr>
+
+                <tr>
+                    <td>Gate</td>
+                    <td>P95 &lt; 500 ms and success rate &gt; 95%</td>
+                </tr>
+
+                <tr>
+                    <td>PASS means</td>
+                    <td>The platform can load saved sessions quickly under concurrent access.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="qa-card">
+        <h3>DuringMergeSimulation.scala</h3>
+
+        <p>
+            Performance test for telemetry synchronization.
+            It validates the DURING phase merge engine used to align Garmin FIT
+            and pulseox CSV data into a single timeline.
+        </p>
+
+        <table border="1" style="width:100%;">
+            <tbody>
+                <tr>
+                    <td>Endpoint</td>
+                    <td><code>POST /api/during_merge</code></td>
+                </tr>
+
+                <tr>
+                    <td>Purpose</td>
+                    <td>Validate merge latency and pipeline stability.</td>
+                </tr>
+
+                <tr>
+                    <td>Signals</td>
+                    <td>HR, HRV, RR interval, pulse and SpO₂.</td>
+                </tr>
+
+                <tr>
+                    <td>Gate</td>
+                    <td>P95 &lt; 1000 ms and failed requests &lt; 10%</td>
+                </tr>
+
+                <tr>
+                    <td>PASS means</td>
+                    <td>The merge engine can process telemetry timelines without performance degradation.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="qa-card">
+        <h3>RunAnalysisSimulation.scala</h3>
+
+        <p>
+            Performance benchmark for the AI analysis pipeline.
+            It validates score generation, anomaly detection, physiological features,
+            risk level, timeline and research disclaimer.
+        </p>
+
+        <table border="1" style="width:100%;">
+            <tbody>
+                <tr>
+                    <td>Endpoint</td>
+                    <td><code>POST /api/run_analysis</code></td>
+                </tr>
+
+                <tr>
+                    <td>Purpose</td>
+                    <td>Validate AI scoring latency and response contract stability.</td>
+                </tr>
+
+                <tr>
+                    <td>Validated fields</td>
+                    <td>score, risk_level, anomaly, features, timeline.</td>
+                </tr>
+
+                <tr>
+                    <td>Gate</td>
+                    <td>P95 &lt; 1500 ms and success rate &gt; 95%</td>
+                </tr>
+
+                <tr>
+                    <td>PASS means</td>
+                    <td>The AI engine can respond fast enough for dashboard and QA workflows.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="qa-card">
+<h3>UploadCsvSimulation.scala</h3>
+
+<p>
+    Upload and parser performance test for pulseox CSV telemetry.
+    It validates ingestion speed, parser stability and database insert behavior
+    using realistic multipart CSV payloads with pulse and SpO₂ samples.
+</p>
+
+<table border="1" style="width:100%;">
+    <tbody>
+        <tr>
+            <td>Endpoint</td>
+            <td><code>POST /upload_csv</code></td>
+        </tr>
+        <tr>
+            <td>Purpose</td>
+            <td>Validate telemetry ingestion and CSV parser throughput.</td>
+        </tr>
+        <tr>
+            <td>Payload</td>
+            <td>Multipart CSV file with pulse and SpO₂ samples.</td>
+        </tr>
+        <tr>
+            <td>Validated now</td>
+            <td>Multipart upload, CSV parser readiness, response latency and controlled failure rate.</td>
+        </tr>
+        <tr>
+            <td>Gate</td>
+            <td>P95 &lt; 2000 ms and failed requests &lt; 20%</td>
+        </tr>
+        <tr>
+            <td>Target gate</td>
+            <td>P95 &lt; 2000 ms and success rate &gt; 95%</td>
+        </tr>
+        <tr>
+            <td>PASS means</td>
+            <td>The platform can ingest pulseox telemetry reliably.</td>
+        </tr>
+    </tbody>
+</table>
+    </div>
+
+    <div class="qa-card">
+        <h3>UploadFitSimulation.scala</h3>
+
+<p>
+    Upload and parser performance test for Garmin FIT telemetry.
+    It validates FIT ingestion latency, upload pipeline stability,
+    HR extraction readiness, RR interval parsing readiness and HRV pipeline readiness.
+</p>
+
+<table border="1" style="width:100%;">
+    <tbody>
+        <tr>
+            <td>Endpoint</td>
+            <td><code>POST /upload_fit</code></td>
+        </tr>
+        <tr>
+            <td>Purpose</td>
+            <td>Validate Garmin FIT ingestion and parser performance.</td>
+        </tr>
+        <tr>
+            <td>Payload</td>
+            <td>Multipart FIT-like file payload for endpoint and parser-path validation.</td>
+        </tr>
+        <tr>
+            <td>Signals</td>
+            <td>HR, RR intervals and HRV-ready telemetry path.</td>
+        </tr>
+        <tr>
+            <td>Validated now</td>
+            <td>Multipart upload handling, parser-path responsiveness and controlled parser failure behavior.</td>
+        </tr>
+        <tr>
+            <td>Gate</td>
+            <td>P95 &lt; 2500 ms and parser failure rate controlled.</td>
+        </tr>
+        <tr>
+            <td>Target gate</td>
+            <td>P95 &lt; 2500 ms and success rate &gt; 95% with real FIT fixture.</td>
+        </tr>
+        <tr>
+            <td>PASS means</td>
+            <td>The platform can ingest Garmin FIT telemetry reliably.</td>
+        </tr>
+    </tbody>
+</table>
+    </div>
+
+</div>
+
+<hr>
+
+<h2>Performance Test Scope</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>API Load Testing</h3>
+        <p>Validate response time and stability of active backend endpoints.</p>
+        <p><code>/api/sessions</code></p>
+        <p><code>/api/run_analysis</code></p>
+        <p><code>/api/during_merge</code></p>
+    </div>
+
+    <div class="qa-card">
+        <h3>Telemetry Ingestion</h3>
+        <p>Measure upload performance for CSV and FIT files.</p>
+        <p><code>/upload_csv</code></p>
+        <p><code>/upload_fit</code></p>
+    </div>
+
+    <div class="qa-card">
+        <h3>AI Pipeline Latency</h3>
+        <p>Measure score, anomaly, feature extraction and timeline response time.</p>
+    </div>
+
+</div>
+
+<hr>
+
+<h2>Gatling Architecture</h2>
+
+<pre class="qa-code">
+tests/performance/gatling/
+├── pom.xml
+└── src/
+    └── test/
+        └── scala/
+            └── corelabtech/
+                ├── BaseSimulation.scala
+                ├── SessionsSimulation.scala
+                ├── DuringMergeSimulation.scala
+                ├── RunAnalysisSimulation.scala
+                ├── UploadCsvSimulation.scala
+                └── UploadFitSimulation.scala
+</pre>
+
+<hr>
+
+<h2>CLI Commands</h2>
+
+<pre class="qa-code">
+cd tests/performance/gatling
+
+mvn gatling:test -Dgatling.simulationClass=corelabtech.SessionsSimulation
+mvn gatling:test -Dgatling.simulationClass=corelabtech.DuringMergeSimulation
+mvn gatling:test -Dgatling.simulationClass=corelabtech.RunAnalysisSimulation
+mvn gatling:test -Dgatling.simulationClass=corelabtech.UploadCsvSimulation
+mvn gatling:test -Dgatling.simulationClass=corelabtech.UploadFitSimulation
+</pre>
+
+<hr>
+
+<h2>Performance Gates</h2>
+
+<div class="qa-card">
+
+    <table border="1" style="width:100%;">
+        <thead>
+            <tr>
+                <th>Area</th>
+                <th>Target</th>
+                <th>Gate</th>
+                <th>Meaning</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td>Sessions API</td>
+                <td>&lt; 300 ms preferred / &lt; 500 ms gate</td>
+                <td>PASS / FAIL</td>
+                <td>Dashboard and selector loading should stay fast.</td>
+            </tr>
+
+            <tr>
+                <td>Merge Engine</td>
+                <td>&lt; 1000 ms</td>
+                <td>PASS / FAIL</td>
+                <td>Telemetry alignment should not block the workflow.</td>
+            </tr>
+
+            <tr>
+                <td>AI Analysis</td>
+                <td>&lt; 1500 ms</td>
+                <td>PASS / FAIL</td>
+                <td>AI score and anomaly response should remain interactive.</td>
+            </tr>
+
+            <tr>
+                <td>CSV Upload</td>
+                <td>&lt; 2000 ms</td>
+                <td>PASS / FAIL</td>
+                <td>Telemetry ingestion should remain stable.</td>
+            </tr>
+
+            <tr>
+                <td>FIT Upload</td>
+                <td>&lt; 2500 ms</td>
+                <td>PASS / FAIL</td>
+                <td>Garmin telemetry ingestion should remain stable.</td>
+            </tr>
+        </tbody>
+    </table>
+
+</div>
+
+<hr>
+
+<h2>Example Gatling Scenarios</h2>
+
+<pre class="qa-code">
+Scenario: Sessions API performance
+
+Given saved HBOT sessions exist
+When multiple virtual users call /api/sessions
+Then 95% of responses should complete below 500 ms
+And success rate should remain above 95%
+
+
+Scenario: AI analysis performance
+
+Given a saved HBOT session exists
+When 50 virtual users call /api/run_analysis
+Then 95% of responses should complete below 1500 ms
+And error rate should remain below 1%
+
+
+Scenario: Merge engine performance
+
+Given FIT and CSV telemetry data exist for a session
+When virtual users call /api/during_merge
+Then the unified timeline should be generated within the performance gate
+
+
+Scenario: CSV ingestion performance
+
+Given a valid pulseox CSV file exists
+When virtual users upload telemetry through /upload_csv
+Then parser response should remain stable
+And no CSV parser failures should occur
+
+
+Scenario: FIT ingestion performance
+
+Given a valid Garmin FIT file exists
+When virtual users upload telemetry through /upload_fit
+Then HR and RR intervals should be extracted successfully
+And parser response time should remain within the performance gate
+And parser failure rate should remain controlled
+</pre>
+
+<hr>
+
+<h2>Performance Architecture</h2>
+
+<pre class="qa-code">
+Browser UI
+    ↓
+Performance Tests Page
+    ↓
+/api/performance/run
+    ↓
+Python Performance Service
+    ↓
+Maven + Gatling
+    ↓
+Flask API Endpoints
+    ↓
+PostgreSQL Storage
+    ↓
+Gatling HTML Report
+</pre>
+
+<hr>
+
+<h2>CI/CD Integration</h2>
+
+<div class="qa-card">
+
+    <p>
+        Gatling simulations can be executed as a separate GitHub Actions job
+        after the Playwright QA job. This allows the project to validate both
+        functional correctness and performance regressions.
+    </p>
+
+<pre class="qa-code">
+CI/CD Flow
+
+1. Checkout repository
+2. Install Python dependencies
+3. Install Node + Playwright
+4. Start Flask backend
+5. Run Playwright QA
+6. Run Gatling performance simulations
+7. Upload Playwright and Gatling reports
+8. Fail pipeline if performance gates are violated
+</pre>
+
+</div>
+
+<hr>
+
+<h2>Status</h2>
+
+<div class="qa-grid">
+
+    <div class="qa-card">
+        <h3>Gatling</h3>
+        <div class="qa-kpi">READY</div>
+        <p>Performance layer implemented with Maven + Gatling simulations.</p>
+    </div>
+
+    <div class="qa-card">
+        <h3>CI/CD Gate</h3>
+        <div class="qa-kpi">READY</div>
+        <p>Can be added to GitHub Actions as a separate performance job.</p>
+    </div>
+
+    <div class="qa-card">
+        <h3>Performance Reports</h3>
+        <div class="qa-kpi">ACTIVE</div>
+        <p>Reports are generated under <code>tests/performance/gatling/target/gatling</code>.</p>
+    </div>
+
+</div>
+
+{% if current_user.is_authenticated and current_user.role == "admin" %}
+
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+
+<script>
+
+let responseTimeChart = null
+let historyTrendChart = null
+let latestPerformanceData = null
+
+function updatePerformanceKpi(data){
+
+    const status =
+        document.getElementById("perfStatus")
+
+    const summary =
+        document.getElementById("perfSummary")
+
+    const simulation =
+        document.getElementById("perfSimulation")
+
+    const returnCode =
+        document.getElementById("perfReturnCode")
+
+    if(!data){
+        return
+    }
+
+    const isSuccess =
+        data.status === "success" ||
+        data.returncode === 0
+
+    if(status){
+        status.innerText =
+            isSuccess ? "PASS" : "FAIL"
+
+        status.className =
+            isSuccess
+                ? "qa-kpi perf-pass"
+                : "qa-kpi perf-fail"
+    }
+
+    if(summary){
+        summary.innerText =
+            isSuccess
+                ? "Performance simulation completed successfully."
+                : data.message || "Performance simulation failed."
+    }
+
+    if(simulation){
+        simulation.innerText =
+            data.simulation
+                ? data.simulation.replace("corelabtech.", "")
+                : "-"
+    }
+
+    if(returnCode){
+        returnCode.innerText =
+            data.returncode ?? "-"
+    }
+}
+
+function renderPerformanceResult(data){
+
+    latestPerformanceData =
+        data
+
+    const result =
+        document.getElementById("perfResult")
+
+    const metrics =
+        data.metrics || {}
+
+    const success =
+        data.status === "success" ||
+        data.returncode === 0
+
+    result.innerHTML = `
+        <div class="qa-grid">
+
+            <div class="qa-card ${success ? "perf-card-pass" : "perf-card-fail"}">
+                <h3>Status</h3>
+                <div class="qa-kpi ${success ? "perf-pass" : "perf-fail"}">
+                    ${success ? "PASS" : "FAIL"}
+                </div>
+            </div>
+
+            <div class="qa-card">
+                <h3>Total Requests</h3>
+                <div class="qa-kpi">${metrics.request_count ?? "-"}</div>
+            </div>
+
+            <div class="qa-card">
+                <h3>Mean Response</h3>
+                <div class="qa-kpi">${metrics.mean_ms ?? "-"} ms</div>
+            </div>
+
+            <div class="qa-card">
+                <h3>P95 Response</h3>
+                <div class="qa-kpi">${metrics.p95_ms ?? "-"} ms</div>
+            </div>
+
+            <div class="qa-card">
+                <h3>P99 Response</h3>
+                <div class="qa-kpi">${metrics.p99_ms ?? "-"} ms</div>
+            </div>
+
+            <div class="qa-card">
+                <h3>Requests / sec</h3>
+                <div class="qa-kpi">${metrics.requests_per_sec ?? "-"}</div>
+            </div>
+
+        </div>
+
+${
+    data.simulation?.includes("Sessions")
+    ? `
+    <div class="qa-card">
+
+        <h3>Validated</h3>
+
+        <div style="line-height:1.8;">
+
+            ✓ GET /api/performance/sessions endpoint<br>
+
+            ✓ dashboard session loading responsiveness<br>
+
+            ✓ HBOT session selector scalability<br>
+
+            ✓ QA panel session retrieval stability<br>
+
+            ✓ concurrent request handling<br>
+
+            ✓ P95 latency gate validation<br>
+
+            ✓ failed request monitoring<br>
+
+            ✓ HTML report generation
+
+        </div>
+
+    </div>
+    `
+    : data.simulation?.includes("DuringMerge")
+    ? `
+    <div class="qa-card">
+
+        <h3>Validated</h3>
+
+        <div style="line-height:1.8;">
+
+            ✓ POST /api/during_merge endpoint<br>
+
+            ✓ DURING telemetry merge responsiveness<br>
+
+            ✓ timeline alignment path<br>
+
+            ✓ telemetry synchronization stability<br>
+
+            ✓ merge engine concurrent handling<br>
+
+            ✓ P95 latency gate validation<br>
+
+            ✓ failed request monitoring<br>
+
+            ✓ HTML report generation
+
+        </div>
+
+    </div>
+    `
+    : data.simulation?.includes("RunAnalysis")
+    ? `
+    <div class="qa-card">
+
+        <h3>Validated</h3>
+
+        <div style="line-height:1.8;">
+
+            ✓ POST /api/run_analysis endpoint<br>
+
+            ✓ JSON request body handling<br>
+
+            ✓ AI analysis route responsiveness<br>
+
+            ✓ backend stability under concurrent requests<br>
+
+            ✓ P95 latency gate validation<br>
+
+            ✓ failed request monitoring<br>
+
+            ✓ HTML report generation
+
+        </div>
+
+    </div>
+    `
+    : data.simulation?.includes("UploadFit")
+    ? `
+    <div class="qa-card">
+
+        <h3>Validated</h3>
+
+        <div style="line-height:1.8;">
+
+            ✓ POST /upload_fit endpoint<br>
+
+            ✓ multipart FIT upload handling<br>
+
+            ✓ upload pipeline responsiveness<br>
+
+            ✓ parser-path readiness<br>
+
+            ✓ Gatling stability under concurrent requests<br>
+
+            ✓ P95 latency gate validation<br>
+
+            ✓ failed request monitoring<br>
+
+            ✓ HTML report generation
+
+        </div>
+
+    </div>
+    `
+    : data.simulation?.includes("UploadCsv")
+    ? `
+    <div class="qa-card">
+
+        <h3>Validated</h3>
+
+        <div style="line-height:1.8;">
+
+            ✓ POST /upload_csv endpoint<br>
+
+            ✓ multipart CSV upload handling<br>
+
+            ✓ telemetry ingestion pipeline<br>
+
+            ✓ CSV parser readiness<br>
+
+            ✓ Gatling stability under concurrent requests<br>
+
+            ✓ P95 latency gate validation<br>
+
+            ✓ failed request monitoring<br>
+
+            ✓ HTML report generation
+
+        </div>
+
+    </div>
+    `
+    : ""
+}
+
+        <div class="qa-card">
+            <h3>Performance Summary</h3>
+
+            <table border="1" style="width:100%;">
+                <tbody>
+                    <tr>
+                        <td>Simulation</td>
+                        <td>${data.simulation || "-"}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Result</td>
+                        <td>${data.summary?.result || "-"}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Gate</td>
+                        <td>${data.summary?.gate || "-"}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Generated</td>
+                        <td>${data.generated_at || "-"}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Report</td>
+                        <td>${data.summary?.report || "-"}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <details style="margin-top:20px;">
+            <summary style="cursor:pointer;">
+                View Raw Gatling Logs
+            </summary>
+
+            <pre class="qa-code">${data.stdout || data.stderr || "No logs"}</pre>
+        </details>
+    `
+
+    renderResponseTimeChart(metrics)
+    renderLatencyHeatmap(metrics)
+}
+
+function renderResponseTimeChart(metrics){
+
+    if (typeof Chart === "undefined") {
+        console.error("Chart.js is not loaded")
+        return
+    }
+
+    const canvas =
+        document.getElementById("responseTimeChart") 
+
+    if(!canvas || !metrics){
+        return
+    }
+
+    const labels = [
+        "Min",
+        "Mean",
+        "P50",
+        "P75",
+        "P95",
+        "P99",
+        "Max"
+    ]
+
+    const values = [
+        metrics.min_ms,
+        metrics.mean_ms,
+        metrics.p50_ms,
+        metrics.p75_ms,
+        metrics.p95_ms,
+        metrics.p99_ms,
+        metrics.max_ms
+    ]
+
+    if(responseTimeChart){
+        responseTimeChart.destroy()
+    }
+
+    responseTimeChart = new Chart(canvas.getContext("2d"), {
+        type:"bar",
+        data:{
+            labels:labels,
+            datasets:[
+                {
+                    label:"Response time ms",
+                    data:values,
+                    borderWidth:1
+                }
+            ]
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                legend:{
+                    display:true
+                }
+            },
+            scales:{
+                y:{
+                    beginAtZero:true
+                }
+            }
+        }
+    })
+}
+
+function renderLatencyHeatmap(metrics){
+
+    const box =
+        document.getElementById("latencyHeatmap")
+
+    if(!box || !metrics){
+        return
+    }
+
+    const buckets = [
+        {
+            label:"P50",
+            value:metrics.p50_ms
+        },
+        {
+            label:"P75",
+            value:metrics.p75_ms
+        },
+        {
+            label:"P95",
+            value:metrics.p95_ms
+        },
+        {
+            label:"P99",
+            value:metrics.p99_ms
+        },
+        {
+            label:"Max",
+            value:metrics.max_ms
+        }
+    ]
+
+    box.innerHTML =
+        buckets.map(b => {
+
+            let cls = "heat-good"
+
+            if(b.value >= 1000){
+                cls = "heat-bad"
+            }else if(b.value >= 500){
+                cls = "heat-warn"
+            }
+
+            return `
+                <div class="heat-cell ${cls}">
+                    <b>${b.label}</b><br>
+                    ${b.value ?? "-"} ms
+                </div>
+            `
+        }).join("")
+}
+
+async function runPerf(type){
+
+    const result =
+        document.getElementById("perfResult")
+
+    result.innerText =
+        "Running performance simulation..."
+
+    updatePerformanceKpi({
+        status:"running",
+        simulation:type,
+        returncode:"-",
+        message:"Simulation is running..."
+    })
+
+    try{
+
+        const res = await fetch("/api/performance/run", {
+            method:"POST",
+
+            credentials:"same-origin",
+
+            headers:{
+                "Content-Type":"application/json"
+            },
+
+            body:JSON.stringify({
+                type:type
+            })
+        })
+
+        const text =
+            await res.text()
+
+        console.log("PERFORMANCE RAW RESPONSE:", text)
+
+        let data = null
+
+        try{
+
+            data = JSON.parse(text)
+
+        }catch(e){
+
+            console.error(
+                "Performance returned non-JSON:",
+                text
+            )
+
+            const errorData = {
+                status:"error",
+                message:"Performance endpoint returned HTML/non-JSON. Check auth/CSRF/backend logs.",
+                raw:text,
+                simulation:type,
+                returncode:res.status
+            }
+
+            updatePerformanceKpi(errorData)
+
+            result.innerText =
+                JSON.stringify(errorData, null, 2)
+
+            return
+        }
+
+        if(!res.ok || data.error){
+
+            const errorData = {
+                status:"error",
+                message:data.error || "Performance simulation failed.",
+                simulation:type,
+                returncode:data.returncode ?? res.status,
+                details:data
+            }
+
+            updatePerformanceKpi(errorData)
+
+            result.innerText =
+                JSON.stringify(errorData, null, 2)
+
+            return
+        }
+
+        updatePerformanceKpi(data)
+        renderPerformanceResult(data)
+        await loadPerformanceHistory()
+
+    }catch(err){
+
+        const errorData = {
+            status:"error",
+            message:String(err),
+            simulation:type,
+            returncode:"-"
+        }
+
+        updatePerformanceKpi(errorData)
+
+        result.innerText =
+            JSON.stringify(errorData, null, 2)
+    }
+}
+
+async function loadPerformanceHistory(){
+
+    const res =
+        await fetch("/api/performance/history", {
+        credentials:"same-origin"
+    })
+
+    const data =
+        await res.json()
+
+    const history =
+        data.history || []
+
+    renderHistoryTrend(history)
+    renderCompareLastRuns(history)
+}
+
+function renderHistoryTrend(history){
+
+    if (typeof Chart === "undefined") {
+    console.error("Chart.js is not loaded")
+    return
+}
+    const canvas =
+        document.getElementById("historyTrendChart")
+
+    if(!canvas){
+        return
+    }
+
+    const last =
+        history.slice(-10)
+
+    const labels =
+        last.map((x, index) =>
+            `${index + 1}. ${x.test_type || "-"}`
+        )
+
+    const p95 =
+        last.map(x =>
+            x.metrics?.p95_ms ?? null
+        )
+
+    const mean =
+        last.map(x =>
+            x.metrics?.mean_ms ?? null
+        )
+
+    if(historyTrendChart){
+        historyTrendChart.destroy()
+    }
+
+    historyTrendChart = new Chart(canvas.getContext("2d"), {
+        type:"line",
+        data:{
+            labels:labels,
+            datasets:[
+                {
+                    label:"P95 ms",
+                    data:p95,
+                    borderWidth:2
+                },
+                {
+                    label:"Mean ms",
+                    data:mean,
+                    borderWidth:2
+                }
+            ]
+        },
+        options:{
+            responsive:true,
+            scales:{
+                y:{
+                    beginAtZero:true
+                }
+            }
+        }
+    })
+}
+
+function renderCompareLastRuns(history){
+
+    const tbody =
+        document.getElementById("compareRunsBody")
+
+    if(!tbody){
+        return
+    }
+
+    const last =
+        history.slice(-5).reverse()
+
+    if(last.length === 0){
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7">No history loaded.</td>
+            </tr>
+        `
+        return
+    }
+
+    tbody.innerHTML =
+        last.map((run, index) => {
+
+            const success =
+                run.status === "success" ||
+                run.returncode === 0
+
+            return `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${run.simulation?.replace("corelabtech.", "") || "-"}</td>
+                    <td class="${success ? "perf-text-pass" : "perf-text-fail"}">
+                        ${success ? "PASS" : "FAIL"}
+                    </td>
+                    <td>${run.metrics?.mean_ms ?? "-"} ms</td>
+                    <td>${run.metrics?.p95_ms ?? "-"} ms</td>
+                    <td>${run.metrics?.p99_ms ?? "-"} ms</td>
+                    <td>${run.metrics?.request_count ?? "-"}</td>
+                </tr>
+            `
+        }).join("")
+}
+
+function openGatlingReport(){
+
+    if(!latestPerformanceData){
+        alert("No Gatling report available yet.")
+        return
+    }
+
+    const reportPath =
+        latestPerformanceData.metrics?.report_path ||
+        latestPerformanceData.summary?.report ||
+        ""
+
+    if(!reportPath){
+        alert("Report path not found.")
+        return
+    }
+
+    const match =
+        reportPath.match(
+            /(sessionssimulation|uploadcsvsimulation|uploadfitsimulation|duringmergesimulation|runanalysissimulation)-\d+/
+        )
+
+    if(!match){
+        alert(
+            "Could not extract Gatling report folder from:\n\n" +
+            reportPath
+        )
+        return
+    }
+
+    const folder =
+        match[0]
+
+    const url =
+        `/admin/gatling-report/${folder}/index.html`
+
+    window.open(
+        url,
+        "_blank"
+    )
+}
+
+function exportPerformancePDF(){
+
+    window.print()
+}
+
+window.addEventListener("load", () => {
+    loadPerformanceHistory()
+})
+
+</script>
+
+{% endif %}
+
+{% endblock %}

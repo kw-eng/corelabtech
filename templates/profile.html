@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h1>Profile</h1>
+
+<div class="panel">
+    <p><strong>Email:</strong> {{ current_user.email }}</p>
+    <p><strong>User ID:</strong> {{ current_user.user_id }}</p>
+    <p><strong>Role:</strong> {{ current_user.role }}</p>
+</div>
+
+<a href="/logout">
+    <button>Logout</button>
+</a>
+
+{% endblock %}

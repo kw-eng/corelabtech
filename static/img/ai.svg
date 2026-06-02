@@ -1,0 +1,27 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#0b1220" stroke="#a855f7" stroke-width="2"/>
+
+  <!-- brain outline -->
+  <path d="M32 18 
+           C24 18,20 24,20 32 
+           C20 40,24 46,32 46
+           C40 46,44 40,44 32
+           C44 24,40 18,32 18Z"
+        fill="none" stroke="#a855f7" stroke-width="2"/>
+
+  <!-- center split -->
+  <line x1="32" y1="20" x2="32" y2="44" stroke="#a855f7" stroke-width="1.5"/>
+
+  <!-- neural nodes -->
+  <circle cx="26" cy="28" r="2.5" fill="#a855f7"/>
+  <circle cx="38" cy="28" r="2.5" fill="#a855f7"/>
+  <circle cx="26" cy="36" r="2.5" fill="#a855f7"/>
+  <circle cx="38" cy="36" r="2.5" fill="#a855f7"/>
+
+  <!-- connections -->
+  <line x1="26" y1="28" x2="38" y2="28" stroke="#a855f7" stroke-width="1.5"/>
+  <line x1="26" y1="36" x2="38" y2="36" stroke="#a855f7" stroke-width="1.5"/>
+  <line x1="26" y1="28" x2="26" y2="36" stroke="#a855f7" stroke-width="1.5"/>
+  <line x1="38" y1="28" x2="38" y2="36" stroke="#a855f7" stroke-width="1.5"/>
+</svg>

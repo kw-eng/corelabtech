@@ -1,0 +1,20 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#0b1220" stroke="#00ffcc" stroke-width="2"/>
+
+  <!-- waveform 1 -->
+  <polyline points="10,22 16,18 22,24 28,20 34,22 40,18 46,24 52,20"
+            fill="none" stroke="#00ffcc" stroke-width="1.5"/>
+
+  <!-- waveform 2 -->
+  <polyline points="10,28 16,24 22,30 28,26 34,28 40,24 46,30 52,26"
+            fill="none" stroke="#00ffcc" stroke-width="1.5"/>
+
+  <!-- waveform 3 -->
+  <polyline points="10,34 16,30 22,36 28,32 34,34 40,30 46,36 52,32"
+            fill="none" stroke="#00ffcc" stroke-width="1.5"/>
+
+  <!-- waveform 4 -->
+  <polyline points="10,40 16,36 22,42 28,38 34,40 40,36 46,42 52,38"
+            fill="none" stroke="#00ffcc" stroke-width="1.5"/>
+</svg>

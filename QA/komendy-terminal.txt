@@ -1,0 +1,289 @@
+Polecenie:
+
+grep -RIn "/chamber" . | wc -l
+
+składa się z 3 części.
+
+1. grep
+
+grep = szuka tekstu w plikach.
+
+Przykład:
+
+grep "hello" test.txt
+
+znajdzie wszystkie linie zawierające:
+
+hello
+2. Opcje -RIn
+grep -RIn "/chamber" .
+-R
+
+Recursive.
+
+Czyli:
+
+szukaj we wszystkich podfolderach
+
+Bez tego grep przeszuka tylko bieżący katalog.
+
+-I
+
+Ignore binary files.
+
+Pomija np:
+
+.png
+.exe
+.db
+
+żeby grep nie próbował czytać binarek.
+
+-n
+
+Numer linii.
+
+Pokazuje:
+
+plik:linia:tekst
+
+np:
+
+./templates/nav.html:12:<a href="/chamber">
+3. "/chamber"
+
+To tekst którego szukasz.
+
+grep znajdzie np:
+
+href="/chamber"
+
+albo:
+
+fetch("/chamber")
+4. .
+
+Kropka oznacza:
+
+szukaj od aktualnego katalogu
+
+Czyli:
+
+grep -RIn "/chamber" .
+
+= przeszukaj cały projekt.
+
+5. |
+
+Pipe.
+
+Przekazuje wynik jednego programu do drugiego.
+
+Czyli:
+
+A | B
+
+oznacza:
+
+weź wynik A i podaj go do B
+6. wc -l
+
+wc = word count.
+
+-l = count lines.
+
+Czyli:
+
+wc -l
+
+liczy liczbę linii.
+
+Finalnie
+grep -RIn "/chamber" . | wc -l
+
+oznacza:
+
+znajdź wszystkie wystąpienia "/chamber"
+we wszystkich plikach projektu
+i policz ile ich jest
+Bez wc -l
+
+Dostajesz szczegóły:
+
+grep -RIn "/chamber" .
+
+wynik:
+
+./templates/nav.html:12:<a href="/chamber">
+./static/js/app.js:55:fetch("/chamber")
+Z wc -l
+
+Dostajesz tylko liczbę:
+
+7
+
+czyli:
+
+"/chamber" występuje 7 razy
+Bardzo przydatne w Twoim projekcie
+Szukaj endpointów
+grep -RIn "save_full_session" .
+Szukaj route
+grep -RIn "@.*route" routes
+Szukaj fetch API
+grep -RIn "fetch(" static/js
+Szukaj starych URL
+grep -RIn "chamber_testing" .
+
+To jest podstawowe narzędzie debugowania dużych projektów Flask/JS.
+
+-----------------------------------------------
+To uporządkuje routing i unikniesz konfliktów.
+
+1. Znajdź wszystkie stare odwołania
+
+W Git Bash:
+
+grep -RIn "chamber_testing" .
+
+Szukaj takich miejsc:
+
+href="/chamber_testing"
+window.location = "/chamber_testing"
+render_template("chamber_testing.html")
+2. Co zostawić
+
+W research_routes.py zostaw tylko:
+
+@research_bp.route("/chamber")
+def chamber_testing():
+    return render_template("chamber_testing.html")
+3. Co usunąć
+
+Usuń z main_routes.py:
+
+@main_bp.route("/chamber_testing")
+def chamber_testing_alias():
+    return render_template("chamber_testing.html")
+4. Zamień stare linki
+Jeśli znajdziesz:
+href="/chamber_testing"
+
+zamień na:
+
+href="/chamber"
+Jeśli znajdziesz:
+window.location = "/chamber_testing"
+
+zamień na:
+
+window.location = "/chamber"
+Jeśli znajdziesz:
+redirect("/chamber_testing")
+
+zamień na:
+
+redirect("/chamber")
+5. Sprawdź czy zostały stare ścieżki
+
+Po poprawkach:
+
+grep -RIn "chamber_testing" .
+
+Powinno zostać tylko:
+
+render_template("chamber_testing.html")
+
+czyli nazwa pliku HTML jest OK — nie zmieniaj jej.
+
+6. Finalny routing
+main_routes.py
+
+Tylko publiczne strony:
+
+/
+ /technology
+ /about
+ /contact
+research_routes.py
+
+Cały HBOT:
+
+/chamber
+/api/save_phase
+/api/save_full_session
+/api/sessions
+/upload_fit
+/upload_csv
+/api/during_merge
+7. Restart Flask
+CTRL + C
+python app.py
+
+Potem wchodzisz już tylko:
+
+http://127.0.0.1:5000/chamber
+
+-----------------------------------
+Znajdziesz go w backendzie, najpewniej w:
+
+routes/research_routes.py
+
+Sprawdź w Git Bash:
+
+grep -RIn "run_analysis" routes
+
+$ grep -RIn '@.*run_analysis' routes
+routes/research_routes.py:779:@research_bp.route("/api/run_analysis", methods=["POST"])
+
+
+-----------------
+
+grep -RIn "@research_bp.route" routes/research_routes.py
+
+powinno zwrócić:
+/platform
+/research
+/chamber
+/api/users
+/api/delete_user
+/upload_fit
+/upload_csv
+/api/fit_data
+/api/csv_data
+/api/fit_timeseries
+/api/save_phase
+/api/save_full_session
+/api/sessions
+/api/delete_sessions
+/api/run_analysis
+/api/ai_latest
+/report
+/api/during_merge
+/api/run_playwright
+/api/generate_test
+/debug/db
+
+zwróciło:
+84:@research_bp.route("/platform")
+89:@research_bp.route("/research")
+94:@research_bp.route("/chamber")
+104:@research_bp.route("/api/users", methods=["GET", "POST"])
+153:@research_bp.route("/api/delete_user", methods=["POST"])
+172:@research_bp.route("/upload_fit", methods=["POST"])
+248:@research_bp.route("/upload_csv", methods=["POST"])
+322:@research_bp.route("/api/fit_data")
+356:@research_bp.route("/api/csv_data")
+386:@research_bp.route("/api/fit_timeseries/<session_id>")
+436:@research_bp.route("/api/save_phase", methods=["POST"])
+499:@research_bp.route("/api/save_full_session", methods=["POST"])
+669:@research_bp.route("/api/sessions")
+702:@research_bp.route("/api/delete_sessions", methods=["POST"])
+726:@research_bp.route("/api/run_analysis", methods=["POST"])
+787:@research_bp.route("/api/ai_latest")
+836:@research_bp.route("/report")
+842:@research_bp.route("/api/during_merge", methods=["POST"])
+957:@research_bp.route("/api/run_playwright", methods=["POST"])
+962:@research_bp.route("/api/generate_test", methods=["POST"])
+975:@research_bp.route("/debug/db")
+

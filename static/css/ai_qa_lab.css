@@ -1,0 +1,205 @@
+/* static/css/ai_qa_lab.css */
+
+.qa-hero {
+    padding: 26px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #07111f, #061b18);
+    border: 1px solid rgba(0, 255, 180, 0.25);
+    box-shadow: 0 0 30px rgba(0, 255, 180, 0.08);
+    margin-bottom: 24px;
+}
+
+.qa-hero h1 {
+    margin-bottom: 8px;
+}
+
+.qa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.qa-card {
+    padding: 20px;
+    border-radius: 18px;
+    background: #070b16;
+    border: 1px solid rgba(0, 255, 180, 0.18);
+    box-shadow: 0 0 24px rgba(0, 255, 180, 0.06);
+}
+
+.qa-card h3 {
+    margin-top: 0;
+    color: #00ffc3;
+}
+
+.qa-kpi {
+    font-size: 34px;
+    font-weight: 700;
+    color: #00ff99;
+}
+
+.qa-muted {
+    opacity: 0.75;
+    font-size: 14px;
+}
+
+.qa-pipeline {
+    display: grid;
+    gap: 10px;
+}
+
+.qa-step {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #0d1324;
+    border-left: 4px solid #555;
+}
+
+.qa-step.pass {
+    border-left-color: #00ff99;
+}
+
+.qa-step.fail {
+    border-left-color: #ff4d6d;
+}
+
+.qa-step.warn {
+    border-left-color: #ffd166;
+}
+
+.qa-code {
+    background: #050812;
+    color: #00ff99;
+    padding: 18px;
+    border-radius: 14px;
+    overflow: auto;
+    border: 1px solid rgba(0, 255, 180, 0.18);
+    white-space: pre-wrap;
+}
+
+.qa-report {
+    background: #050812;
+    color: #00ff99;
+    padding: 18px;
+    border-radius: 14px;
+    overflow: auto;
+    max-height: 460px;
+}
+
+.qa-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.qa-actions button,
+.action-btn {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    background: #00c896;
+    color: #00110d;
+    font-weight: 700;
+}
+
+.qa-actions button:hover,
+.action-btn:hover {
+    filter: brightness(1.1);
+}
+/* =========================
+PERFORMANCE DASHBOARD
+========================= */
+
+.perf-pass {
+    color: #00ff99;
+    text-shadow: 0 0 10px #00ff9977;
+}
+
+.perf-fail {
+    color: #ff4d4d;
+    text-shadow: 0 0 10px #ff4d4d77;
+}
+
+.perf-card-pass {
+    border: 1px solid #00ff9977;
+    box-shadow: 0 0 20px #00ff9933;
+}
+
+.perf-card-fail {
+    border: 1px solid #ff4d4d77;
+    box-shadow: 0 0 20px #ff4d4d33;
+}
+
+.perf-text-pass {
+    color: #00ff99;
+    font-weight: bold;
+}
+
+.perf-text-fail {
+    color: #ff4d4d;
+    font-weight: bold;
+}
+
+.latency-heatmap {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.heat-cell {
+    padding: 18px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 15px;
+    border: 1px solid #00ffcc33;
+}
+
+.heat-good {
+    background: rgba(0, 255, 153, 0.12);
+    color: #00ff99;
+}
+
+.heat-warn {
+    background: rgba(255, 191, 0, 0.15);
+    color: #ffcc00;
+}
+
+.heat-bad {
+    background: rgba(255, 77, 77, 0.15);
+    color: #ff4d4d;
+}
+
+@media print {
+    nav,
+    header,
+    .qa-actions,
+    button {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+        color: black !important;
+    }
+
+    .qa-card,
+    .panel {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        color: black !important;
+    }
+
+    .qa-code {
+        color: black !important;
+        background: #f5f5f5 !important;
+    }
+}
+code {
+    background: rgba(255,255,255,0.08);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}

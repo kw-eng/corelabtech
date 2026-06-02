@@ -1,0 +1,11 @@
+users
+│
+sessions
+│
+tests
+│
+telemetry
+│
+playwright_runs
+│
+ai_logs

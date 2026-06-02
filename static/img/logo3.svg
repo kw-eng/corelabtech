@@ -1,0 +1,51 @@
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+
+
+
+<rect width="400" height="120" fill="#0B1F3A"/>
+
+
+
+<circle cx="60" cy="60" r="30" stroke="#00C2A8" stroke-width="6" fill="none"/>
+
+
+
+<text x="110" y="70"
+
+font-family="Arial"
+
+font-size="36"
+
+fill="#FFFFFF"
+
+font-weight="bold">
+
+
+
+CORELABTECH
+
+
+
+</text>
+
+
+
+<text x="110" y="95"
+
+font-family="Arial"
+
+font-size="14"
+
+fill="#00C2A8">
+
+
+
+RESEARCH • SOFTWARE • TECHNOLOGY
+
+
+
+</text>
+
+
+
+</svg>

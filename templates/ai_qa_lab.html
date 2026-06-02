@@ -1,0 +1,233 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}"
+>
+
+<div class="qa-hero">
+
+    <h1>AI QA Lab</h1>
+
+    <p class="section-desc">
+        Premium AI-powered QA center for validating HBOT telemetry,
+        AI scoring, API contracts, Playwright flows and
+        longitudinal analysis.
+    </p>
+
+</div>
+
+<div class="qa-actions">
+
+    <select id="sessionSelect"></select>
+
+    <button onclick="runAITest()">
+        Run AI Validation
+    </button>
+
+    <button onclick="runUserTrend()">
+        Run User Trend
+    </button>
+
+    {% if current_user.role == "admin" %}
+    <button onclick="runFullSuite()">
+        Run Playwright QA
+    </button>
+    {% endif %}
+
+    <button onclick="runApiHealthCheck()">
+        API Health Check
+    </button>
+
+    <button onclick="runAIContractTest()">
+        AI Contract Test
+    </button>
+
+    <button onclick="loadSessions()">
+        Refresh
+    </button>
+
+</div>
+
+<div id="aiTestResult"></div>
+
+<hr>
+
+<h2>AI QA Scorecard</h2>
+
+<div id="qaScorecard">
+
+    <div class="qa-card">
+        No validation executed yet.
+    </div>
+
+</div>
+
+<hr>
+
+<h2>Live QA Execution Pipeline</h2>
+
+<div class="qa-card">
+
+    <div id="qaPipelineSteps">
+        Waiting for test execution...
+    </div>
+
+</div>
+
+<hr>
+
+<h2>Gherkin Test Scenario</h2>
+
+<pre id="gherkinPreview" class="qa-code">
+No Gherkin scenario generated yet.
+</pre>
+
+<hr>
+
+<h2>Playwright Test Preview</h2>
+
+<pre id="playwrightPreview" class="qa-code">
+No Playwright preview generated yet.
+</pre>
+
+<hr>
+
+<h2>AI Test Generator Preview</h2>
+
+<div class="qa-card">
+
+    <p>
+        Authenticated researchers can preview generated AI QA tests.
+        Admin users can execute full Playwright and system validation flows.
+    </p>
+
+    <textarea
+        id="aiPrompt"
+        style="width:100%; height:110px;"
+        placeholder="Example: Validate AI score, risk_level, anomaly, features and timeline"
+    ></textarea>
+
+    <button
+        class="action-btn"
+        onclick="generateTests()"
+    >
+        Generate Preview
+    </button>
+
+    <pre id="generatedTests" class="qa-code">
+No generated preview yet.
+    </pre>
+
+</div>
+
+<hr>
+
+<h2>Execution Status</h2>
+
+<div class="qa-card">
+
+    <div style="line-height:1.7;">
+
+        <div>
+            <strong>API Health Check</strong>
+            → quick backend smoke test (no HTML report)
+        </div>
+
+        <div style="margin-left:15px; opacity:0.9;">
+            Tested endpoints:
+            <code>/api/sessions</code>,
+            <code>/api/ai_latest</code>,
+            <code>/debug/db</code>
+        </div>
+
+        <br>
+
+        <div>
+            <strong>AI Contract Test</strong>
+            → validates AI analysis JSON contract structure
+            (score, anomaly, features, timeline)
+        </div>
+
+        <br>
+
+        <div>
+            <strong>Run Playwright QA</strong>
+            → full E2E automation suite with Playwright HTML report
+        </div>
+
+    </div>
+
+</div>
+
+<div class="qa-grid">
+
+{% if current_user.role == "admin" %}
+
+    <div class="qa-card">
+
+        <h3>Playwright Suite</h3>
+
+        <div id="fullSuiteStatus">
+            Not executed yet.
+        </div>
+
+    </div>
+    
+{% endif %}
+
+    <div class="qa-card">
+
+        <h3>API Health</h3>
+
+        <div id="apiStatus">
+            Not executed yet.
+        </div>
+
+    </div>
+
+    <div class="qa-card">
+
+        <h3>AI Contract</h3>
+
+        <div id="uiStatus">
+            Not executed yet.
+        </div>
+
+    </div>
+
+</div>
+
+{% if current_user.role == "admin" %}
+
+<hr>
+
+<h2>Database Debug</h2>
+
+<div class="qa-card">
+
+    <button onclick="loadDebugDB()">
+        Load DB Counts
+    </button>
+
+    <pre id="debugDbOutput" class="qa-code">
+No debug data loaded.
+    </pre>
+
+</div>
+
+{% endif %}
+
+<hr>
+
+<h2>QA Execution Report</h2>
+
+<pre id="qaReport" class="qa-report">
+No QA report available yet.
+</pre>
+
+<script src="{{ url_for('static', filename='js/ai_qa_dashboard.js') }}"></script>
+
+{% endblock %}

@@ -1,0 +1,13 @@
+hasła po init i seed:
+$ python seed_postgres_db.py
+PostgreSQL seed completed.
+Admin login: admin@corelabtech.local / Admin123!
+Operator login: operator@corelabtech.local / Operator123!
+Researcher login: researcher@corelabtech.local / Researcher123!
+Viewer login: viewer@corelabtech.local / Viewer123!
+
+python init_postgres_db.py
+python seed_postgres_db.py
+python check_postgres_db.py
+python migrate_sqlite_to_postgres.py
+python check_postgres_db.py

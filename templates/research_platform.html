@@ -1,0 +1,118 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<!-- HERO -->
+
+<div class="hero">
+
+<img src="{{ url_for('static', filename='img/chamber.svg') }}" class="hero-img">
+
+<div class="hero-overlay">
+
+
+<!--<p class="section-label">Research Platform</p>-->
+<h1>HBOT Research Platform</h1>
+<p>Hyperbaric Oxygen Therapy Monitoring & AI Analysis</p>
+
+<div class="action-bar">
+
+<a href="{{ url_for('research.research_dashboard') }}">
+<button class="action-btn"> Open Live Dashboard</button>
+</a>
+
+<a href="{{ url_for('research.chamber_testing') }}">
+<button class="action-btn"> Start Session</button>
+</a>
+
+<a href="{{ url_for('ai.ai_lab') }}">
+<button class="action-btn"> Run AI Analysis</button>
+</a>
+
+</div>
+</div>
+</div>
+<!-- SYSTEM GRID -->
+<h2 class="section-title">System Overview</h2>
+<p class="section-desc">
+Central environment for managing HBOT sessions, monitoring system components
+and initiating data collection workflows.
+</p>
+<div class="system-grid">
+<!-- PANEL IMAGE -->
+<div class="system-card">
+
+<img src="{{ url_for('static', filename='img/panel.svg') }}" class="system-img">
+
+<div class="system-content">
+<h3>Chamber Control Unit</h3>
+
+<p>
+Real-time monitoring of pressure, oxygen levels, temperature
+and humidity inside hyperbaric chamber.
+</p>
+
+<ul>
+<li>Pressure: 1.3–1.5 ATA</li>
+<li>Oxygen: 21% chamber / 90–96% mask</li>
+<li>Environmental telemetry</li>
+</ul>
+
+</div>
+
+</div>
+
+<!-- AI -->
+
+<div class="system-card">
+
+<div class="system-content">
+<h3>AI Physiology Engine</h3>
+
+<p>
+AI-driven physiological analysis combining wearable data
+and hyperbaric exposure parameters.
+</p>
+
+<ul>
+<li>SpO2 analysis</li>
+<li>HRV adaptation model</li>
+<li>HBOT response prediction</li>
+<li>Anomaly detection (hypoxia / stress)</li>
+</ul>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- FLOW -->
+
+<h2 class="section-title">Data Flow</h2>
+
+<div class="flow">
+
+<div class="flow-box">Pulse Oximeter</div>
+<div class="flow-box">Garmin</div>
+<div class="flow-box">Chamber Sensors</div>
+
+<div class="flow-arrow">→</div>
+
+<div class="flow-box">Flask API</div>
+
+<div class="flow-arrow">→</div>
+
+<div class="flow-box">Database</div>
+
+<div class="flow-arrow">→</div>
+
+<div class="flow-box">AI Engine</div>
+
+<div class="flow-arrow">→</div>
+
+<div class="flow-box">Mission Control Dashboard</div>
+
+</div>
+
+{% endblock %}

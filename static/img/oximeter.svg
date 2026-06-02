@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- background -->
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#0b1220" stroke="#00e0ff" stroke-width="2"/>
+
+  <!-- ring -->
+  <circle cx="32" cy="32" r="12" fill="none" stroke="#00e0ff" stroke-width="3"/>
+
+  <!-- inner hole -->
+  <circle cx="32" cy="32" r="6" fill="#0b1220"/>
+
+  <!-- sensor dot -->
+  <circle cx="32" cy="20" r="2.5" fill="#00e0ff"/>
+
+  <!-- pulse wave -->
+  <polyline points="20,40 24,36 28,42 32,34 36,40 40,36 44,38"
+            fill="none" stroke="#00e0ff" stroke-width="1.5"/>
+</svg>

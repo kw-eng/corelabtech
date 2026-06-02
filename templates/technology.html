@@ -1,0 +1,337 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/technology.css') }}">
+
+{% endblock %}
+
+{% block content %}
+
+<!-- ================= HERO ================= -->
+<div class="hero">
+
+    <div class="hero-text panel">
+        <div class="title">Technology</div>
+
+        <div class="subtitle">
+            Integrated Physiology Monitoring, AI Analysis & Software Testing
+        </div>
+
+        <p>
+            CoreLabTech is a next-generation platform that combines continuous physiological monitoring 
+            inside hyperbaric chambers with advanced AI analytics and robust software engineering.
+        </p>
+    </div>
+
+    <div class="hero-graphic">
+        <img src="{{ url_for('static', filename='img/tech.png') }}" class="hero-img">
+    </div>
+
+</div>
+
+<!-- ================= ACCORDION WRAPPER ================= -->
+<div class="accordion">
+
+<!-- ================= SYSTEM OVERVIEW ================= -->
+<div class="accordion-item active">
+<h2 class="section-title accordion-header">System Overview</h2>
+
+<div class="accordion-content">
+<div class="flow">
+
+    <div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <div class="badge">STEP 1</div>
+        <img src="{{ url_for('static', filename='img/puls.svg') }}">
+        <h4>PRE Snapshot</h4>
+        <p>Baseline measurement with pulse oximeter (SpO₂ + Pulse)</p>
+    </div>
+         <div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <div class="badge">STEP 2</div>
+        <img src="{{ url_for('static', filename='img/chamb1.png') }}">
+        <h4>Start Session</h4>
+        <p>Enter chamber & start monitoring</p>
+    </div>
+       <div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <div class="badge">STEP 3</div>
+        <img src="{{ url_for('static', filename='img/garm_puls.svg') }}">
+        <h4>During Session</h4>
+        <p>
+            Garmin records HR/HRV (FIT)<br>
+            Pulseox records SpO₂ + Pulse (CSV)
+        </p>
+    </div>
+     <div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <div class="badge">STEP 4</div>
+        <img src="{{ url_for('static', filename='img/exit.svg') }}">
+        <h4>Exit Chamber</h4>
+        <p>End session & save data</p>
+    </div>
+<div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <div class="badge">STEP 5</div>
+        <img src="{{ url_for('static', filename='img/files.svg') }}">
+        <h4>Upload Data</h4>
+        <p>Upload FIT file and CSV file</p>
+    </div>
+<div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <div class="badge">STEP 6</div>
+        <img src="{{ url_for('static', filename='img/puls.svg') }}">
+        <h4>POST Snapshot</h4>
+        <p>
+            Wait 10 min<br>
+            Post measurement (SpO₂ + Pulse)
+        </p>
+    </div>
+
+</div>
+
+</div>
+</div>
+
+<!-- ================= DATA FLOW ================= -->
+<div class="accordion-item">
+<h2 class="section-title accordion-header">Data Flow & Integration</h2>
+<div class="accordion-content">
+<div class="data-flow">
+
+    <!-- SOURCE BOX -->
+    <div class="data-source panel">
+
+        <div class="card panel file-card">
+            <img src="{{ url_for('static', filename='img/fit.svg') }}" class="file-icon">
+            <div>
+                <h3>Garmin FIT File</h3>
+                <p>HR + HRV (RR intervals)</p>
+            </div>
+        </div>
+
+        <div class="card panel file-card">
+            <img src="{{ url_for('static', filename='img/csv.svg') }}" class="file-icon">
+            <div>
+                <h3>Pulse Oximeter CSV</h3>
+                <p>SpO₂ + Pulse (1Hz)</p>
+            </div>
+        </div>
+
+        <!-- TWO ARROWS -->
+        <div class="arrow-stack">
+            <div class="arrow-horizontal">→</div>
+            <p></p>
+            <div class="arrow-horizontal">→</div>
+        </div>
+
+    </div>
+
+
+    <!-- MERGE -->
+    <div class="card panel center-card">
+        <img src="{{ url_for('static', filename='img/merge.svg') }}" class="card-icon">
+        <h3>Merge Engine</h3>
+        <p>Time Sync & Alignment (1Hz Timeline)</p>
+    </div>
+
+    <div class="arrow-horizontal">→</div>
+
+
+    <!-- TIMELINE -->
+    <div class="card panel center-card">
+        <img src="{{ url_for('static', filename='img/timeline.svg') }}" class="card-icon">
+        <h3>Unified Timeline</h3>
+        <p>HR • HRV • SpO₂ • Pulse</p>
+    </div>
+
+    <div class="arrow-horizontal">→</div>
+
+
+    <!-- AI -->
+    <div class="card panel center-card">
+        <img src="{{ url_for('static', filename='img/ai.svg') }}" class="card-icon">
+        <h3>AI Analysis Engine</h3>
+        <p>Scoring • Anomaly Detection • Recovery • Reports</p>
+    </div>
+
+</div>
+</div>
+</div>
+
+
+<!-- ================= DEVICES ================= -->
+<div class="accordion-item">
+<h2 class="section-title accordion-header">Devices & Technologies</h2>
+
+<div class="accordion-content">
+<!--================-Devices----========================-->
+
+<div class="accordion-item">
+<h2 class="section-title accordion-header">AI QA, Automation & Performance Testing</h2>
+
+<div class="accordion-content">
+<div class="grid">
+
+    <div class="card panel">
+        <h3>AI QA Lab</h3>
+        <p>✔ AI contract validation</p>
+        <p>✔ Gherkin scenario preview</p>
+        <p>✔ Playwright test preview</p>
+        <p>✔ Score, risk, anomaly and timeline validation</p>
+    </div>
+
+    <div class="card panel">
+        <h3>Playwright Automation</h3>
+        <p>✔ Chamber UI validation</p>
+        <p>✔ CSV upload flow</p>
+        <p>✔ Merge endpoint validation</p>
+        <p>✔ AI analysis contract checks</p>
+        <p>✔ User trend endpoint validation</p>
+    </div>
+
+    <div class="card panel">
+        <h3>Performance Testing</h3>
+        <p>✔ Gatling-ready API load tests</p>
+        <p>✔ Session ingestion performance</p>
+        <p>✔ Merge engine latency</p>
+        <p>✔ AI analysis response time</p>
+        <p>✔ CI/CD performance gate</p>
+    </div>
+
+</div>
+</div>
+</div>
+<div class="grid">
+
+    <div class="card panel">
+        <img src="{{ url_for('static', filename='img/device.svg') }}" class="card-icon">
+        <h3>Devices</h3>
+        <p><strong>Garmin Fenix + HRM Strap</strong></p>
+        <img src="{{ url_for('static', filename='img/garmin.svg') }}" class="device-icon">
+
+        <p>Heart Rate (HR)</p>
+        <p>Heart Rate Variability (HRV)</p>
+        <p>Recorded as FIT file</p>
+
+        <hr>
+
+        <p><strong>M1664 Ring Pulse Oximeter</strong></p>
+        <img src="{{ url_for('static', filename='img/oximeter.svg') }}" class="device-icon">
+        <p>SpO₂ + Pulse</p>
+        <p>1Hz Continuous Monitoring</p>
+        <p>Export as CSV File</p>
+    </div>
+
+    <div class="card panel">
+        <img src="{{ url_for('static', filename='img/tech1.svg') }}" class="card-icon">
+        <h3>Technologies</h3>
+        <p><strong>Database:</strong> SQLite now / PostgreSQL-ready architecture</p>
+        <p><strong>QA Automation:</strong> Playwright, API contract tests, AI QA Lab</p>
+        <p><strong>Performance Testing:</strong> Gatling-ready load testing architecture</p>
+        <p><strong>CI/CD:</strong> GitHub Actions QA pipeline</p>
+        <p><strong>Backend:</strong> Python, Flask, SQLAlchemy</p>
+        <p><strong>Database:</strong> PostgreSQL</p>
+        <p><strong>AI / Analytics:</strong> Pandas, NumPy, Scikit-learn</p>
+        <p><strong>Frontend:</strong> HTML, JavaScript, Chart.js</p>
+        <p><strong>Visualization:</strong> Interactive Charts & Dashboards</p>
+    </div>
+
+    <div class="card panel">
+        <img src="{{ url_for('static', filename='img/ai.svg') }}" class="card-icon">
+        <h3>AI Scoring (Research Risk Model)</h3>
+
+        <p>✔ Min SpO₂ (Hypoxia Detection)</p>
+        <p>✔ HRV Drop (Autonomic Stress)</p>
+        <p>✔ HR Max (Cardiovascular Load)</p>
+        <p>✔ Recovery Speed (Post Phase)</p>
+
+        <hr>
+
+        <p>Research-Grade • Clinically Inspired</p>
+        <p>Data-Driven Decision Support</p>
+    </div>
+
+</div>
+
+</div>
+</div>
+<!-- ================= BUSINESS PROCESS ================= -->
+<div class="accordion-item">
+<h2 class="section-title accordion-header">Business Process</h2>
+
+<div class="accordion-content">
+<div class="flow">
+
+    <div class="step panel">
+        <img src="{{ url_for('static', filename='img/recruit.svg') }}" class="step-icon">
+        <h4>Recruit Subjects</h4>
+        <p>Create profiles & baseline data</p>
+    </div>  
+<div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <img src="{{ url_for('static', filename='img/session.svg') }}" class="step-icon">
+        <h4>Run HBOT Session</h4>
+        <p>Collect data in real time</p>
+    </div>
+<div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <img src="{{ url_for('static', filename='img/merge.svg') }}" class="step-icon">
+        <h4>Data Integration</h4>
+        <p>Upload, merge & validate</p>
+    </div>
+<div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <img src="{{ url_for('static', filename='img/ai.svg') }}" class="step-icon">
+        <h4>AI Analysis</h4>
+        <p>Score, detect anomalies & generate insights</p>
+    </div>
+<div class="arrow-horizontal">→</div>
+    <div class="step panel">
+        <img src="{{ url_for('static', filename='img/report.svg') }}" class="step-icon">
+        <h4>Reports & Export</h4>
+        <p>PDF reports, charts & research data</p>
+    </div>
+
+</div>
+</div>
+</div>
+
+</div> <!-- END ACCORDION -->
+
+<!-- ================= MISSION ================= -->
+<h2 class="section-title">Our Mission</h2>
+
+<div class="grid">
+
+    <div class="card panel mission-card">
+        <img src="{{ url_for('static', filename='img/mission.svg') }}" class="card-icon">
+        <p>
+        Empowering research and clinical teams with reliable data, advanced AI 
+        and intuitive software to improve human performance and health.
+        </p>
+    </div>
+
+    <div class="card panel mission-card center-card">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" class="card-icon">
+        <h3>CoreLabTech</h3>
+        <p>Science. Technology. Performance.</p>
+    </div>
+
+</div>
+
+<!-- ================= JS ================= -->
+<script>
+document.querySelectorAll(".accordion-header").forEach(header => {
+    header.addEventListener("click", () => {
+        const item = header.parentElement;
+
+        document.querySelectorAll(".accordion-item").forEach(i => {
+            if (i !== item) i.classList.remove("active");
+        });
+
+        item.classList.toggle("active");
+    });
+});
+</script>
+{% endblock %}

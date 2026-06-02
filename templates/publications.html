@@ -1,0 +1,18 @@
+<!--lista publikacji-->
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h1>Research Publications</h1>
+
+<ul>
+
+{% for p in papers %}
+
+<li>{{ p }}</li>
+
+{% endfor %}
+
+</ul>
+
+{% endblock %}

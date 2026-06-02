@@ -1,0 +1,21 @@
+{
+  "name": "corelabtech_final_clean",
+  "version": "1.0.0",
+  "description": "CoreLabTech QA and Playwright tests",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:list": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,145 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/technology.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+
+    <div class="hero-text panel">
+        <div class="title">About HBOT</div>
+
+        <div class="subtitle">
+            Hyperbaric Oxygen Therapy Monitoring & Research
+        </div>
+
+        <p>
+            HBOT is a process where a person breathes oxygen in a pressurized chamber.
+            CoreLabTech focuses on monitoring how the body responds before, during
+            and after a session.
+        </p>
+
+        <p>
+            The goal is to collect structured physiological data, analyze trends and
+            support research-grade evaluation of oxygenation, pulse, heart rate and recovery.
+        </p>
+    </div>
+
+    <div class="hero-graphic">
+        <img
+            src="{{ url_for('static', filename='img/chamb1.png') }}"
+            class="hero-img"
+            alt="Hyperbaric chamber"
+        >
+    </div>
+
+</div>
+
+<h2 class="section-title">What We Monitor</h2>
+
+<div class="grid">
+
+    <div class="card panel">
+        <img src="{{ url_for('static', filename='img/puls.svg') }}" class="card-icon">
+        <h3>SpO₂</h3>
+        <p>
+            Blood oxygen saturation before, during and after the chamber session.
+        </p>
+    </div>
+
+    <div class="card panel">
+        <img src="{{ url_for('static', filename='img/heart.svg') }}" class="card-icon">
+        <h3>Pulse & HR</h3>
+        <p>
+            Pulse from pulse oximeter and heart rate from Garmin/FIT telemetry.
+        </p>
+    </div>
+
+    <div class="card panel">
+        <img src="{{ url_for('static', filename='img/garm_puls.svg') }}" class="card-icon">
+        <h3>HRV</h3>
+        <p>
+            Heart rate variability from RR intervals to observe autonomic response.
+        </p>
+    </div>
+
+</div>
+
+<h2 class="section-title">HBOT Session Flow</h2>
+
+<div class="flow">
+
+    <div class="step panel">
+        <div class="badge">PRE</div>
+        <h4>Baseline Check</h4>
+        <p>SpO₂ and pulse measurement before entering the chamber.</p>
+    </div>
+
+    <div class="arrow-horizontal">→</div>
+
+    <div class="step panel">
+        <div class="badge">DURING</div>
+        <h4>Chamber Monitoring</h4>
+        <p>Garmin/FIT and pulseox CSV data are collected during the session.</p>
+    </div>
+
+    <div class="arrow-horizontal">→</div>
+
+    <div class="step panel">
+        <div class="badge">POST</div>
+        <h4>Recovery Check</h4>
+        <p>Post-session SpO₂ and pulse are compared with baseline.</p>
+    </div>
+
+    <div class="arrow-horizontal">→</div>
+
+    <div class="step panel">
+        <div class="badge">AI</div>
+        <h4>Research Analysis</h4>
+        <p>AI evaluates score, risk level, anomaly signals and trend response.</p>
+    </div>
+
+</div>
+
+<h2 class="section-title">Why It Matters</h2>
+
+<div class="grid">
+
+    <div class="card panel">
+        <h3>Objective Data</h3>
+        <p>
+            Instead of relying only on subjective feeling after a session, CoreLabTech
+            captures structured physiological signals.
+        </p>
+    </div>
+
+    <div class="card panel">
+        <h3>Recovery Insight</h3>
+        <p>
+            PRE to POST comparison helps identify how oxygen saturation and pulse
+            behave after exposure.
+        </p>
+    </div>
+
+    <div class="card panel">
+        <h3>Research Safety Layer</h3>
+        <p>
+            The system highlights abnormal patterns such as low SpO₂, high pulse,
+            high HR or low HRV for review.
+        </p>
+    </div>
+
+</div>
+
+<h2 class="section-title">Important Note</h2>
+
+<div class="card panel">
+    <p>
+        CoreLabTech is a research and monitoring platform. AI scores and anomaly
+        flags are not a medical diagnosis and should not replace clinical evaluation.
+    </p>
+</div>
+
+{% endblock %}

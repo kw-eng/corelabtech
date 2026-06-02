@@ -1,0 +1,11 @@
+o wpisywać w pole AI Test Generator Preview?
+
+Przykłady:
+
+Validate that POST SpO2 below 92 reduces AI score.
+Validate that high pulse above 160 bpm creates warning.
+Validate that HRV below 30 ms creates autonomic stress warning.
+Validate that timeline contains SpO2, pulse, HR and HRV fields.
+Validate that user trend detects repeated abnormal sessions.
+
+To pole ma być dla użytkownika „AI QA prompt preview”, a nie realny generator produkcyjny.

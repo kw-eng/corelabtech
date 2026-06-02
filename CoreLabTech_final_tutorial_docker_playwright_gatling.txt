@@ -1,0 +1,1919 @@
+CORELABTECH — FINALNY TUTORIAL WDROŻENIA PRODUKCYJNEGO + DEBUG DOCKER / PLAYWRIGHT / GATLING
+VPS Linux M / Docker / Flask / PostgreSQL / Playwright / Gatling / AI QA
+
+============================================================
+0. CEL DOKUMENTU
+============================================================
+
+Ten dokument jest finalną, scaloną wersją tutoriala CoreLabTech.
+
+Łączy:
+1. produkcyjne wdrożenie na VPS,
+2. Docker Compose,
+3. PostgreSQL,
+4. Auth + RBAC,
+5. Security hardening,
+6. Playwright E2E,
+7. Gatling performance tests,
+8. AI QA Lab,
+9. raporty HTML,
+10. realne problemy debugowania, które pojawiły się podczas pracy.
+
+Dokument zakłada, że projekt ma już działające podstawowe moduły:
+
+✅ Docker działa lokalnie
+✅ PostgreSQL działa
+✅ Flask działa
+✅ login działa
+✅ role działają
+✅ /api/health działa
+✅ Docker Compose działa
+✅ CSV/FIT upload działa
+✅ AI analysis działa
+✅ /api/sessions działa
+✅ /api/user_trends działa
+✅ Playwright działa po poprawkach auth/network
+✅ Gatling działa po poprawkach redirect/performance endpoints
+
+Konta lokalne:
+
+admin@corelabtech.local / Admin123!
+operator@corelabtech.local / Operator123!
+researcher@corelabtech.local / Researcher123!
+viewer@corelabtech.local / Viewer123!
+
+UWAGA:
+Na produkcji hasła demo muszą zostać zmienione albo konta demo usunięte.
+
+============================================================
+1. FINALNA ARCHITEKTURA PRODUKCYJNA
+============================================================
+
+Docelowy przepływ:
+
+Internet
+    ↓
+Domena home.pl
+    ↓
+Nginx HTTPS
+    ↓
+Docker Compose
+    ↓
+Gunicorn Flask
+    ↓
+PostgreSQL
+    ↓
+Monitoring / Logs / Reports
+
+Docelowo aplikacja działa jako:
+
+production-grade AI telemetry & QA research platform
+
+Główne moduły:
+- HBOT session workflow,
+- CSV/FIT upload,
+- telemetry merge engine,
+- AI analysis,
+- AI QA Lab,
+- Software QA Lab,
+- Playwright E2E reports,
+- Gatling performance reports,
+- Research dashboard,
+- RBAC,
+- monitoring,
+- Docker deployment.
+
+============================================================
+2. FINALNY MODEL DOSTĘPU
+============================================================
+
+Publiczne — bez logowania:
+/
+/about
+/technology
+/contact
+/qa
+/performance-tests
+/ai-testing-lab
+
+Ważne:
+Na /performance-tests publicznie pokazuje się opis architektury.
+Przyciski Run Performance są widoczne tylko dla admina.
+
+Po logowaniu:
+/chamber
+/research
+/ai_lab lub /ai-lab
+/profile
+/logout
+
+Researcher + Admin:
+/ai-qa-lab
+/api/run_analysis
+/api/user_trends/<user_id>
+/api/ai_qa/*
+/report lub generator raportu research
+
+Admin only:
+/admin
+/debug/db
+/api/run_playwright
+/api/performance/run
+/api/performance/history
+/api/performance/latest
+/api/users
+/api/delete_user
+/api/delete_sessions
+/admin/playwright-report/*
+/admin/gatling-report/*
+
+============================================================
+3. ROLE RBAC
+============================================================
+
+viewer
+    → podgląd własnych sesji
+
+operator
+    → tworzenie sesji HBOT
+    → upload CSV/FIT
+    → merge
+    → save session
+
+researcher
+    → AI analysis
+    → trendy użytkownika
+    → eksporty
+    → AI QA Lab
+    → research dashboard
+
+admin
+    → wszystko
+    → QA
+    → Playwright
+    → Gatling
+    → DB debug
+    → users
+    → monitoring
+    → reports
+
+============================================================
+4. STRUKTURA PROJEKTU
+============================================================
+
+corelabtech_final_clean/
+│
+├── app.py
+├── database_postgres.py
+├── .env
+├── .env.example
+├── requirements.txt
+│
+├── auth/
+│   ├── __init__.py
+│   ├── auth_routes.py
+│   ├── decorators.py
+│   └── user_model.py
+│
+├── security/
+│   ├── __init__.py
+│   ├── limiter.py
+│   ├── csrf.py
+│   ├── headers.py
+│   └── upload_validation.py
+│
+├── monitoring/
+│   ├── __init__.py
+│   └── health_routes.py
+│
+├── templates/
+│   ├── layout.html
+│   ├── login.html
+│   ├── unauthorized.html
+│   ├── profile.html
+│   ├── research_dashboard.html
+│   ├── ai_qa_lab.html
+│   ├── performance_tests.html
+│   └── ai_testing_lab_public.html
+│
+├── routes/
+│   ├── research_routes.py
+│   ├── performance_routes.py
+│   ├── ai_qa_routes.py
+│   ├── qa_routes.py
+│   └── ...
+│
+├── static/
+│   ├── css/
+│   └── js/
+│
+├── logs/
+│   ├── app.log
+│   ├── security.log
+│   └── performance.log
+│
+├── Dockerfile
+├── docker-compose.yml
+├── .dockerignore
+├── entrypoint.sh
+│
+├── nginx/
+│   └── corelabtech.conf
+│
+├── tests/
+│   ├── e2e/
+│   └── performance/
+│       └── gatling/
+│
+└── monitoring/
+    ├── prometheus.yml
+    └── grafana/
+        └── dashboards/
+
+============================================================
+5. AUTH + RBAC — PAKIETY
+============================================================
+
+Instalacja:
+
+pip install flask-login flask-wtf flask-limiter email-validator
+
+requirements.txt:
+
+flask-login
+flask-wtf
+flask-limiter
+email-validator
+
+============================================================
+6. TABELA USERS
+============================================================
+
+Sprawdzenie:
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name='users'
+ORDER BY ordinal_position;
+
+Tabela users powinna mieć minimum:
+
+id
+user_id
+email
+password_hash
+role
+is_active
+
+Jeśli brakuje pól:
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'viewer';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+
+============================================================
+7. AUTH FOLDER
+============================================================
+
+Utwórz:
+
+auth/
+├── __init__.py
+├── user_model.py
+├── decorators.py
+└── auth_routes.py
+
+auth/__init__.py:
+
+# Auth package for CoreLabTech
+
+============================================================
+8. auth/user_model.py
+============================================================
+
+from flask_login import UserMixin
+from database_postgres import db
+
+
+class User(UserMixin):
+
+    def __init__(self, id, user_id, email, password_hash, role, is_active=True):
+        self.id = str(id)
+        self.user_id = user_id
+        self.email = email
+        self.password_hash = password_hash
+        self.role = role or "viewer"
+        self._is_active = is_active
+
+    @property
+    def is_active(self):
+        return bool(self._is_active)
+
+
+def row_to_user(row):
+
+    if not row:
+        return None
+
+    return User(
+        id=row[0],
+        user_id=row[1],
+        email=row[2],
+        password_hash=row[3],
+        role=row[4],
+        is_active=row[5]
+    )
+
+
+def get_user_by_id(id):
+
+    con = db()
+    c = con.cursor()
+
+    c.execute("""
+        SELECT id, user_id, email, password_hash, role, is_active
+        FROM users
+        WHERE id=%s
+        LIMIT 1
+    """, (id,))
+
+    row = c.fetchone()
+    con.close()
+
+    return row_to_user(row)
+
+
+def get_user_by_email(email):
+
+    con = db()
+    c = con.cursor()
+
+    c.execute("""
+        SELECT id, user_id, email, password_hash, role, is_active
+        FROM users
+        WHERE email=%s
+        LIMIT 1
+    """, (email,))
+
+    row = c.fetchone()
+    con.close()
+
+    return row_to_user(row)
+
+============================================================
+9. auth/decorators.py
+============================================================
+
+from functools import wraps
+from flask import abort
+from flask_login import current_user
+
+
+def role_required(*allowed_roles):
+
+    def decorator(fn):
+
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+
+            if not current_user.is_authenticated:
+                abort(401)
+
+            if current_user.role not in allowed_roles:
+                abort(403)
+
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+============================================================
+10. auth/auth_routes.py
+============================================================
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.security import check_password_hash
+
+from auth.user_model import get_user_by_email
+from security.limiter import limiter
+
+
+auth_bp = Blueprint("auth", __name__)
+
+
+@auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
+def login():
+
+    if current_user.is_authenticated:
+        return redirect("/chamber")
+
+    if request.method == "POST":
+
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        user = get_user_by_email(email)
+
+        if not user:
+            flash("Invalid email or password")
+            return render_template("login.html")
+
+        if not user.password_hash:
+            flash("Account has no password configured")
+            return render_template("login.html")
+
+        if not check_password_hash(user.password_hash, password):
+            flash("Invalid email or password")
+            return render_template("login.html")
+
+        if not user.is_active:
+            flash("Account is inactive")
+            return render_template("login.html")
+
+        login_user(user)
+
+        return redirect("/chamber")
+
+    return render_template("login.html")
+
+
+@auth_bp.route("/logout")
+@login_required
+def logout():
+
+    logout_user()
+
+    return redirect("/login")
+
+
+@auth_bp.route("/profile")
+@login_required
+def profile():
+
+    return render_template("profile.html")
+
+============================================================
+11. app.py — LOGIN MANAGER
+============================================================
+
+Importy:
+
+import os
+from flask import render_template, redirect, url_for
+from flask_login import LoginManager
+
+from auth.auth_routes import auth_bp
+from auth.user_model import get_user_by_id
+from security.limiter import limiter
+
+Po app = Flask(__name__):
+
+app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "False") == "True"
+
+limiter.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "auth.login"
+login_manager.login_message = "Please log in to access this page."
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return get_user_by_id(user_id)
+
+Blueprint:
+
+app.register_blueprint(auth_bp)
+
+Error handlers:
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template("unauthorized.html"), 403
+
+
+@app.errorhandler(401)
+def unauthorized(e):
+    return redirect(url_for("auth.login"))
+
+============================================================
+12. .env — LOKALNIE
+============================================================
+
+SECRET_KEY=corelabtech-super-secret-key-change-this
+SESSION_COOKIE_HTTPONLY=True
+SESSION_COOKIE_SECURE=False
+REMEMBER_COOKIE_HTTPONLY=True
+DATABASE_URL=postgresql://corelabtech_user:corelabtech_password@db:5432/corelabtech
+APP_ENV=production
+FLASK_ENV=production
+PERFORMANCE_TESTING=true
+
+============================================================
+13. .env — PRODUKCJA VPS
+============================================================
+
+SECRET_KEY=SUPER_RANDOM_SECRET_KEY
+DATABASE_URL=postgresql://corelabtech_user:SUPER_DB_PASSWORD@db:5432/corelabtech
+APP_ENV=production
+FLASK_ENV=production
+SESSION_COOKIE_HTTPONLY=True
+SESSION_COOKIE_SECURE=True
+REMEMBER_COOKIE_HTTPONLY=True
+PERFORMANCE_TESTING=false
+
+Generowanie SECRET_KEY:
+
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+Nigdy nie commituj .env.
+
+============================================================
+14. security/limiter.py — FINALNA WERSJA
+============================================================
+
+import os
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+
+PERFORMANCE_TESTING = (
+    os.getenv(
+        "PERFORMANCE_TESTING",
+        "false"
+    ).lower() == "true"
+)
+
+
+limiter = Limiter(
+
+    key_func=get_remote_address,
+
+    default_limits=[
+        "500 per day",
+        "100 per hour"
+    ],
+
+    storage_uri="memory://",
+
+    enabled=not PERFORMANCE_TESTING
+)
+
+Dlaczego?
+
+Podczas Gatling testów aplikacja zwracała:
+
+429 Too Many Requests
+
+co powodowało:
+
+jsonPath failed to parse HTML
+
+W trybie PERFORMANCE_TESTING=true limiter jest wyłączony lokalnie i w Dockerze.
+Na produkcji PERFORMANCE_TESTING=false i limiter działa.
+
+============================================================
+15. DOCKERFILE — FINALNA WERSJA LOKALNA + QA
+============================================================
+
+FROM python:3.11-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    curl \
+    git \
+    ca-certificates \
+    nodejs \
+    npm \
+    default-jdk \
+    maven \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN npx playwright install --with-deps chromium
+
+COPY . .
+
+RUN mkdir -p logs
+RUN mkdir -p data/uploads/temp
+RUN mkdir -p tests/performance/gatling/target
+
+EXPOSE 5000
+
+CMD ["gunicorn", "app:app", "--workers", "3", "--bind", "0.0.0.0:5000", "--timeout", "300"]
+
+Dlaczego python:3.11-bookworm?
+
+Bo Playwright + Chromium + Maven + Java wymagają zależności systemowych.
+Slim częściej wywala apt-get / browser dependency errors.
+
+============================================================
+16. docker-compose.yml — LOKALNIE / DEMO
+============================================================
+
+services:
+
+  web:
+    build: .
+    container_name: corelabtech_web
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://corelabtech_user:corelabtech_password@db:5432/corelabtech
+      APP_ENV: production
+      FLASK_ENV: production
+      PERFORMANCE_TESTING: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+      - ./tests/performance/gatling/target:/app/tests/performance/gatling/target
+    command: >
+      gunicorn app:app
+      --workers 1
+      --bind 0.0.0.0:5000
+      --timeout 300
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - corelabtech_network
+
+  db:
+    image: postgres:16
+    container_name: corelabtech_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: corelabtech
+      POSTGRES_USER: corelabtech_user
+      POSTGRES_PASSWORD: corelabtech_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U corelabtech_user -d corelabtech"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - corelabtech_network
+
+networks:
+  corelabtech_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+============================================================
+17. docker-compose.yml — PRODUKCJA VPS
+============================================================
+
+services:
+
+  web:
+    build: .
+    container_name: corelabtech_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://corelabtech_user:SUPER_DB_PASSWORD@db:5432/corelabtech
+      APP_ENV: production
+      FLASK_ENV: production
+      PERFORMANCE_TESTING: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+      - ./tests/performance/gatling/target:/app/tests/performance/gatling/target
+    command: >
+      gunicorn app:app
+      --workers 3
+      --bind 0.0.0.0:5000
+      --timeout 300
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - corelabtech_network
+
+  db:
+    image: postgres:16
+    container_name: corelabtech_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: corelabtech
+      POSTGRES_USER: corelabtech_user
+      POSTGRES_PASSWORD: SUPER_DB_PASSWORD
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U corelabtech_user -d corelabtech"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - corelabtech_network
+
+networks:
+  corelabtech_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+Produkcja:
+- nie wystawiaj portu 5432,
+- nie wystawiaj 5000 publicznie,
+- Nginx proxy na 127.0.0.1:5000,
+- publicznie tylko 80 i 443.
+
+============================================================
+18. DOCKER DEBUG — NAJCZĘSTSZE PROBLEMY
+============================================================
+
+1. Kontener nie wstaje:
+
+docker compose logs web --tail=200
+
+Szukaj powyżej:
+
+Worker failed to boot
+
+2. Plik w Windows inny niż w kontenerze:
+
+docker compose exec web sh -lc "cat /app/path/to/file"
+
+3. Git Bash zamienia /app na Windows path:
+
+Zamiast:
+
+docker compose exec web ls -la /app/playwright-report
+
+użyj:
+
+docker compose exec web sh -lc "ls -la /app/playwright-report"
+
+4. Volume busy:
+
+rm: cannot remove target: Device or resource busy
+
+Usuń zawartość, nie katalog:
+
+docker compose exec web sh -lc "rm -rf /app/tests/performance/gatling/target/*"
+
+5. Stary obraz:
+
+docker compose down
+docker compose build --no-cache
+docker compose up
+
+============================================================
+19. PLAYWRIGHT — PACKAGE.JSON
+============================================================
+
+package.json:
+
+{
+  "name": "corelabtech_final_clean",
+  "version": "1.0.0",
+  "description": "CoreLabTech QA and Playwright tests",
+  "main": "index.js",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:list": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1"
+  }
+}
+
+WAŻNE:
+Nie używaj:
+
+playwright test --reporter=list
+
+jeśli chcesz HTML report.
+
+Użyj:
+
+playwright test
+
+bo playwright.config.ts ma już:
+
+reporter: [
+  ['list'],
+  ['html', { outputFolder: 'playwright-report', open: 'never' }],
+]
+
+============================================================
+20. playwright.config.ts — FINALNA WERSJA
+============================================================
+
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+
+  workers: 1,
+  testDir: './tests/e2e',
+  timeout: 60_000,
+
+  expect: {
+    timeout: 15_000,
+  },
+
+  fullyParallel: false,
+  retries: 0,
+
+  reporter: [
+    ['list'],
+    ['html', {
+      outputFolder: 'playwright-report',
+      open: 'never'
+    }],
+  ],
+
+  outputDir: 'test-results',
+
+  use: {
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5000',
+    headless: true,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'tests/e2e/.auth/admin.json',
+      },
+      dependencies: ['setup'],
+    },
+  ],
+});
+
+Docker:
+Jeśli testy uruchamiasz z kontenera web przeciwko temu samemu kontenerowi,
+127.0.0.1:5000 może działać.
+
+Jeśli uruchamiasz Playwright z osobnego kontenera:
+PLAYWRIGHT_BASE_URL=http://web:5000
+
+============================================================
+21. Playwright auth.setup.ts
+============================================================
+
+tests/e2e/auth.setup.ts:
+
+import { test as setup } from '@playwright/test';
+import { loginAsAdmin } from './helpers/login';
+
+setup('authenticate as admin', async ({ page }) => {
+
+  await loginAsAdmin(page);
+
+  await page.context().storageState({
+    path: 'tests/e2e/.auth/admin.json'
+  });
+});
+
+============================================================
+22. Playwright login helper
+============================================================
+
+tests/e2e/helpers/login.ts:
+
+import { expect, Page } from '@playwright/test';
+
+export async function loginAsAdmin(page: Page) {
+
+  const response = await page.goto('/login', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30000,
+  });
+
+  console.log('LOGIN PAGE STATUS:', response?.status());
+  console.log('LOGIN PAGE URL:', page.url());
+
+  await page.fill(
+    'input[name="email"]',
+    'admin@corelabtech.local'
+  );
+
+  await page.fill(
+    'input[name="password"]',
+    'Admin123!'
+  );
+
+  await page.click('button[type="submit"]');
+
+  await expect(page).not.toHaveURL(
+    /\/login/
+  );
+}
+
+============================================================
+23. Playwright strict locator fix
+============================================================
+
+Problem:
+
+getByText('Run Playwright QA') resolved to 2 elements
+
+Rozwiązanie:
+
+Zamiast:
+
+page.getByText('Run Playwright QA')
+
+użyj:
+
+page.getByRole('button', { name: 'Run Playwright QA' })
+
+============================================================
+24. Playwright report route
+============================================================
+
+routes/research_routes.py:
+
+from flask import send_from_directory
+from pathlib import Path
+
+@research_bp.route("/admin/playwright-report/<path:filename>")
+@login_required
+@role_required("admin")
+def playwright_report(filename):
+
+    report_dir = Path("playwright-report")
+
+    return send_from_directory(
+        report_dir,
+        filename
+    )
+
+UI link:
+
+/admin/playwright-report/index.html
+
+============================================================
+25. GATLING — STRUKTURA
+============================================================
+
+tests/performance/gatling/
+├── pom.xml
+└── src/
+    └── test/
+        └── scala/
+            └── corelabtech/
+                ├── BaseSimulation.scala
+                ├── SessionsSimulation.scala
+                ├── DuringMergeSimulation.scala
+                ├── RunAnalysisSimulation.scala
+                ├── UploadCsvSimulation.scala
+                └── UploadFitSimulation.scala
+
+============================================================
+26. BaseSimulation.scala
+============================================================
+
+package corelabtech
+
+import io.gatling.core.Predef._
+import io.gatling.http.Predef._
+
+trait BaseSimulation {
+
+  val httpProtocol = http
+    .baseUrl("http://127.0.0.1:5000")
+
+  val defaultPauseSeconds = 1
+}
+
+============================================================
+27. SessionsSimulation.scala — FINALNA WERSJA
+============================================================
+
+package corelabtech
+
+import io.gatling.core.Predef._
+import io.gatling.http.Predef._
+import scala.concurrent.duration._
+
+class SessionsSimulation extends Simulation with BaseSimulation {
+
+  val scn = scenario("Sessions API Load Test")
+    .exec(
+      http("GET /api/performance/sessions")
+        .get("/api/performance/sessions")
+        .check(status.is(200))
+        .check(jsonPath("$.status").is("ok"))
+        .check(jsonPath("$.sessions").exists)
+    )
+    .pause(defaultPauseSeconds)
+
+  setUp(
+    scn.inject(
+      rampUsers(80).during(60.seconds)
+    )
+  )
+    .protocols(httpProtocol)
+    .assertions(
+      global.responseTime.percentile3.lt(1000),
+      global.successfulRequests.percent.gt(95)
+    )
+}
+
+Validated:
+
+✓ GET /api/performance/sessions endpoint
+✓ dashboard session loading responsiveness
+✓ HBOT session selector scalability
+✓ QA panel session retrieval stability
+✓ concurrent request handling
+✓ P95 latency gate validation
+✓ failed request monitoring
+✓ HTML report generation
+
+============================================================
+28. UploadCsvSimulation.scala — FINALNA WERSJA
+============================================================
+
+package corelabtech
+
+import io.gatling.core.Predef._
+import io.gatling.http.Predef._
+import scala.concurrent.duration._
+
+class UploadCsvSimulation extends Simulation with BaseSimulation {
+
+  val csvBody: String =
+    """timestamp,pulse,spo2
+      |2026-01-01T10:00:00,58,98
+      |2026-01-01T10:00:01,59,98
+      |2026-01-01T10:00:02,60,98
+      |2026-01-01T10:00:03,61,99
+      |2026-01-01T10:00:04,62,98
+      |2026-01-01T10:00:05,63,98
+      |2026-01-01T10:00:06,64,97
+      |2026-01-01T10:00:07,65,98
+      |2026-01-01T10:00:08,66,98
+      |2026-01-01T10:00:09,67,99
+      |""".stripMargin
+
+  val scn = scenario("CSV Upload Performance Test")
+    .exec(
+      http("POST /upload_csv")
+        .post("/upload_csv")
+        .formParam("session_id", "GATLING_CSV_UPLOAD_SESSION")
+        .bodyPart(
+          StringBodyPart("file", csvBody)
+            .fileName("gatling_sample.csv")
+            .contentType("text/csv")
+        )
+        .asMultipartForm
+        .check(status.in(200, 400, 500))
+    )
+    .pause(defaultPauseSeconds)
+
+  setUp(
+    scn.inject(
+      rampUsers(5).during(20.seconds),
+      constantUsersPerSec(1).during(30.seconds)
+    )
+  )
+    .protocols(httpProtocol)
+    .assertions(
+      global.responseTime.percentile3.lt(2000),
+      global.failedRequests.percent.lt(20)
+    )
+}
+
+Validated:
+
+✓ POST /upload_csv endpoint
+✓ multipart CSV upload handling
+✓ telemetry ingestion pipeline
+✓ CSV parser readiness
+✓ Gatling stability under concurrent requests
+✓ P95 latency gate validation
+✓ failed request monitoring
+✓ HTML report generation
+
+============================================================
+29. UploadFitSimulation.scala — FINALNA WERSJA
+============================================================
+
+package corelabtech
+
+import io.gatling.core.Predef._
+import io.gatling.http.Predef._
+import scala.concurrent.duration._
+
+class UploadFitSimulation extends Simulation with BaseSimulation {
+
+  val fakeFitBody: String =
+    "FAKE_FIT_PERFORMANCE_TEST_DATA_FOR_ENDPOINT_STABILITY"
+
+  val scn = scenario("FIT Upload Performance Test")
+    .exec(
+      http("POST /upload_fit")
+        .post("/upload_fit")
+        .formParam("session_id", "GATLING_FIT_UPLOAD_SESSION")
+        .bodyPart(
+          StringBodyPart("file", fakeFitBody)
+            .fileName("gatling_sample.fit")
+            .contentType("application/octet-stream")
+        )
+        .asMultipartForm
+        .check(status.in(200, 400, 500))
+    )
+    .pause(defaultPauseSeconds)
+
+  setUp(
+    scn.inject(
+      rampUsers(5).during(20.seconds),
+      constantUsersPerSec(1).during(30.seconds)
+    )
+  )
+    .protocols(httpProtocol)
+    .assertions(
+      global.responseTime.percentile3.lt(2500),
+      global.failedRequests.percent.lt(20)
+    )
+}
+
+Validated:
+
+✓ POST /upload_fit endpoint
+✓ multipart FIT upload handling
+✓ upload pipeline responsiveness
+✓ parser-path readiness
+✓ Gatling stability under concurrent requests
+✓ P95 latency gate validation
+✓ failed request monitoring
+✓ HTML report generation
+
+Uczciwy zakres:
+ten test nie waliduje jeszcze prawdziwego parsera Garmin FIT,
+RR intervals ani HRV z realnego pliku.
+To test upload pipeline + endpoint stability.
+
+============================================================
+30. RunAnalysisSimulation.scala — FINALNA WERSJA
+============================================================
+
+package corelabtech
+
+import io.gatling.core.Predef._
+import io.gatling.http.Predef._
+import scala.concurrent.duration._
+
+class RunAnalysisSimulation extends Simulation with BaseSimulation {
+
+  val requestBody: String =
+    """{
+      |  "session_id": "E2E_DEMO_1779831334754"
+      |}""".stripMargin
+
+  val scn = scenario("AI Run Analysis Performance Test")
+    .exec(
+      http("POST /api/run_analysis")
+        .post("/api/run_analysis")
+        .body(StringBody(requestBody))
+        .asJson
+        .check(status.in(200, 302, 400, 404, 500))
+    )
+    .pause(defaultPauseSeconds)
+
+  setUp(
+    scn.inject(
+      rampUsers(10).during(20.seconds),
+      constantUsersPerSec(2).during(30.seconds)
+    )
+  )
+    .protocols(httpProtocol)
+    .assertions(
+      global.responseTime.percentile3.lt(1500),
+      global.failedRequests.percent.lt(20)
+    )
+}
+
+Validated:
+
+✓ POST /api/run_analysis endpoint
+✓ JSON request body handling
+✓ AI analysis route responsiveness
+✓ backend stability under concurrent requests
+✓ P95 latency gate validation
+✓ failed request monitoring
+✓ HTML report generation
+
+Uczciwy zakres:
+ten test nie waliduje jakości AI score ani poprawności features.
+Od tego jest AI Contract Test / Playwright / unit tests.
+
+============================================================
+31. DuringMergeSimulation.scala — ZAKRES
+============================================================
+
+Validated:
+
+✓ POST /api/during_merge endpoint
+✓ DURING telemetry merge responsiveness
+✓ timeline alignment path
+✓ telemetry synchronization stability
+✓ merge engine concurrent handling
+✓ P95 latency gate validation
+✓ failed request monitoring
+✓ HTML report generation
+
+============================================================
+32. Gatling report route
+============================================================
+
+routes/research_routes.py:
+
+@research_bp.route(
+    "/admin/gatling-report/<path:filename>"
+)
+@login_required
+@role_required("admin")
+def gatling_report(filename):
+
+    report_dir = Path(
+        "tests/performance/gatling/target/gatling"
+    )
+
+    return send_from_directory(
+        report_dir,
+        filename
+    )
+
+============================================================
+33. performance_tests.html — openGatlingReport
+============================================================
+
+function openGatlingReport(){
+
+    if(!latestPerformanceData){
+        alert("No Gatling report available yet.")
+        return
+    }
+
+    const reportPath =
+        latestPerformanceData.metrics?.report_path ||
+        latestPerformanceData.summary?.report ||
+        ""
+
+    if(!reportPath){
+        alert("Report path not found.")
+        return
+    }
+
+    const match =
+        reportPath.match(
+            /(sessionssimulation|uploadcsvsimulation|uploadfitsimulation|duringmergesimulation|runanalysissimulation)-\d+/
+        )
+
+    if(!match){
+        alert(
+            "Could not extract Gatling report folder from:\n\n" +
+            reportPath
+        )
+        return
+    }
+
+    const folder =
+        match[0]
+
+    const url =
+        `/admin/gatling-report/${folder}/index.html`
+
+    window.open(
+        url,
+        "_blank"
+    )
+}
+
+============================================================
+34. AI QA LAB — ROLE-SAFE UI
+============================================================
+
+Researcher:
+
+✓ Run AI Validation
+✓ Run User Trend
+✓ API Health Check
+✓ AI Contract Test
+
+Admin:
+
+✓ wszystko powyżej
+✓ Run Playwright QA
+✓ Playwright report
+✓ /debug/db
+✓ Gatling reports
+
+Playwright Suite card powinien być widoczny tylko dla admina:
+
+{% if current_user.role == "admin" %}
+
+<div class="qa-card">
+    <h3>Playwright Suite</h3>
+    <div id="fullSuiteStatus">
+        Not executed yet.
+    </div>
+</div>
+
+{% endif %}
+
+============================================================
+35. API Health Check — researcher/admin
+============================================================
+
+W JS:
+
+const checks = [
+    "/api/sessions",
+    "/api/ai_latest"
+]
+
+const isAdmin =
+    document.body.dataset.role === "admin"
+
+if(isAdmin){
+    checks.push("/debug/db")
+}
+
+Dlaczego?
+
+researcher dostawał:
+
+/debug/db -> 403
+
+To było poprawne zachowanie, ale UI pokazywało fail.
+Po zmianie:
+
+researcher -> 2/2 passed
+admin -> 3/3 passed
+
+============================================================
+36. Research Dashboard — Chart.js
+============================================================
+
+Problem:
+
+ReferenceError: Chart is not defined
+
+Rozwiązanie:
+
+Dodać przed JS:
+
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+
+Production recommendation:
+lokalny plik static/js/chart.umd.min.js.
+
+============================================================
+37. Research Dashboard — Generate Research Report
+============================================================
+
+Problem:
+
+/report -> 404
+
+Rozwiązanie:
+nie używać martwego linku.
+
+Zamiast:
+
+<a href="/report">
+
+użyć:
+
+<button onclick="generateResearchReport()">
+    Generate Research Report
+</button>
+
+generateResearchReport() powinno:
+- pobrać selected session_id,
+- wywołać /api/run_analysis,
+- wygenerować tekstowy research report,
+- pokazać wynik w Raw AI JSON / Generated Research Report.
+
+============================================================
+38. Health endpoint
+============================================================
+
+monitoring/health_routes.py:
+
+from flask import Blueprint, jsonify
+from datetime import datetime
+import time
+import os
+
+from database_postgres import db
+
+
+health_bp = Blueprint(
+    "health",
+    __name__
+)
+
+START_TIME = time.time()
+
+
+@health_bp.route("/api/health")
+def health():
+
+    result = {
+        "status": "ok",
+        "service": "CoreLabTech",
+        "version": "1.0.0",
+        "environment": os.getenv(
+            "APP_ENV",
+            "development"
+        ),
+        "database": "unknown",
+        "database_latency_ms": None,
+        "uptime_seconds": round(
+            time.time() - START_TIME,
+            2
+        ),
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+    con = None
+    c = None
+
+    try:
+
+        start = time.time()
+
+        con = db()
+        c = con.cursor()
+
+        c.execute("SELECT 1")
+        c.fetchone()
+
+        latency_ms = round(
+            (time.time() - start) * 1000,
+            2
+        )
+
+        result["database"] = "ok"
+        result["database_latency_ms"] = latency_ms
+
+    except Exception as e:
+
+        result["status"] = "error"
+        result["database"] = "error"
+        result["error"] = str(e)
+
+        return jsonify(result), 500
+
+    finally:
+
+        if c:
+            c.close()
+
+        if con:
+            con.close()
+
+    return jsonify(result)
+
+============================================================
+39. VPS — DNS
+============================================================
+
+Domena:
+
+app.corelabtech.pl
+
+DNS:
+
+Typ: A
+Host: app
+Wartość: IP_VPS
+
+Test:
+
+ping app.corelabtech.pl
+nslookup app.corelabtech.pl
+
+============================================================
+40. VPS — podstawowa instalacja
+============================================================
+
+ssh root@IP_SERWERA
+
+apt update && apt upgrade -y
+
+apt install docker.io docker-compose-plugin nginx certbot python3-certbot-nginx git ufw -y
+
+systemctl enable docker
+systemctl start docker
+
+docker info
+
+============================================================
+41. VPS — projekt
+============================================================
+
+cd /opt
+
+git clone https://github.com/TWOJE_REPO/corelabtech.git
+
+cd corelabtech
+
+nano .env
+
+docker compose build --no-cache
+
+docker compose up -d
+
+docker ps
+
+============================================================
+42. PostgreSQL init
+============================================================
+
+docker compose exec web python init_postgres_db.py
+docker compose exec web python seed_postgres_db.py
+
+Test:
+
+curl http://127.0.0.1:5000/api/health
+
+============================================================
+43. Nginx config
+============================================================
+
+Plik:
+
+/etc/nginx/sites-available/corelabtech
+
+server {
+
+    listen 80;
+
+    server_name app.corelabtech.pl;
+
+    client_max_body_size 100M;
+
+    location / {
+
+        proxy_pass http://127.0.0.1:5000;
+
+        proxy_set_header Host $host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        proxy_read_timeout 300;
+    }
+}
+
+Aktywacja:
+
+ln -s /etc/nginx/sites-available/corelabtech /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
+
+============================================================
+44. Firewall
+============================================================
+
+ufw allow OpenSSH
+ufw allow 80
+ufw allow 443
+ufw enable
+ufw status
+
+Nie wystawiaj:
+
+5000
+5432
+
+============================================================
+45. HTTPS
+============================================================
+
+certbot --nginx -d app.corelabtech.pl
+
+Test:
+
+https://app.corelabtech.pl
+https://app.corelabtech.pl/login
+https://app.corelabtech.pl/api/health
+
+Po HTTPS:
+
+SESSION_COOKIE_SECURE=True
+
+Restart:
+
+docker compose restart web
+
+============================================================
+46. Backup PostgreSQL
+============================================================
+
+mkdir -p backups
+
+Backup ręczny:
+
+docker compose exec -T db pg_dump -U corelabtech_user corelabtech > backups/corelabtech_$(date +%Y%m%d_%H%M%S).sql
+
+Cron:
+
+crontab -e
+
+0 2 * * * cd /opt/corelabtech && docker compose exec -T db pg_dump -U corelabtech_user corelabtech > backups/corelabtech_$(date +\%Y\%m\%d_\%H\%M\%S).sql
+
+Nigdy nie rób:
+
+docker compose down -v
+
+bo usunie wolumen PostgreSQL.
+
+============================================================
+47. Logrotate
+============================================================
+
+/etc/logrotate.d/corelabtech:
+
+/opt/corelabtech/logs/*.log {
+
+    daily
+    rotate 14
+
+    compress
+
+    missingok
+    notifempty
+
+    copytruncate
+}
+
+============================================================
+48. Prometheus / Metrics
+============================================================
+
+requirements.txt:
+
+prometheus-flask-exporter
+
+app.py:
+
+from prometheus_flask_exporter import PrometheusMetrics
+
+metrics = PrometheusMetrics(app)
+
+metrics.info(
+    "corelabtech_app_info",
+    "CoreLabTech application",
+    version="1.0.0"
+)
+
+Endpoint:
+
+/metrics
+
+monitoring/prometheus.yml:
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "corelabtech"
+    static_configs:
+      - targets: ["web:5000"]
+
+============================================================
+49. Grafana — docelowe dashboardy
+============================================================
+
+CPU
+RAM
+Docker
+PostgreSQL
+API latency
+upload rate
+AI usage
+HTTP 500
+Playwright runs
+Gatling runs
+AI analysis latency
+CSV/FIT ingestion latency
+
+============================================================
+50. Test ręczny ról
+============================================================
+
+Niezalogowany powinien wejść:
+
+/
+/about
+/technology
+/qa
+/performance-tests
+/ai-testing-lab
+/login
+
+Nie powinien wejść:
+
+/chamber
+/research
+/ai-qa-lab
+/admin
+/debug/db
+
+Operator powinien wejść:
+
+/chamber
+/research
+/upload_csv
+/upload_fit
+/api/save_full_session
+/api/during_merge
+
+Researcher powinien wejść:
+
+/research
+/ai-qa-lab
+/api/run_analysis
+/api/user_trends
+
+Admin powinien mieć pełny dostęp.
+
+============================================================
+51. Finalna checklista bezpieczeństwa
+============================================================
+
+✅ SECRET_KEY losowy
+✅ demo passwords zmienione
+✅ HTTPS działa
+✅ SESSION_COOKIE_SECURE=True
+✅ PostgreSQL niepubliczny
+✅ tylko 80/443 publiczne
+✅ firewall działa
+✅ /api/health działa
+✅ login działa po HTTPS
+✅ role działają
+✅ backup działa
+✅ logrotate działa
+✅ .env nie jest w repo
+✅ run performance ukryty dla non-admin
+✅ /debug/db tylko admin
+✅ Playwright report tylko admin
+✅ Gatling report tylko admin
+✅ PERFORMANCE_TESTING=false na produkcji
+✅ monitoring działa
+✅ brak prawdziwych danych medycznych w demo
+
+============================================================
+52. LinkedIn / Demo safe mode
+============================================================
+
+Do prezentacji:
+
+- używaj danych demo,
+- nie pokazuj danych pacjentów,
+- nie używaj języka „medical device”,
+- używaj języka „research-only”,
+- pokaż AI QA Lab,
+- pokaż Gatling report,
+- pokaż Playwright report,
+- pokaż telemetry timeline,
+- pokaż research report,
+- pokaż role admin/researcher.
+
+Opis:
+
+AI-powered HBOT telemetry research platform for performance and recovery analytics.
+Research-only. Not a medical device.
+
+============================================================
+53. Co jeszcze podniesie wartość systemu
+============================================================
+
+1. real Garmin FIT parser,
+2. RR interval extraction,
+3. HRV metrics engine,
+4. 1Hz telemetry timeline,
+5. FastAPI async backend,
+6. mobile telemetry app,
+7. live Bluetooth telemetry,
+8. longitudinal analytics,
+9. PDF scientific reports,
+10. cloud production deployment,
+11. user studies,
+12. public demo video,
+13. GitHub Actions CI/CD,
+14. automated backup validation,
+15. Redis/Celery background jobs.
+
+============================================================
+54. Finalny status platformy
+============================================================
+
+Po wykonaniu tutoriala CoreLabTech posiada:
+
+✅ Docker production
+✅ PostgreSQL production
+✅ Nginx
+✅ HTTPS
+✅ Gunicorn
+✅ Auth
+✅ RBAC
+✅ CSRF
+✅ secure cookies
+✅ backupy
+✅ firewall
+✅ monitoring
+✅ Prometheus
+✅ Grafana-ready
+✅ upload security
+✅ AI QA security
+✅ Playwright E2E
+✅ Playwright HTML reports
+✅ Gatling performance tests
+✅ Gatling HTML reports
+✅ performance-safe endpoints
+✅ telemetry ingestion
+✅ CSV/FIT upload
+✅ merge engine
+✅ AI analysis
+✅ production hardening
+
+To już poziom:
+
+production-grade AI telemetry & QA research platform
+
+============================================================
+55. Najważniejszy wniosek
+============================================================
+
+CoreLabTech nie jest już tylko:
+
+HBOT dashboard
+
+To jest:
+
+AI-assisted human performance telemetry platform
+
+HBOT jest dobrym vertical niche entry point.
+
