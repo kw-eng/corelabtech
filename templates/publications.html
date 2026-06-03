@@ -1,18 +1,21 @@
-<!--lista publikacji-->
 {% extends "layout.html" %}
 
 {% block content %}
 
 <h1>Research Publications</h1>
 
+{% if papers %}
+
 <ul>
-
-{% for p in papers %}
-
-<li>{{ p }}</li>
-
-{% endfor %}
-
+    {% for p in papers %}
+    <li>{{ p }}</li>
+    {% endfor %}
 </ul>
+
+{% else %}
+
+<p>No research publications uploaded yet.</p>
+
+{% endif %}
 
 {% endblock %}
