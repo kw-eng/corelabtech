@@ -591,7 +591,7 @@ def delete_user():
 @csrf.exempt
 @research_bp.route("/upload_fit", methods=["POST"])
 @login_required
-@role_required("operator", "admin")
+@role_required("admin", "researcher", "operator")
 @limiter.limit(UPLOAD_LIMIT)
 def upload_fit():
 
@@ -735,7 +735,7 @@ def upload_fit():
 @csrf.exempt
 @research_bp.route("/upload_csv", methods=["POST"])
 @login_required
-@role_required("operator", "admin")
+@role_required("admin", "researcher", "operator")
 @limiter.limit(UPLOAD_LIMIT)
 def upload_csv():
 
