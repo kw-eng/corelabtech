@@ -19,7 +19,7 @@ from routes.ai_routes import ai_bp
 from routes.ai_qa_routes import ai_qa_bp
 from routes.qa_routes import qa_bp
 from routes.publication_routes import pub_bp
-from routes.user_routes import user_bp
+#  from routes.user_routes import user_bp
 from routes.telemetry_routes import telemetry_bp
 from routes.upload_routes import upload_bp
 from routes.performance_routes import performance_bp
@@ -61,7 +61,7 @@ app.register_blueprint(ai_bp)
 app.register_blueprint(ai_qa_bp)
 app.register_blueprint(qa_bp)
 app.register_blueprint(pub_bp)
-app.register_blueprint(user_bp)
+# app.register_blueprint(user_bp)
 app.register_blueprint(telemetry_bp)
 app.register_blueprint(upload_bp)
 app.register_blueprint(performance_bp)
