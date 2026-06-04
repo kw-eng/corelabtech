@@ -1060,7 +1060,7 @@ def fit_timeseries(session_id):
 @csrf.exempt
 @research_bp.route("/api/save_phase", methods=["POST"])
 @login_required
-@role_required("operator", "admin")
+@role_required("admin", "researcher", "operator")
 @limiter.limit("120 per minute")
 def save_phase():
 
@@ -1167,7 +1167,7 @@ def save_phase():
 @csrf.exempt
 @research_bp.route("/api/save_full_session", methods=["POST"])
 @login_required
-@role_required("operator", "admin")
+@role_required("admin", "researcher", "operator")
 @limiter.limit("60 per minute")
 def save_full_session():
 
