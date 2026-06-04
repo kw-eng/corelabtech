@@ -368,13 +368,13 @@ def performance_sessions():
         }), 500
 
 # =========================================================
-# USERS
+# USERS - LIST
+# admin + researcher can view users
 # =========================================================
 
-@csrf.exempt
-@research_bp.route("/api/users", methods=["GET", "POST"])
+@research_bp.route("/api/users", methods=["GET"])
 @login_required
-@role_required("admin")
+@role_required("admin", "researcher")
 @limiter.limit("120 per minute")
 def users():
 
@@ -384,31 +384,90 @@ def users():
         con = db()
         c = con.cursor()
 
-        if request.method == "GET":
-            c.execute("SELECT * FROM users ORDER BY id DESC")
-            rows = c.fetchall()
+        c.execute("""
+            SELECT
+                id,
+                user_id,
+                email,
+                subject_id,
+                sex,
+                age,
+                weight,
+                notes,
+                role,
+                is_active
+            FROM users
+            ORDER BY id DESC
+        """)
 
-            c.close()
+        rows = c.fetchall()
+
+        c.close()
+        con.close()
+
+        return jsonify([
+            {
+                "id": r[0],
+                "user_id": r[1] or str(r[0]),
+                "email": r[2],
+                "subject_id": r[3],
+                "sex": r[4],
+                "age": r[5],
+                "weight": r[6],
+                "notes": r[7],
+                "role": r[8],
+                "is_active": r[9],
+            }
+            for r in rows
+        ])
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+        if con:
+            con.rollback()
             con.close()
 
-            return jsonify([
-                {
-                    "user_id": r[1] or str(r[0]),
-                    "subject_id": r[3],
-                    "sex": r[4],
-                    "age": r[5],
-                    "weight": r[6],
-                    "notes": r[7],
-                }
-                for r in rows
-            ])
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+
+# =========================================================
+# USERS - CREATE
+# only admin can create users
+# =========================================================
+
+@csrf.exempt
+@research_bp.route("/api/users", methods=["POST"])
+@login_required
+@role_required("admin")
+@limiter.limit("60 per minute")
+def create_user():
+
+    con = None
+
+    try:
+        con = db()
+        c = con.cursor()
 
         data = request.get_json() or {}
         user_id = str(uuid.uuid4())[:8]
 
         c.execute("""
-            INSERT INTO users(user_id, subject_id, sex, age, weight, notes)
-            VALUES(%s,%s,%s,%s,%s,%s)
+            INSERT INTO users(
+                user_id,
+                subject_id,
+                sex,
+                age,
+                weight,
+                notes,
+                role,
+                is_active
+            )
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             user_id,
             data.get("subject_id"),
@@ -416,6 +475,8 @@ def users():
             data.get("age"),
             data.get("weight"),
             data.get("notes"),
+            data.get("role", "viewer"),
+            True,
         ))
 
         con.commit()
@@ -429,15 +490,18 @@ def users():
         })
 
     except IntegrityError:
+
         if con:
             con.rollback()
             con.close()
 
         return jsonify({
+            "status": "error",
             "error": "User already exists"
         }), 400
 
     except Exception as e:
+
         traceback.print_exc()
 
         if con:
