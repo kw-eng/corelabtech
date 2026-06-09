@@ -29,7 +29,7 @@ async function parseJsonResponse(res, label) {
 
 window.onload = () => {
 
-    loadUsers()
+    loadSubjects()
 
     loadSessions()
 
@@ -269,15 +269,24 @@ function go(phase) {
 }
 
 // ========================================
-// USERS
+// SUBJECTS
 // ========================================
 
-async function createUser() {
+async function createSubject() {
+
+    const subjectId =
+        document.getElementById("subject_id")
+            .value
+            .trim()
+
+    if (!subjectId) {
+        alert("Enter Subject ID")
+        return
+    }
 
     const payload = {
 
-        subject_id:
-            document.getElementById("subject_id").value,
+        subject_id: subjectId,
 
         sex:
             document.getElementById("sex").value,
@@ -296,7 +305,7 @@ async function createUser() {
             document.getElementById("notes").value
     }
 
-    const res = await fetch("/api/users", {
+    const res = await fetch("/api/subjects", {
 
         method: "POST",
         credentials: "same-origin",
@@ -307,42 +316,42 @@ async function createUser() {
         body: JSON.stringify(payload)
     })
 
-    const data = await parseJsonResponse(res, "CREATE USER")
+    const data = await parseJsonResponse(res, "CREATE SUBJECT")
 
-    if (data.error) {
+    if (!res.ok || data.error) {
 
-        alert(data.error)
+        alert(data.error || "Create subject failed")
         return
     }
 
-    alert("User created")
+    alert("Subject created")
 
-    loadUsers()
+    await loadSubjects()
 }
 
-async function deleteUser() {
+async function deleteSubject() {
 
-    const userSelect =
+    const subjectSelect =
         document.getElementById("user_id")
 
-    const userId =
-        userSelect.value
+    const subjectId =
+        subjectSelect.value
 
-    const userLabel =
-        userSelect.options[userSelect.selectedIndex]?.text || userId
+    const subjectLabel =
+        subjectSelect.options[subjectSelect.selectedIndex]?.text || subjectId
 
-    if (!userId) {
-        alert("No user selected")
+    if (!subjectId) {
+        alert("No subject selected")
         return
     }
 
-    if (!confirm(`Are you sure you want to delete this user and all related sessions?\n\nUser: ${userLabel}\nID: ${userId}`)) {
+    if (!confirm(`Are you sure you want to delete this subject and all related sessions?\n\nSubject: ${subjectLabel}\nID: ${subjectId}`)) {
         return
     }
 
     try {
 
-        const res = await fetch("/api/delete_user", {
+        const res = await fetch("/api/delete_subject", {
 
             method: "POST",
 
@@ -353,32 +362,32 @@ async function deleteUser() {
             },
 
             body: JSON.stringify({
-                user_id: userId
+                user_id: subjectId
             })
         })
 
         const text = await res.text()
 
-        console.log("DELETE USER RAW RESPONSE:", text)
+        console.log("DELETE SUBJECT RAW RESPONSE:", text)
 
         let data = null
 
         try {
             data = JSON.parse(text)
         } catch (e) {
-            console.error("Delete user non-JSON response:", text)
-            alert("Delete user returned HTML. Check CSRF/auth/route.")
+            console.error("Delete subject non-JSON response:", text)
+            alert("Delete subject returned HTML. Check CSRF/auth/route.")
             return
         }
 
         if (!res.ok || data.error) {
-            alert(data.error || "Delete user failed")
+            alert(data.error || "Delete subject failed")
             return
         }
 
-        alert("User deleted")
+        alert("Subject deleted")
 
-        loadUsers()
+        loadSubjects()
 
         if (typeof loadSessions === "function") {
             loadSessions()
@@ -386,37 +395,68 @@ async function deleteUser() {
 
     } catch (err) {
 
-        console.error("deleteUser crash:", err)
+        console.error("deleteSubject crash:", err)
 
-        alert("Delete user crashed - check console and Flask logs")
+        alert("Delete subject crashed - check console and Flask logs")
     }
 }
 
-async function loadUsers() {
+async function loadSubjects() {
 
-    const res = await fetch("/api/users", {
-    credentials: "same-origin"
+    const res = await fetch("/api/subjects", {
+        credentials: "same-origin"
     })
 
-    const users = await parseJsonResponse(res, "LOAD USERS")
+    const subjects = await parseJsonResponse(res, "LOAD SUBJECTS")
 
     const select =
         document.getElementById("user_id")
 
-    if (!select) return
+    if (!select) {
+        console.error("Select Subject element #user_id not found")
+        return
+    }
 
     select.innerHTML = ""
 
-    users.forEach(user => {
+    if (!Array.isArray(subjects)) {
+        console.error("LOAD SUBJECTS invalid response:", subjects)
+        return
+    }
+
+    const onlySubjects = subjects.filter(s =>
+        s &&
+        s.subject_id &&
+        !s.email &&
+        s.role !== "admin" &&
+        s.role !== "researcher"
+    )
+
+    console.log("LOAD SUBJECTS all:", subjects)
+    console.log("LOAD SUBJECTS filtered:", onlySubjects)
+
+    onlySubjects.forEach(subject => {
+
+        const value =
+            subject.user_id || subject.subject_id
+
+        const label =
+            subject.subject_id || subject.user_id
+
+        if (!value || !label) return
 
         select.innerHTML += `
-            <option value="${user.user_id}">
-                ${user.subject_id}
+            <option value="${value}">
+                ${label}
             </option>
         `
     })
 
-    generateSession()
+    if (select.options.length > 0) {
+        generateSession()
+    } else {
+        document.getElementById("session_id").value = ""
+    }
 }
 
 // ========================================
@@ -425,15 +465,15 @@ async function loadUsers() {
 
 function generateSession() {
 
-    const user =
+    const subject =
         document.getElementById("user_id")?.value
 
-    if (!user) return
+    if (!subject) return
 
     document.getElementById(
         "session_id"
     ).value =
-        `${user}_${Date.now()}`
+        `${subject}_${Date.now()}`
 
     state = {
         pre: null,
@@ -1084,7 +1124,7 @@ async function saveDURING() {
     const sessionId =
         document.getElementById("session_id").value
 
-    const userId =
+    const subjectId =
         document.getElementById("user_id").value
 
     const pressure =
@@ -1174,7 +1214,7 @@ async function saveDURING() {
         },
         body: JSON.stringify({
             session_id: sessionId,
-            user_id: userId,
+            user_id: subjectId,
             phase: "during",
             pressure_kpa: pressure,
             pressure_ata: ata,
@@ -1373,6 +1413,13 @@ async function saveFullSession() {
         return
     }
 
+    const subjectSelect =
+        document.getElementById("user_id")
+
+    const selectedSubjectLabel =
+        subjectSelect.options[subjectSelect.selectedIndex]?.text ||
+        subjectSelect.value
+
     const payload = {
         session_id: document.getElementById("session_id").value,
         user_id: document.getElementById("user_id").value,
@@ -1424,7 +1471,7 @@ async function saveFullSession() {
             <div class="success-box">
                 <b>✔ FULL SESSION SAVED</b><br><br>
                 Session: ${payload.session_id}<br>
-                User: ${payload.user_id}<br>
+                Subject: ${selectedSubjectLabel}<br>
                 DB saved_count: ${data.saved_count}
             </div>
         `
@@ -1501,7 +1548,7 @@ async function loadSessions() {
                 </td>
 
                 <td>${s.session_id}</td>
-                <td>${s.user_id || "-"}</td>
+                <td>${s.subject_id || "-"}</td>
 
                 <td>
                     <button onclick="runAnalysis('${s.session_id}')">
@@ -2116,9 +2163,9 @@ async function updateRealtimeAI() {
         console.error(e)
     }
 }
-window.createUser = createUser
-window.deleteUser = deleteUser
-window.loadUsers = loadUsers
+window.createSubject = createSubject
+window.deleteSubject = deleteSubject
+window.loadSubjects = loadSubjects
 window.generateSession = generateSession
 
 window.savePRE = savePRE

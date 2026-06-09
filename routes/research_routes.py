@@ -373,10 +373,11 @@ def performance_sessions():
 # =========================================================
 
 @research_bp.route("/api/users", methods=["GET"])
+@research_bp.route("/api/subjects", methods=["GET"])
 @login_required
-@role_required("admin", "researcher")
+@role_required("admin", "researcher", "operator")
 @limiter.limit("120 per minute")
-def users():
+def subjects():
 
     con = None
 
@@ -442,10 +443,11 @@ def users():
 
 @csrf.exempt
 @research_bp.route("/api/users", methods=["POST"])
+@research_bp.route("/api/subjects", methods=["POST"])
 @login_required
-@role_required("admin")
+@role_required("admin", "researcher")
 @limiter.limit("60 per minute")
-def create_user():
+def create_subject():
 
     con = None
 
@@ -454,7 +456,16 @@ def create_user():
         c = con.cursor()
 
         data = request.get_json() or {}
-        user_id = str(uuid.uuid4())[:8]
+
+        subject_id = (data.get("subject_id") or "").strip()
+
+        if not subject_id:
+         return jsonify({
+        "status": "error",
+        "error": "missing subject_id"
+        }), 400
+
+        user_id = subject_id
 
         c.execute("""
             INSERT INTO users(
@@ -470,7 +481,7 @@ def create_user():
             VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             user_id,
-            data.get("subject_id"),
+            subject_id,
             data.get("sex"),
             data.get("age"),
             data.get("weight"),
@@ -516,10 +527,11 @@ def create_user():
 
 @csrf.exempt
 @research_bp.route("/api/delete_user", methods=["POST"])
+@research_bp.route("/api/delete_subject", methods=["POST"])
 @login_required
 @role_required("admin")
 @limiter.limit("10 per minute")
-def delete_user():
+def delete_subject():
 
     data = request.get_json() or {}
     user_id = data.get("user_id")
