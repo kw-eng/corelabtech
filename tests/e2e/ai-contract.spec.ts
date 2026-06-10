@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers/login";
 
 test("AI analysis contract works for latest saved session", async ({ page }) => {
+
+  await page.goto("/ai-qa-lab");
 
   const sessionsResponse = await page.request.get("/api/sessions");
 

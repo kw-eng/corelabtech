@@ -19,9 +19,9 @@ test.describe('AI QA Lab - current pipeline', () => {
   // SESSIONS API
   // =====================================================
 
-  test('API health: sessions endpoint works', async ({ request }) => {
+  test('API health: sessions endpoint works', async ({ page }) => {
 
-    const res = await request.get('/api/sessions');
+    const res = await page.request.get('/api/sessions');
 
     expect(res.status()).toBe(200);
 
@@ -46,9 +46,9 @@ test.describe('AI QA Lab - current pipeline', () => {
   // AI LATEST
   // =====================================================
 
-  test('API health: latest AI endpoint returns JSON', async ({ request }) => {
+  test('API health: latest AI endpoint returns JSON', async ({ page }) => {
 
-    const res = await request.get('/api/ai_latest');
+    const res = await page.request.get('/api/ai_latest');
 
     expect([200, 404]).toContain(
       res.status()
