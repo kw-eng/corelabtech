@@ -1,4 +1,9 @@
-import { defineConfig, devices } from '@playwright/test';
+import dotenv from "dotenv";
+import { defineConfig, devices } from "@playwright/test";
+
+dotenv.config({
+  path: process.env.ENV_FILE || ".env.local",
+});
 
 export default defineConfig({
 

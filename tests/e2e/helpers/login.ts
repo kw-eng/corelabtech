@@ -22,15 +22,27 @@ export async function loginAsAdmin(page: Page) {
     );
   }
 
-  const loginInput = page.locator("#email");
-  const passwordInput = page.locator("#password");
+  const adminEmail = process.env.E2E_ADMIN_EMAIL;
+  const adminPassword = process.env.E2E_ADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword) {
+    throw new Error(
+      "Missing E2E_ADMIN_EMAIL or E2E_ADMIN_PASSWORD"
+    );
+  }
+
+  const loginInput =
+    page.locator("#email");
+
+  const passwordInput =
+    page.locator("#password");
 
   await loginInput.fill(
-    "admin@corelabtech.local"
+    adminEmail
   );
 
   await passwordInput.fill(
-    "Admin123!"
+    adminPassword
   );
 
   await page.locator(
@@ -42,6 +54,9 @@ export async function loginAsAdmin(page: Page) {
   );
 
   await expect(page).not.toHaveURL(
-    /\/login/
+    /\/login/,
+    {
+      timeout: 15000,
+    }
   );
 }
