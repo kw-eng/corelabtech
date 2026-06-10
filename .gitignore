@@ -111,3 +111,6 @@ secrets/
 research/*.pdf
 data/performance/*.json
 change_demo_passwords.py
+
+# Playwright auth state
+tests/e2e/.auth/
