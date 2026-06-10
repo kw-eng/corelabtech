@@ -17,11 +17,18 @@ def run_playwright_tests():
     ]
 
     try:
+        env = {
+            **os.environ,
+            "ENV_FILE": os.getenv("ENV_FILE", ".env.local"),
+        }
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            cwd=os.getcwd()
+            cwd=os.getcwd(),
+            timeout=120,
+            env=env,
         )
 
         output = {
@@ -33,7 +40,17 @@ def run_playwright_tests():
             "command": " ".join(cmd),
             "report_path": "playwright-report/index.html"
         }
-
+    except subprocess.TimeoutExpired as e:
+        output = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": "error",
+            "returncode": None,
+            "error": "Playwright execution timeout",
+            "stdout": (e.stdout or "")[-12000:] if e.stdout else "",
+            "stderr": (e.stderr or "")[-5000:] if e.stderr else "",
+            "command": " ".join(cmd),
+            "report_path": "playwright-report/index.html"
+        }
     except Exception as e:
         output = {
             "timestamp": datetime.utcnow().isoformat(),

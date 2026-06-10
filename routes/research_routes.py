@@ -1929,18 +1929,18 @@ def run_playwright():
 
     try:
 
+        env = {
+            **os.environ,
+            "ENV_FILE": os.getenv("ENV_FILE", ".env.local"),
+        }
+
         result = subprocess.run(
             ["npm", "run", "test:e2e:list"],
             cwd=os.getcwd(),
             capture_output=True,
             text=True,
-            env={
-        **os.environ,
-        "PLAYWRIGHT_BASE_URL": os.getenv(
-            "PLAYWRIGHT_BASE_URL",
-            "http://127.0.0.1:5000"
-        )
-            }
+            timeout=120,
+            env=env,
         )
 
         return jsonify({
@@ -1951,7 +1951,20 @@ def run_playwright():
             "command": "npm run test:e2e:list",
             "report_path": "/admin/playwright-report/index.html"
         })
+        
+    except subprocess.TimeoutExpired as e:
 
+        traceback.print_exc()
+
+        return jsonify({
+            "status": "error",
+            "returncode": None,
+            "error": "Playwright execution timeout",
+            "stdout": (e.stdout or "")[-12000:] if e.stdout else "",
+            "stderr": (e.stderr or "")[-5000:] if e.stderr else "",
+            "command": "npm run test:e2e:list"
+        }), 504
+        
     except Exception as e:
 
         traceback.print_exc()
