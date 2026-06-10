@@ -22,7 +22,7 @@ services:
       PERFORMANCE_TESTING: "true"
       # Produkcja/VPS:
       # PERFORMANCE_TESTING: "false"
-      PLAYWRIGHT_BASE_URL: "http://127.0.0.1:5000"
+      PLAYWRIGHT_BASE_URL: ${PLAYWRIGHT_BASE_URL}
 
     depends_on:
       db:
