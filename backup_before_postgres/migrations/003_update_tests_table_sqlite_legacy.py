@@ -1,4 +1,4 @@
-# migrations/update_tests_table.py
+# Legacy SQLite migration kept for PostgreSQL migration reference.
 
 import sqlite3
 

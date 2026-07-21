@@ -1,8 +1,12 @@
 # services/fit_parser.py
 
-from fitparse import FitFile
-import pandas as pd
-import numpy as np
+from collections import deque
+import math
+
+RR_MIN_SECONDS = 0.3
+RR_MAX_SECONDS = 2.0
+RR_MAX_DELTA_SECONDS = 0.15
+RR_MAX_DELTA_RATIO = 0.20
 
 
 # =========================================================
@@ -22,20 +26,183 @@ def safe_float(v):
 # =========================================================
 
 def calculate_hrv(rr_intervals):
+    return calculate_rmssd(rr_intervals)
 
-    rr = np.array([
-        r for r in rr_intervals
-        if r is not None
-    ])
+
+def calculate_rmssd(values):
+    rr = [
+        value
+        for value in values
+        if value is not None
+    ]
 
     if len(rr) < 2:
         return None
 
-    diff = np.diff(rr)
+    squared_diffs = [
+        (current - previous) ** 2
+        for previous, current in zip(rr, rr[1:])
+    ]
 
-    rmssd = np.sqrt(np.mean(diff ** 2))
+    return round(
+        calculate_rmssd_raw(rr),
+        2,
+    )
 
-    return round(float(rmssd), 2)
+
+def calculate_rmssd_raw(values):
+    if len(values) < 2:
+        return None
+
+    squared_diffs = [
+        (current - previous) ** 2
+        for previous, current in zip(values, values[1:])
+    ]
+
+    return math.sqrt(
+        sum(squared_diffs) / len(squared_diffs)
+    )
+
+
+def calculate_rmssd_ms(values):
+    clean = [
+        value
+        for value in values
+        if value is not None
+    ]
+
+    result = calculate_rmssd_raw(clean)
+
+    if result is None:
+        return None
+
+    if max(clean) < 10:
+        result *= 1000
+
+    return round(result, 2)
+
+
+def is_valid_rr_interval(value):
+    return (
+        value is not None
+        and RR_MIN_SECONDS <= value <= RR_MAX_SECONDS
+    )
+
+
+def is_rr_artifact(value, previous_value):
+    if not is_valid_rr_interval(value):
+        return True
+
+    if previous_value is None:
+        return False
+
+    delta = abs(value - previous_value)
+    ratio = (
+        delta / previous_value
+        if previous_value
+        else 0
+    )
+
+    return (
+        delta > RR_MAX_DELTA_SECONDS
+        or ratio > RR_MAX_DELTA_RATIO
+    )
+
+
+def append_filtered_rr(rr_window, value, previous_value):
+    if is_rr_artifact(value, previous_value):
+        return previous_value, True
+
+    rr_window.append(value)
+
+    return value, False
+
+
+def normalize_timestamp(value):
+    if value is None:
+        return None
+
+    try:
+        return value.isoformat()
+    except AttributeError:
+        return str(value)
+
+
+def extract_rr_values(value):
+    if isinstance(value, (list, tuple)):
+        return [
+            safe_float(item)
+            for item in value
+            if safe_float(item) is not None
+        ]
+
+    normalized = safe_float(value)
+
+    return (
+        [normalized]
+        if normalized is not None
+        else []
+    )
+
+
+def extract_hrv_packets(fitfile):
+    packets = []
+
+    try:
+        for message in fitfile.get_messages("hrv"):
+            rr_values = []
+
+            for field in message:
+                name = str(field.name).lower()
+
+                if name in [
+                    "time",
+                    "rr_interval",
+                    "rr",
+                    "rr_intervals",
+                ]:
+                    rr_values.extend(
+                        extract_rr_values(field.value)
+                    )
+
+            if rr_values:
+                packets.append(rr_values)
+
+    except Exception as exc:
+        print("FIT HRV PARSE ERROR:", exc)
+
+    return packets
+
+
+def apply_hrv_packets(rows, hrv_packets):
+    if not rows or not hrv_packets:
+        return
+
+    rr_window = deque(maxlen=31)
+    previous_rr = None
+
+    for index, row in enumerate(rows):
+        packet = (
+            hrv_packets[index]
+            if index < len(hrv_packets)
+            else []
+        )
+
+        if packet and row.get("rr_interval") is None:
+            row["rr_interval"] = packet[0]
+
+        row_artifact = False
+
+        for value in packet:
+            previous_rr, artifact = append_filtered_rr(
+                rr_window,
+                value,
+                previous_rr,
+            )
+            row_artifact = row_artifact or artifact
+
+        row["hrv"] = calculate_rmssd_ms(rr_window)
+        row["rr_artifact"] = row_artifact
 
 
 # =========================================================
@@ -43,29 +210,30 @@ def calculate_hrv(rr_intervals):
 # =========================================================
 
 def parse_fit_file(file_path):
+    try:
+        from fitparse import FitFile
+    except ImportError as e:
+        raise RuntimeError(
+            "FIT parser dependency is missing: install fitparse"
+        ) from e
 
     rows = []
 
     try:
 
-        fitfile = FitFile(file_path)
+        fitfile = FitFile(str(file_path))
 
     except Exception as e:
 
         print("FIT OPEN ERROR:", e)
 
-        return []
+        raise
 
     try:
 
-        for record in fitfile.get_messages():
+        hrv_packets = extract_hrv_packets(fitfile)
 
-            # =========================================
-            # ONLY RECORDS
-            # =========================================
-
-            if record.name != "record":
-                continue
+        for record in fitfile.get_messages("record"):
 
             row = {
 
@@ -98,7 +266,7 @@ def parse_fit_file(file_path):
 
                     if name == "timestamp":
 
-                        row["timestamp"] = str(value)
+                        row["timestamp"] = normalize_timestamp(value)
 
                     # =============================
                     # HEART RATE
@@ -179,40 +347,29 @@ def parse_fit_file(file_path):
         return []
 
     # =========================================
-    # DATAFRAME
-    # =========================================
-
-    try:
-
-        df = pd.DataFrame(rows)
-
-    except Exception as e:
-
-        print("FIT DF ERROR:", e)
-
-        return rows
-
-    # =========================================
     # HRV
     # =========================================
 
     try:
 
-        rr_values = df["rr_interval"].tolist()
+        apply_hrv_packets(rows, hrv_packets)
 
-        hrv_values = []
+        rr_window = deque(maxlen=31)
+        previous_rr = None
 
-        for i in range(len(rr_values)):
+        for row in rows:
 
-            window = rr_values[
-                max(0, i - 30):i + 1
-            ]
+            if row.get("hrv") is not None:
+                continue
 
-            hrv_values.append(
-                calculate_hrv(window)
+            previous_rr, artifact = append_filtered_rr(
+                rr_window,
+                row.get("rr_interval"),
+                previous_rr,
             )
+            row["rr_artifact"] = artifact
 
-        df["hrv"] = hrv_values
+            row["hrv"] = calculate_rmssd_ms(rr_window)
 
     except Exception as e:
 
@@ -222,10 +379,9 @@ def parse_fit_file(file_path):
     # CLEANUP
     # =========================================
 
-    df = df.replace({
-        np.nan: None
-    })
+    for row in rows:
+        for key, value in list(row.items()):
+            if isinstance(value, float) and math.isnan(value):
+                row[key] = None
 
-    return df.to_dict(
-        orient="records"
-    )
+    return rows

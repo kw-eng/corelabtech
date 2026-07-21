@@ -4,82 +4,90 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/ai_lab.css') }}"
+    href="{{ url_for('static', filename='css/ai_lab.css') }}?v=ai-lab-polish-20260721"
 >
 
-<h1>AI Lab</h1>
+<div class="ai-lab-page">
 
-<p class="section-desc">
-    Analyze completed HBOT sessions from chamber_testing.html.
-</p>
+    <section class="ai-lab-hero">
+        <div>
+            <h1>AI Lab</h1>
+            <p>
+                Analyze completed HBOT sessions and review synchronized physiology signals.
+            </p>
+        </div>
 
-<div style="margin-bottom:20px;">
-    <button onclick="runSelectedAnalysis()" class="action-btn">
-        Run Analysis Selected
-    </button>
+        <div class="ai-lab-actions">
+            <button onclick="runSelectedAnalysis()" class="action-btn">
+                Run Selected
+            </button>
 
-    <button onclick="runLatestSession()" class="action-btn">
-        Run Latest Session
-    </button>
+            <button onclick="runLatestSession()" class="action-btn">
+                Run Latest
+            </button>
 
-    <button onclick="loadSessions()" class="action-btn">
-        Refresh Sessions
-    </button>
-</div>
+            <button onclick="loadSessions()" class="action-btn secondary">
+                Refresh
+            </button>
+        </div>
+    </section>
 
-<h3>Realtime AI Score</h3>
+    <section class="ai-live-card">
+        <span>Realtime AI Score</span>
+        <div id="telemetryBox">
+            Waiting for latest completed session...
+        </div>
+    </section>
 
-<div
-    id="telemetryBox"
-    style="padding:10px; background:#111; color:#0f0; margin-bottom:20px;"
->
-    Waiting for latest completed session...
-</div>
+    <section class="ai-lab-section">
+        <div class="section-heading">
+            <h3>Sessions</h3>
+            <span id="sessionCount">Loading...</span>
+        </div>
 
-<hr>
+        <div class="sessions-table-wrap">
+            <table class="sessions-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" onclick="toggleAll(this)">
+                        </th>
+                        <th>Session</th>
+                        <th>User</th>
+                        <th>Date</th>
+                        <th>Completed</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
 
-<h3>Sessions</h3>
+                <tbody id="sessionsBody"></tbody>
+            </table>
+        </div>
+    </section>
 
-<table border="1" cellpadding="10" cellspacing="0" style="width:100%;">
-    <thead>
-        <tr>
-            <th>
-                <input type="checkbox" onclick="toggleAll(this)">
-            </th>
-            <th>Session</th>
-            <th>User</th>
-            <th>Date</th>
-            <th>Completed</th>
-            <th>Action</th>
-        </tr>
-    </thead>
+    <section class="ai-lab-section">
+        <div class="section-heading">
+            <h3>AI Visualization</h3>
+        </div>
 
-    <tbody id="sessionsBody"></tbody>
-</table>
+        <div id="chartsContainer"></div>
+    </section>
 
-<hr>
+    <section class="ai-lab-section compact-result">
+        <div class="section-heading">
+            <h3>AI Result</h3>
+        </div>
 
-<h3>AI Visualization</h3>
+        <div id="ai-result">
+            <p id="ai-summary">No analysis yet</p>
+            <div id="ai-score"></div>
+            <div id="ai-anomaly"></div>
+        </div>
+    </section>
 
-<div
-    id="chartsContainer"
-    style="display:grid; gap:20px;"
-></div>
-
-<hr>
-
-<h3>AI Result</h3>
-
-<div
-    id="ai-result"
-    style="margin-top:20px; padding:20px; background:#111; color:#0f0;"
->
-    <p id="ai-summary">No analysis yet</p>
-    <div id="ai-score"></div>
-    <div id="ai-anomaly"></div>
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/ai_lab.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_lab.js') }}?v=ai-lab-polish-20260721"></script>
 
 {% endblock %}

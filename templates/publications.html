@@ -2,20 +2,52 @@
 
 {% block content %}
 
-<h1>Research Publications</h1>
+<section class="publications-page">
+    <div class="publications-hero">
+        <div>
+            <span class="page-eyebrow">Research Library</span>
+            <h1>Research Publications</h1>
+            <p>
+                Curated CoreLabTech materials for HBOT monitoring, telemetry
+                synchronization, AI scoring and software quality validation.
+            </p>
+        </div>
 
-{% if papers %}
+        <div class="publications-status">
+            <span>Available files</span>
+            <strong>{{ papers|length }}</strong>
+        </div>
+    </div>
 
-<ul>
-    {% for p in papers %}
-    <li>{{ p }}</li>
-    {% endfor %}
-</ul>
+    {% if papers %}
+        <div class="publication-grid">
+            {% for paper in papers %}
+                <article class="publication-card">
+                    <div>
+                        <span class="publication-type">{{ paper.extension }}</span>
+                        <h2>{{ paper.title }}</h2>
+                        <p>{{ paper.filename }}</p>
+                    </div>
 
-{% else %}
-
-<p>No research publications uploaded yet.</p>
-
-{% endif %}
+                    <div class="publication-meta">
+                        <span>{{ paper.size_kb }} KB</span>
+                        <a href="{{ url_for('pub.download_publication', filename=paper.filename) }}">
+                            Download
+                        </a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <section class="publications-empty">
+            <span>Library ready</span>
+            <h2>No public research files uploaded yet</h2>
+            <p>
+                Add PDF, DOCX, TXT or Markdown files to the research papers
+                folder. Internal placeholder files are hidden from this page.
+            </p>
+        </section>
+    {% endif %}
+</section>
 
 {% endblock %}

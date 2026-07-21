@@ -1,3 +1,4 @@
+# Legacy SQLite migration kept for PostgreSQL migration reference.
 import sqlite3
 
 DB_PATH = "data/database.db"

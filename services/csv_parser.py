@@ -1,202 +1,243 @@
 # services/csv_parser.py
 
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
-import numpy as np
 
 
 # =========================================================
-# SAFE FLOAT
+# SAFE CONVERSIONS
 # =========================================================
 
-def safe_float(v):
-
+def safe_float(value: Any) -> float | None:
     try:
-
-        if pd.isna(v):
+        if pd.isna(value):
             return None
 
-        return float(v)
+        return float(value)
 
-    except:
-
+    except (TypeError, ValueError):
         return None
+
+
+def safe_int(value: Any) -> int | None:
+    number = safe_float(value)
+
+    if number is None:
+        return None
+
+    return int(number)
 
 
 # =========================================================
 # NORMALIZE COLUMN
 # =========================================================
 
-def normalize_column(name):
-
+def normalize_column(name: Any) -> str:
     return (
         str(name)
         .strip()
         .lower()
         .replace(" ", "_")
+        .replace("-", "_")
+        .replace("/", "_")
     )
+
+
+# =========================================================
+# FIND FIRST AVAILABLE COLUMN
+# =========================================================
+
+def find_column(
+    columns: list[str],
+    aliases: list[str],
+) -> str | None:
+    for alias in aliases:
+        if alias in columns:
+            return alias
+
+    return None
 
 
 # =========================================================
 # CSV PARSER
 # =========================================================
 
-def parse_csv_file(path):
-
+def parse_csv_file(path: str | Path) -> list[dict]:
     try:
+        df = pd.read_csv(
+            path,
+            encoding="utf-8-sig",
+        )
 
-        df = pd.read_csv(path)
+    except UnicodeDecodeError:
+        df = pd.read_csv(
+            path,
+            encoding="cp1252",
+        )
 
-    except Exception as e:
+    except Exception as exc:
+        raise ValueError(f"CSV read error: {exc}") from exc
 
-        print("CSV READ ERROR:", e)
-
-        return []
-
-    print("CSV COLUMNS:", df.columns.tolist())
-
-    # =====================================================
-    # NORMALIZE COLUMNS
-    # =====================================================
+    if df.empty:
+        raise ValueError("CSV file contains no records")
 
     df.columns = [
-        normalize_column(c)
-        for c in df.columns
+        normalize_column(column)
+        for column in df.columns
     ]
 
-    print("NORMALIZED:", df.columns.tolist())
+    columns = df.columns.tolist()
 
-    rows = []
-
-    # =====================================================
-    # ITERATE ROWS
-    # =====================================================
-
-    for _, r in df.iterrows():
-
-        row = {
-
-            "timestamp": None,
-
-            "pulse": None,
-
-            "heart_rate": None,
-
-            "spo2": None,
-
-            "source": "csv"
-        }
-
-        # =================================================
-        # TIME
-        # =================================================
-
-        for col in [
-
+    timestamp_column = find_column(
+        columns,
+        [
             "timestamp",
             "time",
             "datetime",
+            "date_time",
             "date",
-            "date_time"
+        ],
+    )
 
-        ]:
-
-            if col in df.columns:
-
-                try:
-
-                    row["timestamp"] = str(
-                        pd.to_datetime(r[col])
-                    )
-
-                except:
-
-                    row["timestamp"] = str(r[col])
-
-                break
-
-        # =================================================
-        # PULSE / HR
-        # =================================================
-
-        for col in [
-
+    pulse_column = find_column(
+        columns,
+        [
             "pulse",
+            "pulse_rate",
             "heart_rate",
             "hr",
-            "bpm"
+            "bpm",
+            "pr",
+            "pr_bpm",
+        ],
+    )
 
-        ]:
-
-            if col in df.columns:
-
-                val = safe_float(r[col])
-
-                row["pulse"] = val
-                row["heart_rate"] = val
-
-                break
-
-        # =================================================
-        # SPO2
-        # =================================================
-
-        for col in [
-
+    spo2_column = find_column(
+        columns,
+        [
             "spo2",
             "sp02",
             "s02",
             "so2",
-
             "spo₂",
-
             "oxygen",
-            "saturation",
+            "oxygen_level",
             "oxygen_saturation",
-
+            "saturation",
             "blood_oxygen",
-
             "o2",
-            "sat"
+            "sat",
+        ],
+    )
 
-        ]:
+    motion_column = find_column(
+        columns,
+        [
+            "motion",
+            "movement",
+            "activity",
+        ],
+    )
 
-            if col in df.columns:
+    o2_reminder_column = find_column(
+        columns,
+        [
+            "o2_reminder",
+            "spo2_reminder",
+            "oxygen_reminder",
+        ],
+    )
 
-                row["spo2"] = safe_float(
-                    r[col]
-                )
+    pr_reminder_column = find_column(
+        columns,
+        [
+            "pr_reminder",
+            "pulse_reminder",
+            "heart_rate_reminder",
+        ],
+    )
 
-                break
+    missing = []
 
-        # =================================================
-        # DEBUG
-        # =================================================
+    if timestamp_column is None:
+        missing.append("timestamp")
 
-        print("CSV ROW:", row)
-        print("CSV SPO2:", row["spo2"])
+    if spo2_column is None:
+        missing.append("SpO2")
+
+    if pulse_column is None:
+        missing.append("pulse")
+
+    if missing:
+        raise ValueError(
+            "Required CSV columns were not found: "
+            + ", ".join(missing)
+            + f". Available columns: {columns}"
+        )
+
+    rows: list[dict] = []
+
+    for index, record in df.iterrows():
+        raw_timestamp = record[timestamp_column]
+
+        timestamp = pd.to_datetime(
+            raw_timestamp,
+            format="%H:%M:%S %b %d %Y",
+            errors="coerce",
+        )
+
+        if pd.isna(timestamp):
+            timestamp = pd.to_datetime(
+                raw_timestamp,
+                errors="coerce",
+            )
+
+        if pd.isna(timestamp):
+            continue
+
+        spo2 = safe_float(record[spo2_column])
+        pulse = safe_float(record[pulse_column])
+
+        if spo2 is None and pulse is None:
+            continue
+
+        if spo2 is not None and not 50 <= spo2 <= 100:
+            continue
+
+        if pulse is not None and not 20 <= pulse <= 250:
+            continue
+
+        row = {
+            "timestamp": timestamp.isoformat(),
+            "pulse": pulse,
+            "heart_rate": pulse,
+            "spo2": spo2,
+            "motion": (
+                safe_int(record[motion_column])
+                if motion_column
+                else None
+            ),
+            "o2_reminder": (
+                safe_int(record[o2_reminder_column])
+                if o2_reminder_column
+                else None
+            ),
+            "pr_reminder": (
+                safe_int(record[pr_reminder_column])
+                if pr_reminder_column
+                else None
+            ),
+            "source": "pulseox",
+            "device": "checkme_o2",
+        }
 
         rows.append(row)
 
-    # =====================================================
-    # CLEAN EMPTY
-    # =====================================================
+    if not rows:
+        raise ValueError(
+            "No valid SpO2 or pulse measurements were found in the CSV file"
+        )
 
-    clean = []
-
-    for r in rows:
-
-        if (
-
-            r["timestamp"] is not None
-
-            or r["pulse"] is not None
-
-            or r["spo2"] is not None
-
-        ):
-
-            clean.append(r)
-
-    print("FINAL CSV:", len(clean))
-
-    return clean
+    return rows

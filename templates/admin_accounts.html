@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="accounts-page">
+
+    <section class="accounts-hero">
+        <div>
+            <span class="accounts-eyebrow">Account administration</span>
+            <h1>Admin Accounts</h1>
+            <p>
+                Manage CoreLabTech platform access for operators, researchers,
+                viewers and administrators.
+            </p>
+        </div>
+
+        <div class="accounts-kpi-grid">
+            <div>
+                <span>Total accounts</span>
+                <strong id="accountsTotal">-</strong>
+            </div>
+            <div>
+                <span>Active</span>
+                <strong id="accountsActive">-</strong>
+            </div>
+            <div>
+                <span>Admins</span>
+                <strong id="accountsAdmins">-</strong>
+            </div>
+        </div>
+    </section>
+
+    <div id="accountsStatus" class="accounts-status"></div>
+
+    <section class="accounts-grid">
+        <div class="accounts-card">
+            <div class="accounts-section-header">
+                <div>
+                    <h2>Create Account</h2>
+                    <p>Add a platform user and assign the initial access role.</p>
+                </div>
+            </div>
+
+            <div class="accounts-form">
+                <div class="accounts-field">
+                    <label for="account_email">Email</label>
+                    <input id="account_email" type="email" placeholder="user@corelabtech.local" autocomplete="email">
+                </div>
+
+                <div class="accounts-field">
+                    <label for="account_password">Password</label>
+                    <input id="account_password" type="password" placeholder="Temporary password" autocomplete="new-password">
+                </div>
+
+                <div class="accounts-field">
+                    <label for="account_role">Role</label>
+                    <select id="account_role">
+                        <option value="viewer">viewer</option>
+                        <option value="operator">operator</option>
+                        <option value="researcher">researcher</option>
+                        <option value="admin">admin</option>
+                    </select>
+                </div>
+
+                <button onclick="createAccount()">
+                    Create Account
+                </button>
+            </div>
+        </div>
+
+        <div class="accounts-card accounts-note">
+            <div class="accounts-section-header">
+                <div>
+                    <h2>Role Scope</h2>
+                    <p>Use the smallest role that supports the user's workflow.</p>
+                </div>
+            </div>
+
+            <div class="accounts-role-list">
+                <div><span>viewer</span><strong>Read-only access where enabled.</strong></div>
+                <div><span>operator</span><strong>Chamber workflow and telemetry capture.</strong></div>
+                <div><span>researcher</span><strong>AI Lab, QA review and research dashboards.</strong></div>
+                <div><span>admin</span><strong>Accounts, logs, debug and performance tools.</strong></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="accounts-card">
+        <div class="accounts-section-header">
+            <div>
+                <h2>Accounts</h2>
+                <p>Update roles, activate or disable accounts, and reset passwords.</p>
+            </div>
+
+            <button class="accounts-secondary" onclick="loadAccounts()">Refresh</button>
+        </div>
+
+        <div class="accounts-table-wrap">
+            <table class="accounts-table">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Active</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="accountsBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/admin_accounts.js') }}?v=accounts-polish-20260721"></script>
+
+{% endblock %}

@@ -2,8 +2,98 @@
 
 {% block content %}
 
-<h1>Contact</h1>
+<div class="contact-page">
 
-<p>Email: contact@corelabtech.pl</p>
+    <section class="contact-hero">
+        <div>
+            <span class="contact-eyebrow">Contact CoreLabTech</span>
+            <h1>Research, QA and HBOT monitoring inquiries</h1>
+            <p>
+                Use this page for research collaboration, HBOT session workflow questions,
+                telemetry integration issues and CoreLabTech software QA topics.
+            </p>
+
+            <div class="contact-actions">
+                <a class="contact-primary-action" href="mailto:contact@corelabtech.pl">
+                    Email CoreLabTech
+                </a>
+                <a class="contact-secondary-action" href="{{ url_for('research.research_platform') }}">
+                    Open Platform
+                </a>
+            </div>
+        </div>
+
+        <aside class="contact-direct-card">
+            <span>Primary contact</span>
+            <a href="mailto:contact@corelabtech.pl">contact@corelabtech.pl</a>
+            <p>
+                For faster review, include the session ID, device type and a short
+                description of the issue or research question.
+            </p>
+        </aside>
+    </section>
+
+    <section class="contact-grid">
+        <article class="contact-card">
+            <span>Research</span>
+            <h2>HBOT Session Review</h2>
+            <p>
+                Questions about session structure, PRE/DURING/POST workflow,
+                research reports and longitudinal observations.
+            </p>
+        </article>
+
+        <article class="contact-card">
+            <span>Telemetry</span>
+            <h2>FIT / CSV Data</h2>
+            <p>
+                Support for Garmin FIT files, Checkme/pulse oximeter CSV data,
+                merge quality and synchronized timelines.
+            </p>
+        </article>
+
+        <article class="contact-card">
+            <span>Software QA</span>
+            <h2>Platform Validation</h2>
+            <p>
+                Issues related to AI analysis output, charts, reports, endpoint behavior
+                or automated QA workflows.
+            </p>
+        </article>
+    </section>
+
+    <section class="contact-panel">
+        <div>
+            <h2>What To Include</h2>
+            <p>
+                A concise report helps reproduce and resolve issues quickly.
+            </p>
+        </div>
+
+        <div class="contact-checklist">
+            <div>
+                <strong>Session context</strong>
+                <span>Session ID, subject ID and phase: PRE, DURING or POST.</span>
+            </div>
+            <div>
+                <strong>Source files</strong>
+                <span>FIT filename, CSV filename and approximate session time.</span>
+            </div>
+            <div>
+                <strong>Observed result</strong>
+                <span>What you expected, what happened, and which page showed the issue.</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="contact-note">
+        <strong>Research-only platform</strong>
+        <p>
+            CoreLabTech analysis output is intended for research and monitoring review.
+            It is not a medical diagnosis or clinical decision system.
+        </p>
+    </section>
+
+</div>
 
 {% endblock %}

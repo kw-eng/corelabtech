@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="debug-db-page">
+
+    <section class="debug-db-hero">
+        <div>
+            <span class="debug-db-eyebrow">Admin diagnostics</span>
+            <h1>Database Status</h1>
+            <p>
+                Lightweight row counters for CoreLabTech telemetry, sessions,
+                accounts and QA diagnostics.
+            </p>
+        </div>
+
+        <div class="debug-db-status-card">
+            <span>Status</span>
+            <strong>OK</strong>
+            <small>Database counters loaded successfully.</small>
+        </div>
+    </section>
+
+    <section class="debug-db-grid">
+        <div class="debug-db-card">
+            <span>FIT records</span>
+            <strong>{{ tables.fit_data | default("-") }}</strong>
+            <small>Garmin FIT telemetry rows</small>
+        </div>
+        <div class="debug-db-card">
+            <span>CSV records</span>
+            <strong>{{ tables.csv_data | default("-") }}</strong>
+            <small>Pulse oximeter CSV rows</small>
+        </div>
+        <div class="debug-db-card">
+            <span>Full sessions</span>
+            <strong>{{ tables.full_sessions | default("-") }}</strong>
+            <small>Saved HBOT sessions</small>
+        </div>
+        <div class="debug-db-card">
+            <span>Users / subjects</span>
+            <strong>{{ tables.users | default("-") }}</strong>
+            <small>Accounts and research subjects</small>
+        </div>
+        <div class="debug-db-card">
+            <span>Tests</span>
+            <strong>{{ tables.tests | default("-") }}</strong>
+            <small>QA and diagnostic records</small>
+        </div>
+    </section>
+
+    <section class="debug-db-section">
+        <div class="debug-db-section-header">
+            <div>
+                <h2>Raw Counters</h2>
+                <p>Same data returned as JSON when this endpoint is called by frontend code.</p>
+            </div>
+            <a href="/admin">Open Admin Panel</a>
+        </div>
+
+        <div class="debug-db-table-wrap">
+            <table class="debug-db-table">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Rows</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for name, count in tables.items() %}
+                    <tr>
+                        <td><code>{{ name }}</code></td>
+                        <td>{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+{% endblock %}

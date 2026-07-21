@@ -607,3 +607,731 @@ AI LAB FIX — CHART / RESULT
     margin-bottom: 10px;
     line-height: 1.5;
 }
+
+/* =========================
+AI LAB POLISHED VIEW
+========================= */
+
+.ai-lab-page{
+    color:#e5edf5;
+    display:grid;
+    gap:22px;
+    padding:18px 14px 40px;
+}
+
+.ai-lab-hero,
+.ai-lab-section,
+.ai-live-card,
+.ai-report,
+.ai-chart-panel,
+#ai-result{
+    background:#020617;
+    border:1px solid #1f3448;
+    border-radius:8px;
+    box-shadow:0 12px 30px #00000022;
+}
+
+.ai-lab-hero{
+    align-items:center;
+    display:flex;
+    justify-content:space-between;
+    gap:18px;
+    padding:22px;
+}
+
+.ai-lab-hero h1,
+.section-heading h3,
+.ai-report-header h3,
+.ai-chart-panel h3{
+    color:#e5edf5;
+    margin:0;
+}
+
+.ai-lab-hero p,
+.ai-report-header p,
+.ai-summary-card p,
+.ai-disclaimer{
+    color:#94a3b8;
+    line-height:1.45;
+    margin:6px 0 0;
+}
+
+.ai-lab-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+}
+
+.action-btn,
+.tiny-action{
+    background:#00ffcc;
+    border:0;
+    border-radius:6px;
+    color:#001014;
+    cursor:pointer;
+    font-weight:700;
+    padding:10px 14px;
+}
+
+.action-btn.secondary{
+    background:#1e293b;
+    color:#dbeafe;
+    border:1px solid #334155;
+}
+
+.tiny-action{
+    font-size:12px;
+    padding:6px 9px;
+}
+
+.ai-live-card,
+.ai-lab-section{
+    padding:16px;
+}
+
+.ai-live-card > span,
+.section-heading span,
+.ai-kpi-card span,
+.metric-row span{
+    color:#94a3b8;
+    font-size:12px;
+}
+
+.live-score{
+    align-items:center;
+    display:flex;
+    gap:10px;
+    margin-top:8px;
+}
+
+.live-score strong{
+    color:#f8fafc;
+    font-size:22px;
+}
+
+.section-heading{
+    align-items:center;
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+}
+
+.sessions-table-wrap{
+    border:1px solid #18324a;
+    border-radius:8px;
+    max-height:330px;
+    overflow:auto;
+}
+
+.sessions-table{
+    border-collapse:collapse;
+    margin:0;
+    width:100%;
+}
+
+.sessions-table th,
+.sessions-table td{
+    border-bottom:1px solid #12263a;
+    border-left:0;
+    border-right:0;
+    color:#dbeafe;
+    padding:10px 12px;
+    text-align:left;
+}
+
+.sessions-table th{
+    background:#07111f;
+    color:#00ffcc;
+    font-size:12px;
+    position:sticky;
+    top:0;
+    z-index:1;
+}
+
+.session-id-cell{
+    font-family:Consolas, monospace;
+    font-size:12px;
+}
+
+.status-badge,
+.status-pill{
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    padding:6px 10px;
+    white-space:nowrap;
+}
+
+.status-low{
+    background:#0f5132;
+    color:#d1ffe4;
+    border:1px solid #198754;
+}
+
+.status-moderate{
+    background:#664d03;
+    color:#fff3cd;
+    border:1px solid #ffc107;
+}
+
+.status-high{
+    background:#842029;
+    color:#f8d7da;
+    border:1px solid #dc3545;
+}
+
+#chartsContainer{
+    display:grid;
+    gap:18px;
+    margin:0;
+}
+
+.ai-report{
+    padding:20px;
+}
+
+.ai-report-header{
+    align-items:flex-start;
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:18px;
+}
+
+.ai-kpi-grid,
+.ai-summary-grid{
+    display:grid;
+    gap:12px;
+}
+
+.ai-kpi-grid{
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    margin-bottom:14px;
+}
+
+.ai-summary-grid{
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+
+.ai-kpi-card,
+.ai-summary-card{
+    background:#07111f;
+    border:1px solid #18324a;
+    border-radius:8px;
+    padding:14px;
+}
+
+.ai-kpi-card strong{
+    color:#f8fafc;
+    display:block;
+    font-size:22px;
+    line-height:1.2;
+    margin-top:8px;
+}
+
+.ai-summary-card h4{
+    color:#00ffcc;
+    font-size:14px;
+    margin:0 0 10px;
+}
+
+.ai-summary-card-wide{
+    grid-column:span 3;
+}
+
+.ai-finding-list{
+    color:#dbeafe;
+    line-height:1.45;
+    margin:0;
+    padding-left:18px;
+}
+
+.warning-list{
+    color:#fff3cd;
+}
+
+.empty-state,
+.muted-value{
+    color:#64748b;
+    font-weight:500;
+}
+
+.metric-list{
+    display:grid;
+    gap:8px;
+}
+
+.metric-row{
+    align-items:center;
+    border-bottom:1px solid #12263a;
+    display:flex;
+    gap:14px;
+    justify-content:space-between;
+    padding-bottom:7px;
+}
+
+.metric-row:last-child{
+    border-bottom:0;
+    padding-bottom:0;
+}
+
+.metric-row strong{
+    color:#f8fafc;
+    font-weight:700;
+    text-align:right;
+}
+
+.metric-unit{
+    color:#94a3b8;
+    font-size:12px;
+    font-weight:600;
+}
+
+.ai-disclaimer{
+    border-top:1px solid #18324a;
+    font-size:12px;
+    margin-top:16px;
+    padding-top:12px;
+}
+
+.ai-chart-panel{
+    box-sizing:border-box;
+    height:420px;
+    min-height:420px;
+    overflow:hidden;
+    padding:16px;
+}
+
+.ai-chart-panel canvas,
+#aiTimelineChart{
+    display:block;
+    height:350px !important;
+    max-height:350px !important;
+    width:100% !important;
+}
+
+#aiTimelineStatus{
+    color:#94a3b8;
+    margin-top:8px;
+    text-align:left;
+}
+
+.compact-result #ai-result{
+    margin:0;
+    padding:16px;
+}
+
+@media(max-width:1100px){
+    .ai-kpi-grid,
+    .ai-summary-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-summary-card-wide{
+        grid-column:span 2;
+    }
+}
+
+@media(max-width:720px){
+    .ai-lab-hero,
+    .ai-report-header{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .ai-kpi-grid,
+    .ai-summary-grid{
+        grid-template-columns:1fr;
+    }
+
+    .ai-summary-card-wide{
+        grid-column:span 1;
+    }
+}
+
+/* =========================
+MISSION CONTROL
+========================= */
+
+.mission-control-page{
+    color:#e5edf5;
+    display:grid;
+    gap:24px;
+}
+
+.mission-hero,
+.mission-metric-card,
+.mission-card,
+.mission-live-card{
+    background:#020617;
+    border:1px solid #1f3448;
+    border-radius:8px;
+    box-shadow:0 18px 40px #00000028;
+}
+
+.mission-hero{
+    align-items:stretch;
+    display:grid;
+    gap:22px;
+    grid-template-columns:minmax(0, 1.35fr) minmax(320px, 0.65fr);
+    padding:38px;
+}
+
+.mission-eyebrow{
+    color:#00ffcc;
+    font-size:13px;
+    font-weight:700;
+}
+
+.mission-hero h1{
+    color:#f8fafc;
+    font-size:48px;
+    line-height:1.05;
+    margin:14px 0 16px;
+}
+
+.mission-hero p,
+.mission-section-heading p,
+.mission-analysis,
+.mission-raw{
+    color:#b6c5d6;
+}
+
+.mission-hero p{
+    font-size:17px;
+    line-height:1.55;
+    margin:0;
+    max-width:820px;
+}
+
+.mission-toolbar{
+    align-items:center;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:28px;
+}
+
+.mission-toolbar select,
+.mission-toolbar button{
+    border-radius:6px;
+    font-weight:700;
+    min-height:40px;
+}
+
+.mission-toolbar select{
+    background:#07111f;
+    border:1px solid #24445f;
+    color:#dbeafe;
+    min-width:min(520px, 100%);
+    padding:10px 12px;
+}
+
+.mission-toolbar button{
+    background:#07111f;
+    border:1px solid #24445f;
+    color:#dbeafe;
+    cursor:pointer;
+    padding:10px 14px;
+}
+
+.mission-toolbar button:nth-of-type(2),
+.mission-toolbar button:hover{
+    background:#00ffcc;
+    border-color:#00ffcc;
+    color:#001014;
+}
+
+.mission-live-card{
+    background:#07111f;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:22px;
+}
+
+.mission-live-card > span,
+.mission-live-grid span,
+.mission-metric-card span,
+.mission-section-heading p,
+.mission-analysis-grid span,
+.mission-muted{
+    color:#94a3b8;
+    font-size:13px;
+}
+
+.mission-live-card > strong{
+    color:#f8fafc;
+    display:block;
+    font-size:20px;
+    line-height:1.35;
+    margin-top:8px;
+    overflow-wrap:anywhere;
+}
+
+.mission-live-grid{
+    display:grid;
+    gap:12px;
+    grid-template-columns:1fr 1fr;
+    margin-top:22px;
+}
+
+.mission-live-grid div{
+    background:#020617;
+    border:1px solid #18324a;
+    border-radius:8px;
+    padding:14px;
+}
+
+.mission-live-grid strong{
+    color:#00ffcc;
+    display:block;
+    margin-top:7px;
+}
+
+.mission-metric-grid{
+    display:grid;
+    gap:14px;
+    grid-template-columns:repeat(5, minmax(0, 1fr));
+}
+
+.mission-metric-card{
+    padding:18px;
+}
+
+.mission-metric-card strong{
+    color:#f8fafc;
+    display:block;
+    font-size:24px;
+    line-height:1.2;
+    margin-top:8px;
+}
+
+.mission-alert{
+    border-radius:8px;
+    font-weight:700;
+    padding:14px 16px;
+}
+
+.mission-alert-neutral{
+    background:#07111f;
+    border:1px solid #24445f;
+    color:#dbeafe;
+}
+
+.mission-alert-ok{
+    background:#0f513222;
+    border:1px solid #19875488;
+    color:#d1ffe4;
+}
+
+.mission-alert-warning{
+    background:#84202922;
+    border:1px solid #dc354588;
+    color:#fecaca;
+}
+
+.mission-two-column{
+    display:grid;
+    gap:16px;
+    grid-template-columns:minmax(0, 1.35fr) minmax(320px, 0.65fr);
+}
+
+.mission-card{
+    padding:22px;
+}
+
+.mission-section-heading{
+    align-items:flex-start;
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:16px;
+}
+
+.mission-section-heading h2{
+    color:#f8fafc;
+    margin:0;
+}
+
+.mission-section-heading p{
+    line-height:1.45;
+    margin:6px 0 0;
+}
+
+.mission-analysis{
+    line-height:1.55;
+}
+
+.mission-analysis-grid{
+    display:grid;
+    gap:10px;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    margin-bottom:16px;
+}
+
+.mission-analysis-grid.two{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+
+.mission-analysis-grid div,
+.mission-analysis-block,
+.mission-analysis-columns > div{
+    background:#07111f;
+    border:1px solid #18324a;
+    border-radius:8px;
+    padding:14px;
+}
+
+.mission-analysis-grid strong{
+    color:#f8fafc;
+    display:block;
+    margin-top:7px;
+    overflow-wrap:anywhere;
+}
+
+.mission-analysis-block{
+    margin-bottom:12px;
+}
+
+.mission-analysis-block h3,
+.mission-analysis-columns h3{
+    color:#00ffcc;
+    font-size:14px;
+    margin:0 0 8px;
+}
+
+.mission-analysis-block p{
+    margin:0;
+}
+
+.mission-analysis-columns{
+    display:grid;
+    gap:12px;
+    grid-template-columns:1fr 1fr;
+}
+
+.mission-list{
+    margin:0;
+    padding-left:18px;
+}
+
+.mission-list li{
+    margin-bottom:6px;
+}
+
+.mission-list li::marker{
+    color:#00ffcc;
+}
+
+.mission-disclaimer{
+    border-top:1px solid #18324a;
+    color:#94a3b8;
+    font-size:12px;
+    margin:16px 0 0;
+    padding-top:12px;
+}
+
+.mission-warning{
+    background:#84202922;
+    border:1px solid #dc354588;
+    border-radius:8px;
+    color:#fecaca;
+    padding:14px;
+}
+
+.mission-pill{
+    background:#07111f;
+    border:1px solid #24445f;
+    border-radius:999px;
+    color:#dbeafe;
+    font-size:12px;
+    font-weight:700;
+    padding:7px 10px;
+    white-space:nowrap;
+}
+
+.mission-chart-panel{
+    background:#07111f;
+    border:1px solid #18324a;
+    border-radius:8px;
+    box-sizing:border-box;
+    height:420px;
+    overflow:hidden;
+    padding:14px;
+    position:relative;
+}
+
+.mission-chart-panel canvas{
+    background:transparent;
+    box-shadow:none;
+    display:block;
+    height:390px !important;
+    max-height:390px !important;
+    padding:0;
+    width:100% !important;
+}
+
+.mission-chart-empty{
+    align-items:center;
+    background:#020617;
+    border:1px dashed #24445f;
+    border-radius:8px;
+    color:#64748b;
+    display:flex;
+    inset:14px;
+    justify-content:center;
+    position:absolute;
+    text-align:center;
+}
+
+.mission-raw{
+    background:#07111f;
+    border:1px solid #18324a;
+    border-radius:8px;
+    box-sizing:border-box;
+    line-height:1.5;
+    margin:0;
+    max-height:420px;
+    overflow:auto;
+    padding:16px;
+    white-space:pre-wrap;
+}
+
+@media(max-width:1180px){
+    .mission-hero,
+    .mission-two-column{
+        grid-template-columns:1fr;
+    }
+
+    .mission-metric-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .mission-analysis-grid,
+    .mission-analysis-columns{
+        grid-template-columns:1fr;
+    }
+}
+
+@media(max-width:720px){
+    .mission-hero,
+    .mission-card{
+        padding:22px;
+    }
+
+    .mission-hero h1{
+        font-size:38px;
+    }
+
+    .mission-metric-grid,
+    .mission-live-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mission-toolbar select,
+    .mission-toolbar button{
+        width:100%;
+    }
+}
