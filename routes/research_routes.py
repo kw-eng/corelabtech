@@ -495,9 +495,12 @@ def upload_fit():
             user_id=user_id,
         )
 
+        payload = result.to_dict()
+
         return jsonify({
             "status": "fit_saved",
-            **result.to_dict(),
+            "records": payload.get("records_saved", 0),
+            **payload,
         }), 201
 
     except DuplicateImportError as exc:
@@ -506,6 +509,7 @@ def upload_fit():
             "error": str(exc),
             "import_type": exc.import_type,
             "import_id": exc.import_id,
+            "records": exc.records_saved,
             "records_saved": exc.records_saved,
         }), 409
 
@@ -589,9 +593,12 @@ def upload_csv():
             user_id=user_id,
         )
 
+        payload = result.to_dict()
+
         return jsonify({
             "status": "csv_saved",
-            **result.to_dict(),
+            "records": payload.get("records_saved", 0),
+            **payload,
         }), 201
 
     except DuplicateImportError as exc:
@@ -600,6 +607,7 @@ def upload_csv():
             "error": str(exc),
             "import_type": exc.import_type,
             "import_id": exc.import_id,
+            "records": exc.records_saved,
             "records_saved": exc.records_saved,
         }), 409
 
