@@ -443,7 +443,7 @@ def delete_subject():
 )
 @limiter.limit(UPLOAD_LIMIT)
 def upload_fit():
-    """Accept a FIT upload and store validated Garmin telemetry."""
+    """Accept a FIT upload and store validated wearable telemetry."""
 
     file = request.files.get("file")
 

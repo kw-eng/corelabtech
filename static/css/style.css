@@ -510,6 +510,14 @@ border-top:1px solid #00ffcc33;
 
 }
 
+.brand-disclaimer{
+    color:#8aa0b8;
+    font-size:11px;
+    line-height:1.45;
+    margin:6px auto 0;
+    max-width:920px;
+}
+
 /* =========================
 AUTH / LOGIN PAGE
 ========================= */

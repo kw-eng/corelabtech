@@ -240,7 +240,7 @@ def analyze_measurements(
     if sensor_mismatch:
         score -= 10
         reasons.append(
-            "Notable discrepancy between Garmin heart rate "
+            "Notable discrepancy between wearable heart rate "
             "and pulse oximeter pulse"
         )
 
@@ -398,7 +398,7 @@ def build_research_summary(
         )
 
         sentences.append(
-            "A notable discrepancy was detected between Garmin heart rate "
+            "A notable discrepancy was detected between wearable heart rate "
             "and pulse oximeter pulse, which may indicate sensor mismatch, "
             f"time alignment issues, or signal artifact.{detail}"
         )
@@ -407,7 +407,7 @@ def build_research_summary(
         reason
         for reason in reasons
         if not reason.startswith(
-            "Notable discrepancy between Garmin heart rate"
+            "Notable discrepancy between wearable heart rate"
         )
     ]
 

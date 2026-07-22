@@ -33,7 +33,7 @@ CSV_PARSER_VERSION = "csv-v1"
 FIT_PARSER_VERSION = "fit-v3"
 
 CSV_DEVICE = "Checkme O2"
-FIT_DEVICE = "Garmin"
+FIT_DEVICE = "FIT-compatible wearable"
 
 
 # =========================================================
@@ -240,7 +240,7 @@ def import_fit_file(
     session_id: str,
     user_id: str | None = None,
 ) -> ImportResult:
-    """Parse and persist a Garmin FIT upload.
+    """Parse and persist a FIT upload from a compatible wearable.
 
     FIT metadata is kept alongside measurements so the research pipeline can
     later trace a session back to the originating device/import.

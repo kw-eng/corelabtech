@@ -58,7 +58,7 @@ $manifest = @'
 {
   "name": "CoreLabTech Recovery",
   "short_name": "CoreLabTech",
-  "description": "Mobile recovery, HBOT and physiology session tracker for Garmin FIT and pulse oximeter data.",
+  "description": "Mobile recovery, HBOT and physiology session tracker for wearable FIT and pulse oximeter data.",
   "id": "/?source=pwa",
   "start_url": "/?source=pwa",
   "scope": "/",

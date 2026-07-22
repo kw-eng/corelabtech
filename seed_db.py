@@ -65,7 +65,7 @@ for i in range(50):
         user_id,
         session_id,
         "during",
-        "garmin",
+        "wearable_fit",
         spo2,
         pulse,
         hrv,

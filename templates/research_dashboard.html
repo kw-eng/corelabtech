@@ -102,7 +102,7 @@
         <div class="mission-section-heading">
             <div>
                 <h2>Telemetry Timeline</h2>
-                <p>SpO2, pulse, Garmin heart rate and HRV after FIT/CSV synchronization.</p>
+                <p>SpO2, pulse, wearable heart rate and HRV after FIT/CSV synchronization.</p>
             </div>
             <span id="chartSampleCount" class="mission-pill">0 samples</span>
         </div>
@@ -621,7 +621,7 @@ function renderDashboardChart(timeline, totalSamples = null){
                     yAxisID: "rate"
                 },
                 {
-                    label: "Garmin HR",
+                    label: "Wearable HR",
                     data: hr,
                     borderColor: "#38bdf8",
                     backgroundColor: "#38bdf822",

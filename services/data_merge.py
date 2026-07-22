@@ -1,6 +1,6 @@
 """Synchronize FIT and CSV telemetry into one research timeline.
 
-FIT data usually carries Garmin heart-rate/HRV signals, while CSV data carries
+FIT data usually carries wearable heart-rate/HRV signals, while CSV data carries
 pulse oximeter SpO2/pulse signals. This module matches those streams by nearest
 timestamp and stores the merged timeline for analysis.
 """
@@ -378,7 +378,7 @@ def choose_fit_time_offset(
 ) -> int:
     """Choose the hour offset that gives the strongest FIT/CSV overlap.
 
-    Garmin FIT timestamps are commonly UTC, while Checkme CSV exports are local
+    FIT timestamps from wearable exports are commonly UTC, while Checkme CSV exports are local
     wall-clock time without timezone information. Existing imports store both
     as naive timestamps, so merge-time offset selection keeps old data usable.
     """

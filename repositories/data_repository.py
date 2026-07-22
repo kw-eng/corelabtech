@@ -564,7 +564,7 @@ def insert_fit_measurements(
     filename: str,
     rows: list[dict[str, Any]],
 ) -> int:
-    """Bulk insert Garmin/FIT measurements for one import."""
+    """Bulk insert FIT wearable measurements for one import."""
 
     if not rows:
         return 0

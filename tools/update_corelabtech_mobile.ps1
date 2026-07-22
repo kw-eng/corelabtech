@@ -211,7 +211,7 @@ fun HeroCard() {
             style = MaterialTheme.typography.headlineMedium
         )
         Text(
-            "Connect Garmin HRM data, pulse oximeter readings and session notes to understand how your body responds before, during and after recovery.",
+            "Connect wearable FIT data, pulse oximeter readings and session notes to understand how your body responds before, during and after recovery.",
             color = TextMuted
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -279,7 +279,7 @@ fun CreateSessionCard(
 fun DevicePlanCard() {
     AppCard {
         Text("Device plan", color = TextPrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-        Bullet("Garmin HRM 600 or compatible Garmin FIT source")
+        Bullet("FIT-capable wearable and compatible HR strap")
         Bullet("Pulse oximeter CSV or manual SpO2 entry")
         Bullet("Optional notes: sleep, stress, training, HBOT, sauna")
     }
@@ -513,7 +513,7 @@ struct ContentView: View {
     ]
 
     private let checklist = [
-        DeviceChecklistItem(title: "Garmin signal", detail: "HRM 600 or compatible Garmin FIT source"),
+        DeviceChecklistItem(title: "Wearable signal", detail: "FIT-capable wearable and compatible HR strap"),
         DeviceChecklistItem(title: "Oxygenation", detail: "Pulse oximeter CSV or manual SpO2 entry"),
         DeviceChecklistItem(title: "Context", detail: "Sleep, stress, training, HBOT, sauna or breathwork notes")
     ]
@@ -583,7 +583,7 @@ struct ContentView: View {
             Text("Personal recovery tracker")
                 .font(.largeTitle.bold())
                 .foregroundStyle(.white)
-            Text("Connect Garmin HRM data, pulse oximeter readings and session notes to understand how your body responds before, during and after recovery.")
+            Text("Connect wearable FIT data, pulse oximeter readings and session notes to understand how your body responds before, during and after recovery.")
                 .foregroundStyle(.coreMuted)
             HStack {
                 Button("Start Session", action: createLocalSession)
@@ -798,7 +798,7 @@ not diagnose, treat or prevent disease.
 
 - Today readiness score.
 - Start a personal session.
-- Garmin HRM / Garmin FIT readiness.
+- FIT-compatible wearable readiness.
 - Pulse oximeter SpO2 input or CSV import.
 - Before / During / After summary.
 - Recovery session history.
@@ -827,7 +827,7 @@ $iosReadme = @'
 # CoreLabTech Recovery - iOS
 
 Consumer SwiftUI client for personal recovery sessions. This build is designed
-for individual users who want simple recovery insight from Garmin HRM/FIT data,
+for individual users who want simple recovery insight from wearable FIT data,
 SpO2 readings and session notes.
 
 ## Product Positioning
@@ -843,7 +843,7 @@ not diagnose, treat or prevent disease.
 
 - Today readiness score.
 - Start a personal session.
-- Garmin HRM / Garmin FIT readiness.
+- FIT-compatible wearable readiness.
 - Pulse oximeter SpO2 input or CSV import.
 - Before / During / After summary.
 - Recovery session history.
@@ -873,7 +873,7 @@ $productDoc = @'
 
 ## Consumer Promise
 
-CoreLabTech Recovery turns Garmin HRM/FIT data, pulse oximeter readings and
+CoreLabTech Recovery turns FIT-compatible wearable data, pulse oximeter readings and
 session notes into a simple personal recovery timeline.
 
 The consumer app should answer one question:
@@ -892,7 +892,7 @@ The consumer app should answer one question:
 
 - Today readiness score.
 - Before / During / After session capture.
-- Garmin HRM / FIT import path.
+- FIT import path for compatible wearable devices.
 - Pulse oximeter SpO2 and pulse import path.
 - Data quality check.
 - Recovery trend history.
@@ -910,7 +910,7 @@ The consumer app should answer one question:
 
 Short description:
 
-Personal recovery tracker for Garmin HRM, SpO2 and session trends.
+Personal recovery tracker for FIT-compatible wearables, SpO2 and session trends.
 
 Long description:
 
