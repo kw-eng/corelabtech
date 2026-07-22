@@ -1,8 +1,19 @@
 from database_postgres import db
+import os
 from werkzeug.security import generate_password_hash
 
 
 def seed_postgres_db():
+
+    admin_password = os.getenv(
+        "E2E_ADMIN_PASSWORD",
+        "CHANGE_ME_ADMIN_PASSWORD"
+    )
+
+    researcher_password = os.getenv(
+        "E2E_RESEARCHER_PASSWORD",
+        "CHANGE_ME_RESEARCHER_PASSWORD"
+    )
 
     con = db()
     c = con.cursor()
@@ -16,7 +27,7 @@ def seed_postgres_db():
             "sex": None,
             "age": None,
             "weight": None,
-            "password": "CHANGE_ME_ADMIN_PASSWORD",
+            "password": admin_password,
             "role": "admin",
             "notes": "Default admin account"
         },
@@ -28,7 +39,7 @@ def seed_postgres_db():
             "sex": None,
             "age": None,
             "weight": None,
-            "password": "CHANGE_ME_RESEARCHER_PASSWORD",
+            "password": researcher_password,
             "role": "researcher",
             "notes": "Demo researcher account"
         },
@@ -119,8 +130,8 @@ def seed_postgres_db():
     print("========================================")
 
     print("Active production/demo accounts:")
-    print("  admin@corelabtech.local / CHANGE_ME_ADMIN_PASSWORD")
-    print("  researcher@corelabtech.local / CHANGE_ME_RESEARCHER_PASSWORD")
+    print("  admin@corelabtech.local / configured from E2E_ADMIN_PASSWORD")
+    print("  researcher@corelabtech.local / configured from E2E_RESEARCHER_PASSWORD")
 
     print("")
     print("Operator/viewer examples are commented out in seed_postgres_db.py")

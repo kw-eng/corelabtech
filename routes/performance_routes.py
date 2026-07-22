@@ -23,6 +23,30 @@ performance_bp = Blueprint(
 
 
 # =========================================
+# GATLING SESSIONS HEALTH ENDPOINT
+# SYNTHETIC DATA, NO USER SESSION CONTENT
+# =========================================
+
+@performance_bp.route(
+    "/api/performance/sessions"
+)
+@limiter.exempt
+def performance_sessions():
+    return jsonify({
+        "status": "ok",
+        "count": 1,
+        "sessions": [
+            {
+                "session_id": "performance-ci-session",
+                "user": "performance",
+                "completed": True,
+                "source": "synthetic_gatling_fixture"
+            }
+        ]
+    })
+
+
+# =========================================
 # RUN PERFORMANCE TEST
 # ADMIN ONLY
 # =========================================

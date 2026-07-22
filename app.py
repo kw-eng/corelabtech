@@ -125,12 +125,6 @@ def ai_monitoring():
 # =========================
 print(app.url_map)
 
-# =========================
-# RUN
-# =========================
-if __name__ == "__main__":
-    app.run(debug=True)
-    
 @app.errorhandler(403)
 def forbidden(e):
     """Render the role/permission error page."""
@@ -143,3 +137,15 @@ def unauthorized(e):
     """Redirect anonymous users to login instead of returning raw 401 HTML."""
 
     return redirect(url_for("auth.login"))
+
+
+# =========================
+# RUN
+# =========================
+if __name__ == "__main__":
+    debug_enabled = os.getenv("FLASK_DEBUG", "False") == "True"
+
+    app.run(
+        debug=debug_enabled,
+        use_reloader=debug_enabled
+    )
