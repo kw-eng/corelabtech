@@ -1117,12 +1117,33 @@ def run_analysis():
             user_id=get_current_user_id(),
         )
 
+        result = {
+            **analysis.result,
+        }
+
+        score = result.get("overall_score")
+
+        result.setdefault(
+            "score",
+            score,
+        )
+
+        result.setdefault(
+            "anomaly",
+            bool(result.get("anomaly_detected")),
+        )
+
+        result.setdefault(
+            "risk_level",
+            risk_level_from_score(score),
+        )
+
         return jsonify({
             "status": "completed",
             "analysis_id": analysis.ai_result_id,
             "session_id": analysis.session_id,
             "merge_id": analysis.merge_id,
-            **analysis.result,
+            **result,
         }), 201
 
     except AnalysisInputMissingError as exc:
@@ -1775,6 +1796,21 @@ def average_or_none(
         sum(values) / len(values),
         2,
     )
+
+
+def risk_level_from_score(score) -> str:
+    try:
+        numeric_score = float(score)
+    except (TypeError, ValueError):
+        return "Unknown"
+
+    if numeric_score >= 90:
+        return "Low"
+
+    if numeric_score >= 70:
+        return "Moderate"
+
+    return "High"
 
 
 def calculate_trend_direction(
