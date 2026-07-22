@@ -53,7 +53,7 @@ class MergeResult:
     session_id: str
     user_id: str
 
-    fit_import_id: int
+    fit_import_id: int | None
     csv_import_id: int
 
     fit_records: int
@@ -67,6 +67,7 @@ class MergeResult:
     algorithm: str
     tolerance_ms: int
     fit_time_offset_hours: int
+    mode: str
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -98,11 +99,6 @@ def merge_session_data(
             session_id=session_id,
         )
 
-        if not fit_import:
-            raise MergeInputMissingError(
-                "No completed FIT import found"
-            )
-
         if not csv_import:
             raise MergeInputMissingError(
                 "No completed CSV import found"
@@ -110,15 +106,9 @@ def merge_session_data(
 
         final_user_id = (
             user_id
-            or fit_import.get("user_id")
+            or (fit_import or {}).get("user_id")
             or csv_import.get("user_id")
             or session_id
-        )
-
-        fit_rows = load_fit(
-            cursor,
-            session_id=session_id,
-            import_id=fit_import["id"],
         )
 
         csv_rows = load_csv(
@@ -127,40 +117,62 @@ def merge_session_data(
             import_id=csv_import["id"],
         )
 
-        if not fit_rows:
-            raise MergeInputMissingError(
-                "FIT import contains no measurements"
-            )
-
         if not csv_rows:
             raise MergeInputMissingError(
                 "CSV import contains no measurements"
             )
 
+        if fit_import:
+            fit_rows = load_fit(
+                cursor,
+                session_id=session_id,
+                import_id=fit_import["id"],
+            )
+
+            if not fit_rows:
+                raise MergeInputMissingError(
+                    "FIT import contains no measurements"
+                )
+
+            merged_rows = merge_fit_and_csv(
+                fit_rows=fit_rows,
+                csv_rows=csv_rows,
+                tolerance_ms=tolerance_ms,
+            )
+
+            algorithm = MERGE_ALGORITHM
+            mode = "fit_csv"
+            fit_import_id = fit_import["id"]
+            fit_records = len(fit_rows)
+            fit_time_offset_hours = first_not_none(
+                *[
+                    row.get("fit_time_offset_hours")
+                    for row in merged_rows
+                ],
+                0,
+            )
+
+        else:
+            merged_rows = merge_csv_only(
+                csv_rows=csv_rows,
+            )
+
+            algorithm = "csv_only"
+            mode = "csv_only"
+            fit_import_id = None
+            fit_records = 0
+            fit_time_offset_hours = 0
+
         merge_id = create_merge_job(
             cursor,
             session_id=session_id,
             user_id=final_user_id,
-            fit_import_id=fit_import["id"],
+            fit_import_id=fit_import_id,
             csv_import_id=csv_import["id"],
-            fit_records=len(fit_rows),
+            fit_records=fit_records,
             csv_records=len(csv_rows),
-            algorithm=MERGE_ALGORITHM,
+            algorithm=algorithm,
             tolerance_ms=tolerance_ms,
-        )
-
-        merged_rows = merge_fit_and_csv(
-            fit_rows=fit_rows,
-            csv_rows=csv_rows,
-            tolerance_ms=tolerance_ms,
-        )
-
-        fit_time_offset_hours = first_not_none(
-            *[
-                row.get("fit_time_offset_hours")
-                for row in merged_rows
-            ],
-            0,
         )
 
         saved = insert_merged_measurements(
@@ -197,17 +209,18 @@ def merge_session_data(
             merge_id=merge_id,
             session_id=session_id,
             user_id=final_user_id,
-            fit_import_id=fit_import["id"],
+            fit_import_id=fit_import_id,
             csv_import_id=csv_import["id"],
-            fit_records=len(fit_rows),
+            fit_records=fit_records,
             csv_records=len(csv_rows),
             merged_records=saved,
             matched_records=matched,
             unmatched_records=unmatched,
             match_rate=match_rate,
-            algorithm=MERGE_ALGORITHM,
+            algorithm=algorithm,
             tolerance_ms=tolerance_ms,
             fit_time_offset_hours=fit_time_offset_hours,
+            mode=mode,
         )
 
     except Exception:
@@ -366,6 +379,35 @@ def merge_fit_and_csv(
                 "fit_time_offset_hours": fit_time_offset,
             }
         )
+
+    return result
+
+
+def merge_csv_only(
+    *,
+    csv_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Create a DURING timeline when only pulse oximeter CSV is available."""
+
+    result = []
+
+    for row in csv_rows:
+        timestamp = row.get("timestamp")
+
+        result.append({
+            "timestamp": timestamp,
+            "heart_rate": row.get("heart_rate") or row.get("pulse"),
+            "hrv": None,
+            "rr_interval": None,
+            "spo2": row.get("spo2"),
+            "pulse": row.get("pulse"),
+            "motion": row.get("motion"),
+            "fit_timestamp": None,
+            "csv_timestamp": timestamp,
+            "delta_ms": None,
+            "synchronized": True,
+            "fit_time_offset_hours": 0,
+        })
 
     return result
 

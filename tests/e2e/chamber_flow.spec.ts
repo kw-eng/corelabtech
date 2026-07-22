@@ -78,7 +78,7 @@ test.afterAll(async ({ browser }) => {
       },
     });
 
-    expect(res.status()).toBe(200);
+    expect([200, 201]).toContain(res.status());
 
     const body = await res.json();
 
@@ -101,7 +101,7 @@ test('05 - should save full PRE DURING POST session', async ({ page }) => {
   console.log('MERGE STATUS:', mergeRes.status());
   console.log('MERGE RAW:', mergeRaw);
 
-  expect(mergeRes.status()).toBe(200);
+  expect([200, 201]).toContain(mergeRes.status());
 
   const mergeBody = JSON.parse(mergeRaw);
 

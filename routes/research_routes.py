@@ -828,8 +828,9 @@ def during_merge():
             connection.close()
 
         return jsonify({
-            "status": "merge_completed",
-            "mode": "fit_csv",
+            "status": "ok",
+            "result_status": "merge_completed",
+            "mode": result.mode,
             "fit_samples": result.fit_records,
             "csv_samples": result.csv_records,
             "merged": merged_rows,

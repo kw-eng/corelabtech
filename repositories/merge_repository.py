@@ -16,7 +16,7 @@ def create_merge_job(
     *,
     session_id: str,
     user_id: str,
-    fit_import_id: int,
+    fit_import_id: int | None,
     csv_import_id: int,
     fit_records: int,
     csv_records: int,
