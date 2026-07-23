@@ -988,6 +988,7 @@ def save_full_session():
             "fit_samples": result.fit_samples,
             "csv_samples": result.csv_samples,
             "merged_samples": result.merged_samples,
+            "features": result.features,
             "completed": True,
         })
 
@@ -1349,6 +1350,7 @@ def user_trends(user_id: str):
             ),
             "trend_direction": calculate_trend_direction(scores),
             "analyses": analyses,
+            "timeline": analyses,
         })
 
     except Exception as exc:

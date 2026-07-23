@@ -43,7 +43,7 @@ class CompletedSessionResult:
     fit_samples: int
     csv_samples: int
     merged_samples: int
-
+    features: dict[str, Any]
 
 def save_session_phase(
     *,
@@ -196,6 +196,10 @@ def complete_session(
             ),
         )
 
+        features = {
+    "avg_csv_spo2": average_from_payload(during, "spo2"),
+    "avg_csv_pulse": average_from_payload(during, "pulse"),
+}
         result = CompletedSessionResult(
             session_id=session_id,
             user_id=user_id,
@@ -214,6 +218,7 @@ def complete_session(
                 table="merged_data",
                 session_id=session_id,
             ),
+            features=features,
         )
 
         connection.commit()
@@ -774,3 +779,37 @@ def json_loads(value: Any) -> Any:
         return json.loads(value)
     except (TypeError, ValueError):
         return value
+def average_from_payload(
+    payload: dict[str, Any],
+    field: str,
+) -> float | None:
+    """Calculate an average from scalar or list telemetry values."""
+
+    value = payload.get(field)
+
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, list):
+        numeric_values = []
+
+        for item in value:
+            if isinstance(item, dict):
+                item = item.get(field)
+
+            try:
+                if item is not None:
+                    numeric_values.append(float(item))
+            except (TypeError, ValueError):
+                continue
+
+        if numeric_values:
+            return round(
+                sum(numeric_values) / len(numeric_values),
+                2,
+            )
+
+    return None
