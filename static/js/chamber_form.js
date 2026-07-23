@@ -6,10 +6,23 @@ let state = {
     post: null
 }
 
+const TABLE_PREVIEW_LIMIT = 5000
+const TABLE_RENDER_CHUNK_SIZE = 100
+const FIT_UPLOAD_TIMEOUT_MS = 120000
+const GENERATED_SESSION_SUFFIX_PATTERN = /_\d{10,}$/
+
 async function parseJsonResponse(res, label) {
     const text = await res.text()
 
-    console.log(`${label} RAW RESPONSE:`, text)
+    console.log(
+        `${label} response:`,
+        {
+            ok: res.ok,
+            status: res.status,
+            bytes: text.length,
+            preview: text.slice(0, 300)
+        }
+    )
 
     try {
         return JSON.parse(text)
@@ -20,6 +33,114 @@ async function parseJsonResponse(res, label) {
             error: `${label} returned HTML/non-JSON`,
             raw: text
         }
+    }
+}
+
+function waitForNextFrame() {
+    return new Promise(resolve => {
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(resolve)
+            return
+        }
+
+        setTimeout(resolve, 0)
+    })
+}
+
+async function renderTableRowsChunked(tbody, rows, columns) {
+    tbody.replaceChildren()
+
+    for (
+        let start = 0;
+        start < rows.length;
+        start += TABLE_RENDER_CHUNK_SIZE
+    ) {
+        const fragment =
+            document.createDocumentFragment()
+
+        rows
+            .slice(start, start + TABLE_RENDER_CHUNK_SIZE)
+            .forEach(row => {
+                const tr =
+                    document.createElement("tr")
+
+                columns.forEach(getValue => {
+                    const td =
+                        document.createElement("td")
+
+                    td.textContent = getValue(row)
+
+                    tr.appendChild(td)
+                })
+
+                fragment.appendChild(tr)
+            })
+
+        tbody.appendChild(fragment)
+
+        if (start + TABLE_RENDER_CHUNK_SIZE < rows.length) {
+            await waitForNextFrame()
+        }
+    }
+}
+
+function displayValue(...values) {
+    const value = values.find(item => (
+        item !== undefined &&
+        item !== null &&
+        item !== ""
+    ))
+
+    return value === undefined ? "-" : value
+}
+
+function setText(id, text) {
+    const element =
+        document.getElementById(id)
+
+    if (element) {
+        element.textContent = text
+    }
+}
+
+function normalizeSubjectId(value) {
+    let subjectId = String(value || "").trim()
+
+    while (GENERATED_SESSION_SUFFIX_PATTERN.test(subjectId)) {
+        subjectId = subjectId.replace(GENERATED_SESSION_SUFFIX_PATTERN, "")
+    }
+
+    return subjectId
+}
+
+function looksLikeGeneratedSessionId(value) {
+    return GENERATED_SESSION_SUFFIX_PATTERN.test(String(value || "").trim())
+}
+
+function getSelectedSubjectId() {
+    return normalizeSubjectId(
+        document.getElementById("user_id")?.value
+    )
+}
+
+function clearMergedPreview() {
+    const tbody =
+        document.querySelector("#mergedDataTable tbody")
+
+    if (tbody) {
+        tbody.replaceChildren()
+    }
+
+    const status =
+        document.getElementById("mergeStatus")
+
+    if (status) {
+        status.innerHTML = ""
+    }
+
+    if (typeof fitChart !== "undefined" && fitChart) {
+        fitChart.destroy()
+        fitChart = null
     }
 }
 
@@ -275,9 +396,9 @@ function go(phase) {
 async function createSubject() {
 
     const subjectId =
-        document.getElementById("subject_id")
-            .value
-            .trim()
+        normalizeSubjectId(
+            document.getElementById("subject_id").value
+        )
 
     if (!subjectId) {
         alert("Enter Subject ID")
@@ -427,6 +548,8 @@ async function loadSubjects() {
     const onlySubjects = subjects.filter(s =>
         s &&
         s.subject_id &&
+        !looksLikeGeneratedSessionId(s.subject_id) &&
+        !looksLikeGeneratedSessionId(s.user_id) &&
         !s.email &&
         s.role !== "admin" &&
         s.role !== "researcher"
@@ -438,10 +561,14 @@ async function loadSubjects() {
     onlySubjects.forEach(subject => {
 
         const value =
-            subject.user_id || subject.subject_id
+            normalizeSubjectId(
+                subject.user_id || subject.subject_id
+            )
 
         const label =
-            subject.subject_id || subject.user_id
+            normalizeSubjectId(
+                subject.subject_id || subject.user_id
+            )
 
         if (!value || !label) return
 
@@ -466,7 +593,7 @@ async function loadSubjects() {
 function generateSession() {
 
     const subject =
-        document.getElementById("user_id")?.value
+        getSelectedSubjectId()
 
     if (!subject) return
 
@@ -561,9 +688,7 @@ async function savePRE() {
                         ).value,
 
                     user_id:
-                        document.getElementById(
-                            "user_id"
-                        ).value,
+                        getSelectedSubjectId(),
 
                     phase: "pre",
 
@@ -651,6 +776,12 @@ async function uploadFIT() {
     let input =
         document.getElementById("fitFile")
 
+    const status =
+        document.getElementById("fitStatus")
+
+    const uploadButton =
+        document.getElementById("uploadFitButton")
+
     if (!input.files.length) {
 
         alert("Select FIT file")
@@ -658,6 +789,14 @@ async function uploadFIT() {
     }
 
     let file = input.files[0]
+    const sessionId =
+        document.getElementById("session_id").value.trim()
+
+    if (!sessionId) {
+
+        alert("Generate session first")
+        return
+    }
 
     let fd = new FormData()
 
@@ -665,25 +804,53 @@ async function uploadFIT() {
 
     fd.append(
         "session_id",
-        document.getElementById(
-            "session_id"
-        ).value
+        sessionId
     )
 
     try {
 
-let res = await fetch(
-    "/upload_fit",
-    {
-        method: "POST",
-        credentials: "same-origin",
-        body: fd
-    }
-)
+        if (uploadButton) {
+            uploadButton.disabled = true
+        }
 
-let data = await parseJsonResponse(res, "UPLOAD FIT")
+        if (status) {
+            status.innerHTML = `
+                <div class="success-box">
+                    Uploading and parsing FIT...
+                </div>
+            `
+        }
 
-        if (!res.ok || data.error) {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(
+            () => controller.abort(),
+            FIT_UPLOAD_TIMEOUT_MS
+        )
+
+        let res
+
+        try {
+            res = await fetch(
+                "/upload_fit",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    body: fd,
+                    signal: controller.signal
+                }
+            )
+        } finally {
+            clearTimeout(timeoutId)
+        }
+
+        let data = await parseJsonResponse(res, "UPLOAD FIT")
+        const duplicateImport =
+            res.status === 409 &&
+            data &&
+            data.status === "duplicate" &&
+            data.import_type === "fit"
+
+        if ((!res.ok && !duplicateImport) || (data.error && !duplicateImport)) {
 
             console.error(data)
 
@@ -692,12 +859,24 @@ let data = await parseJsonResponse(res, "UPLOAD FIT")
                 "FIT upload failed"
             )
 
+            if (status) {
+                status.innerHTML = `
+                    <div class="error-box">
+                        ${data.error || "FIT upload failed"}
+                    </div>
+                `
+            }
+
             return
         }
 
-        document.getElementById(
-            "fitStatus"
-        ).innerHTML = `
+        if (status) {
+            const fitStatusMessage =
+                duplicateImport
+                    ? "FIT already imported"
+                    : "FIT uploaded"
+
+            status.innerHTML = `
 
             <div class="success-box">
 
@@ -706,38 +885,88 @@ let data = await parseJsonResponse(res, "UPLOAD FIT")
                 <br>
 
                 Records:
-                ${data.records || 0}
+                ${data.records_saved || data.records || 0}
 
             </div>
-        `
+            `
 
-        await loadFITTable(
-            document.getElementById(
-                "session_id"
-            ).value
-        )
+            const fitStatusBox =
+                status.querySelector(".success-box")
+
+            if (fitStatusBox && fitStatusBox.firstChild) {
+                fitStatusBox.firstChild.textContent =
+                    `\n\n                ${fitStatusMessage}\n\n                `
+            }
+        }
+
+        await loadFITTable(sessionId, data.import_id)
+        clearMergedPreview()
 
         if (typeof loadFitChart === "function") {
 
-            loadFitChart(
-                document.getElementById(
-                    "session_id"
-                ).value
-            )
+            loadFitChart(sessionId, data.import_id)
         }
 
     } catch (err) {
 
         console.error(err)
 
-        alert("FIT upload server error")
+        const message =
+            err.name === "AbortError"
+                ? "FIT upload timed out"
+                : "FIT upload server error"
+
+        if (status) {
+            status.innerHTML = `
+                <div class="error-box">
+                    ${message}
+                </div>
+            `
+        }
+
+        alert(message)
+
+    } finally {
+
+        if (uploadButton) {
+            uploadButton.disabled = false
+        }
     }
 }
 
-async function loadFITTable(session) {
+async function loadFITTable(session, importId = null) {
+    try {
+
+    let tbody =
+        document.querySelector(
+            "#fitDataTable tbody"
+        )
+
+    if (!tbody) {
+        return
+    }
+
+    setText("fitTableStatus", "")
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="4">
+                Loading FIT preview...
+            </td>
+        </tr>
+    `
+
+    const params = new URLSearchParams({
+        session_id: session,
+        limit: String(TABLE_PREVIEW_LIMIT)
+    })
+
+    if (importId) {
+        params.set("import_id", String(importId))
+    }
 
 let res = await fetch(
-    "/api/fit_data?session_id=" + session,
+    "/api/fit_data?" + params.toString(),
     {
         credentials: "same-origin"
     }
@@ -745,16 +974,10 @@ let res = await fetch(
 
 let data = await parseJsonResponse(res, "LOAD FIT DATA")
 
-    let tbody =
-        document.querySelector(
-            "#fitDataTable tbody"
-        )
-
-    tbody.innerHTML = ""
-
     if (!Array.isArray(data)) {
 
         console.error(data)
+        setText("fitTableStatus", "FIT table error: invalid API response")
 
         tbody.innerHTML = `
             <tr>
@@ -768,6 +991,7 @@ let data = await parseJsonResponse(res, "LOAD FIT DATA")
     }
 
     if (data.length === 0) {
+        setText("fitTableStatus", "FIT table: 0 records")
 
         tbody.innerHTML = `
             <tr>
@@ -780,45 +1004,36 @@ let data = await parseJsonResponse(res, "LOAD FIT DATA")
         return
     }
 
-    data.forEach(r => {
+    setText(
+        "fitTableStatus",
+        `FIT table: rendering ${data.length} records...`
+    )
 
-        const time =
-            r.timestamp ||
-            r.time ||
-            "-"
+    await renderTableRowsChunked(
+        tbody,
+        data,
+        [
+            r => displayValue(r.timestamp, r.time),
+            r => displayValue(r.heart_rate, r.hr, r.pulse),
+            r => displayValue(r.rr, r.rr_interval, r.rr_intervals),
+            r => displayValue(r.hrv, r.rmssd)
+        ]
+    )
 
-        const hr =
-            r.heart_rate ||
-            r.hr ||
-            r.pulse ||
-            "-"
+    setText(
+        "fitTableStatus",
+        data.length >= TABLE_PREVIEW_LIMIT
+            ? `FIT table: first ${data.length} records loaded`
+            : `FIT table: ${data.length} records loaded`
+    )
 
-        const rr =
-            r.rr ||
-            r.rr_interval ||
-            r.rr_intervals ||
-            "-"
-
-        const hrv =
-            r.hrv ||
-            r.rmssd ||
-            "-"
-
-        tbody.innerHTML += `
-
-            <tr>
-
-                <td>${time}</td>
-
-                <td>${hr}</td>
-
-                <td>${rr}</td>
-
-                <td>${hrv}</td>
-
-            </tr>
-        `
-    })
+    } catch (err) {
+        console.error("loadFITTable failed", err)
+        setText(
+            "fitTableStatus",
+            `FIT table error: ${err.message || err}`
+        )
+    }
 }
 
 // ========================================
@@ -861,8 +1076,13 @@ let res = await fetch(
 )
 
 let data = await parseJsonResponse(res, "UPLOAD CSV")
+        const duplicateImport =
+            res.status === 409 &&
+            data &&
+            data.status === "duplicate" &&
+            data.import_type === "csv"
 
-        if (!res.ok || data.error) {
+        if ((!res.ok && !duplicateImport) || (data.error && !duplicateImport)) {
 
             alert(
                 data.error ||
@@ -883,7 +1103,7 @@ let data = await parseJsonResponse(res, "UPLOAD CSV")
                 <br>
 
                 Records:
-                ${data.records || 0}
+                ${data.records_saved || data.records || 0}
 
             </div>
         `
@@ -891,8 +1111,10 @@ let data = await parseJsonResponse(res, "UPLOAD CSV")
         await loadCSVTable(
             document.getElementById(
                 "session_id"
-            ).value
+            ).value,
+            data.import_id
         )
+        clearMergedPreview()
 
     } catch (err) {
 
@@ -902,10 +1124,39 @@ let data = await parseJsonResponse(res, "UPLOAD CSV")
     }
 }
 
-async function loadCSVTable(session) {
+async function loadCSVTable(session, importId = null) {
+    try {
+
+    let tbody =
+        document.querySelector(
+            "#csvDataTable tbody"
+        )
+
+    if (!tbody) {
+        return
+    }
+
+    setText("csvTableStatus", "")
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="3">
+                Loading CSV preview...
+            </td>
+        </tr>
+    `
+
+    const params = new URLSearchParams({
+        session_id: session,
+        limit: String(TABLE_PREVIEW_LIMIT)
+    })
+
+    if (importId) {
+        params.set("import_id", String(importId))
+    }
 
 let res = await fetch(
-    "/api/csv_data?session_id=" + session,
+    "/api/csv_data?" + params.toString(),
     {
         credentials: "same-origin"
     }
@@ -913,14 +1164,8 @@ let res = await fetch(
 
 let data = await parseJsonResponse(res, "LOAD CSV DATA")
 
-    let tbody =
-        document.querySelector(
-            "#csvDataTable tbody"
-        )
-
-    tbody.innerHTML = ""
-
     if (!Array.isArray(data)) {
+        setText("csvTableStatus", "CSV table error: invalid API response")
 
         tbody.innerHTML = `
             <tr>
@@ -934,6 +1179,7 @@ let data = await parseJsonResponse(res, "LOAD CSV DATA")
     }
 
     if (data.length === 0) {
+        setText("csvTableStatus", "CSV table: 0 records")
 
         tbody.innerHTML = `
             <tr>
@@ -946,38 +1192,33 @@ let data = await parseJsonResponse(res, "LOAD CSV DATA")
         return
     }
 
-    data.forEach(r => {
+    setText(
+        "csvTableStatus",
+        `CSV table: rendering ${data.length} records...`
+    )
 
-        const time =
-            r.timestamp ||
-            r.time ||
-            "-"
+    await renderTableRowsChunked(
+        tbody,
+        data,
+        [
+            r => displayValue(r.timestamp, r.time),
+            r => displayValue(r.pulse, r.hr, r.heart_rate),
+            r => displayValue(r.spo2, r.oxygen, r.saturation)
+        ]
+    )
 
-        const pulse =
-            r.pulse ||
-            r.hr ||
-            r.heart_rate ||
-            "-"
+    setText(
+        "csvTableStatus",
+        `CSV table: ${data.length} records loaded`
+    )
 
-        const spo2 =
-            r.spo2 ||
-            r.oxygen ||
-            r.saturation ||
-            "-"
-
-        tbody.innerHTML += `
-
-            <tr>
-
-                <td>${time}</td>
-
-                <td>${pulse}</td>
-
-                <td>${spo2}</td>
-
-            </tr>
-        `
-    })
+    } catch (err) {
+        console.error("loadCSVTable failed", err)
+        setText(
+            "csvTableStatus",
+            `CSV table error: ${err.message || err}`
+        )
+    }
 }
 
 // ========================================
@@ -1046,7 +1287,10 @@ async function mergeDuring() {
                     Mode: ${data.mode || "-"}<br>
                     FIT samples: ${data.fit_samples ?? "-"}<br>
                     CSV samples: ${data.csv_samples ?? "-"}<br>
-                    Merged samples: ${merged.length}
+                    Merged samples: ${merged.length}<br>
+                    Matched: ${data.matched_records ?? "-"}
+                    (${data.match_rate ?? "-"}%)<br>
+                    FIT time offset: ${data.fit_time_offset_hours ?? 0}h
                 </div>
             `
         }
@@ -1088,7 +1332,9 @@ function renderMergedTable(rows) {
         return
     }
 
-    rows.forEach(r => {
+    const previewRows = rows.slice(0, 500)
+
+    const htmlRows = previewRows.map(r => {
 
         const spo2 =
             r.spo2 ??
@@ -1100,7 +1346,7 @@ function renderMergedTable(rows) {
             r.sp02 ??
             "-"
 
-        tbody.innerHTML += `
+        return `
             <tr>
                 <td>${r.timestamp || r.time || "-"}</td>
                 <td>${r.hr || r.heart_rate || "-"}</td>
@@ -1112,6 +1358,8 @@ function renderMergedTable(rows) {
             </tr>
         `
     })
+
+    tbody.innerHTML = htmlRows.join("")
 }
 
 
@@ -1125,7 +1373,7 @@ async function saveDURING() {
         document.getElementById("session_id").value
 
     const subjectId =
-        document.getElementById("user_id").value
+        getSelectedSubjectId()
 
     const pressure =
         Number(document.getElementById("during_pressure").value)
@@ -1154,17 +1402,23 @@ async function saveDURING() {
         1 + (pressure / 100)
 
     const fitRes =
-    await fetch("/api/fit_data?session_id=" + sessionId, {
+    await fetch(
+        "/api/fit_data?session_id=" + encodeURIComponent(sessionId) + "&limit=1",
+        {
         credentials: "same-origin"
-    })
+        }
+    )
 
     const fit =
     await parseJsonResponse(fitRes, "DURING LOAD FIT")
 
     const csvRes =
-    await fetch("/api/csv_data?session_id=" + sessionId, {
+    await fetch(
+        "/api/csv_data?session_id=" + encodeURIComponent(sessionId) + "&limit=1",
+        {
         credentials: "same-origin"
-    })
+        }
+    )
 
     const csv =
     await parseJsonResponse(csvRes, "DURING LOAD CSV")
@@ -1344,9 +1598,7 @@ async function savePOST() {
                     ).value,
 
                 user_id:
-                    document.getElementById(
-                        "user_id"
-                    ).value,
+                    getSelectedSubjectId(),
 
                 phase: "post",
 
@@ -1422,7 +1674,7 @@ async function saveFullSession() {
 
     const payload = {
         session_id: document.getElementById("session_id").value,
-        user_id: document.getElementById("user_id").value,
+        user_id: getSelectedSubjectId(),
         pre: state.pre,
         during: state.during,
         post: state.post
@@ -1548,7 +1800,7 @@ async function loadSessions() {
                 </td>
 
                 <td>${s.session_id}</td>
-                <td>${s.subject_id || "-"}</td>
+                <td>${s.subject_id || s.user_id || "-"}</td>
 
                 <td>
                     <button onclick="runAnalysis('${s.session_id}')">
@@ -1647,14 +1899,29 @@ async function runAnalysis(sessionId) {
                 ? "YES - abnormal response detected"
                 : "NO critical anomaly detected"
 
-        document.getElementById("ai-summary").innerHTML =
-            "<b>Summary:</b> " + (data.summary || "-")
+        const aiSummary =
+            document.getElementById("ai-summary")
 
-        document.getElementById("ai-score").innerHTML =
-            "<b>Score:</b> " + (data.score ?? "-") + " / 100"
+        if (aiSummary) {
+            aiSummary.innerHTML =
+                "<b>Summary:</b> " + escapeHtml(data.summary || "-")
+        }
 
-        document.getElementById("ai-anomaly").innerHTML =
-            "<b>Anomaly:</b> " + anomalyText
+        const aiScore =
+            document.getElementById("ai-score")
+
+        if (aiScore) {
+            aiScore.innerHTML =
+                "<b>Score:</b> " + escapeHtml(data.score ?? "-") + " / 100"
+        }
+
+        const aiAnomaly =
+            document.getElementById("ai-anomaly")
+
+        if (aiAnomaly) {
+            aiAnomaly.innerHTML =
+                "<b>Anomaly:</b> " + escapeHtml(anomalyText)
+        }
 
         renderAIVisualization(data)
 
@@ -1668,6 +1935,81 @@ async function runAnalysis(sessionId) {
 // ========================================
 // render AI Visualization
 // ========================================
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;")
+}
+
+function formatMetric(value, unit = "") {
+    if (value === undefined || value === null || value === "") {
+        return `<span class="muted-value">Not available</span>`
+    }
+
+    const suffix = unit ? ` <span class="metric-unit">${unit}</span>` : ""
+
+    return `${escapeHtml(value)}${suffix}`
+}
+
+function formatScore(value) {
+    if (value === undefined || value === null || value === "") {
+        return `<span class="muted-value">Pending</span>`
+    }
+
+    return `${escapeHtml(value)}<span class="metric-unit">/100</span>`
+}
+
+function riskClass(label) {
+    const normalized = String(label || "").toLowerCase()
+
+    if (normalized.includes("high")) return "status-high"
+    if (normalized.includes("moderate")) return "status-moderate"
+
+    return "status-low"
+}
+
+function renderFindingList(items, fallback, className = "") {
+    const cleanItems = Array.isArray(items)
+        ? items.filter(Boolean)
+        : []
+
+    if (!cleanItems.length) {
+        return `<div class="empty-state">${escapeHtml(fallback)}</div>`
+    }
+
+    return `
+        <ul class="ai-finding-list ${className}">
+            ${cleanItems
+                .map(item => `<li>${escapeHtml(item)}</li>`)
+                .join("")}
+        </ul>
+    `
+}
+
+function renderMetricRows(rows) {
+    return rows.map(row => `
+        <div class="metric-row">
+            <span>${escapeHtml(row.label)}</span>
+            <strong>${formatMetric(row.value, row.unit)}</strong>
+        </div>
+    `).join("")
+}
+
+function pickMetric(features, ...keys) {
+    for (const key of keys) {
+        const value = features[key]
+
+        if (value !== undefined && value !== null && value !== "") {
+            return value
+        }
+    }
+
+    return null
+}
 
 function renderAIVisualization(data) {
 
@@ -1689,12 +2031,17 @@ function renderAIVisualization(data) {
                 ? data.merged
                 : []
 
+    const scoreValue =
+        data.score ??
+        data.overall_score ??
+        features.overall_score
+
     const riskLabel =
         data.risk_level ||
         (
-            data.score >= 90
+            scoreValue >= 90
                 ? "Low"
-                : data.score >= 70
+                : scoreValue >= 70
                     ? "Moderate"
                     : "High"
         )
@@ -1705,18 +2052,28 @@ function renderAIVisualization(data) {
             : "NO critical anomaly detected"
 
     const warnings =
-        data.reasons && data.reasons.length
-            ? data.reasons.join("<br>")
-            : "No rule-based warning detected"
+        Array.isArray(data.reasons)
+            ? data.reasons
+            : []
 
     const positiveFindings =
-        data.positive_findings && data.positive_findings.length
-            ? data.positive_findings.join("<br>")
-            : "No additional positive findings"
+        Array.isArray(data.positive_findings)
+            ? data.positive_findings
+            : []
 
     const disclaimer =
         data.medical_disclaimer ||
         "Research-only score. Not a medical diagnosis."
+
+    const keyFinding =
+        data.summary ||
+        warnings[0] ||
+        positiveFindings[0] ||
+        "No critical rule-based finding was detected."
+
+    const dataQualityScore =
+        features.data_quality_score ??
+        data.data_quality_score
 
     const scoreReference = `
         90-100 = Low risk / stable session<br>
@@ -1919,6 +2276,245 @@ function renderAIVisualization(data) {
         </div>
     `
 
+    container.innerHTML = `
+        <section class="ai-report">
+            <div class="ai-report-header">
+                <div>
+                    <h3>AI Session Summary</h3>
+                    <p>${escapeHtml(data.score_type || "Research risk score")}</p>
+                </div>
+                <span class="status-badge ${riskClass(riskLabel)}">
+                    ${escapeHtml(riskLabel)} risk
+                </span>
+            </div>
+
+            <div class="ai-kpi-grid">
+                <div class="ai-kpi-card">
+                    <span>Risk score</span>
+                    <strong>${formatScore(scoreValue)}</strong>
+                </div>
+                <div class="ai-kpi-card">
+                    <span>Anomaly status</span>
+                    <strong>${escapeHtml(anomalyLabel)}</strong>
+                </div>
+                <div class="ai-kpi-card">
+                    <span>Data quality</span>
+                    <strong>${formatMetric(dataQualityScore, "/100")}</strong>
+                </div>
+                <div class="ai-kpi-card">
+                    <span>Timeline samples</span>
+                    <strong>${formatMetric(timeline.length)}</strong>
+                </div>
+            </div>
+
+            <div class="ai-summary-grid">
+                <div class="ai-summary-card ai-summary-card-wide">
+                    <h4>Key Finding</h4>
+                    <p>${escapeHtml(keyFinding)}</p>
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Warnings</h4>
+                    ${renderFindingList(
+                        warnings,
+                        "No rule-based warning detected.",
+                        warnings.length ? "warning-list" : ""
+                    )}
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Positive Findings</h4>
+                    ${renderFindingList(
+                        positiveFindings,
+                        "No additional positive findings."
+                    )}
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Signal Quality</h4>
+                    <div class="metric-list">
+                        ${renderMetricRows([
+                            {
+                                label: "FIT samples",
+                                value: pickMetric(
+                                    features,
+                                    "fit_samples",
+                                    "samples_total"
+                                ) ?? data.fit_samples
+                            },
+                            {
+                                label: "CSV samples",
+                                value: pickMetric(
+                                    features,
+                                    "csv_samples",
+                                    "samples_synchronized"
+                                ) ?? data.csv_samples
+                            },
+                            {
+                                label: "Merged samples",
+                                value: pickMetric(
+                                    features,
+                                    "merged_samples",
+                                    "samples_synchronized"
+                                ) ?? data.merged_samples
+                            },
+                            {
+                                label: "CSV pulse artifacts ignored",
+                                value: features.csv_pulse_artifacts ?? 0
+                            }
+                        ])}
+                    </div>
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Physiology Metrics</h4>
+                    <div class="metric-list">
+                        ${renderMetricRows([
+                            {
+                                label: "Average SpO2",
+                                value: pickMetric(
+                                    features,
+                                    "avg_csv_spo2",
+                                    "avg_spo2"
+                                ),
+                                unit: "%"
+                            },
+                            {
+                                label: "Minimum SpO2",
+                                value: features.min_spo2,
+                                unit: "%"
+                            },
+                            {
+                                label: "Maximum SpO2",
+                                value: features.max_spo2,
+                                unit: "%"
+                            },
+                            {
+                                label: "Average pulse",
+                                value: pickMetric(
+                                    features,
+                                    "avg_csv_pulse",
+                                    "avg_pulse"
+                                ),
+                                unit: "bpm"
+                            },
+                            {
+                                label: "Pulse range",
+                                value: (
+                                    pickMetric(
+                                        features,
+                                        "min_csv_pulse",
+                                        "min_pulse"
+                                    ) !== null &&
+                                    pickMetric(
+                                        features,
+                                        "max_csv_pulse",
+                                        "max_pulse"
+                                    ) !== null
+                                )
+                                    ? `${
+                                        pickMetric(
+                                            features,
+                                            "min_csv_pulse",
+                                            "min_pulse"
+                                        )
+                                    }-${
+                                        pickMetric(
+                                            features,
+                                            "max_csv_pulse",
+                                            "max_pulse"
+                                        )
+                                    }`
+                                    : null,
+                                unit: "bpm"
+                            },
+                            {
+                                label: "Average HR",
+                                value: pickMetric(
+                                    features,
+                                    "avg_fit_hr",
+                                    "avg_heart_rate"
+                                ),
+                                unit: "bpm"
+                            },
+                            {
+                                label: "HR range",
+                                value: (
+                                    pickMetric(
+                                        features,
+                                        "min_fit_hr",
+                                        "min_heart_rate"
+                                    ) !== null &&
+                                    pickMetric(
+                                        features,
+                                        "max_fit_hr",
+                                        "max_heart_rate"
+                                    ) !== null
+                                )
+                                    ? `${
+                                        pickMetric(
+                                            features,
+                                            "min_fit_hr",
+                                            "min_heart_rate"
+                                        )
+                                    }-${
+                                        pickMetric(
+                                            features,
+                                            "max_fit_hr",
+                                            "max_heart_rate"
+                                        )
+                                    }`
+                                    : null,
+                                unit: "bpm"
+                            },
+                            {
+                                label: "Average HRV",
+                                value: features.avg_hrv,
+                                unit: "ms"
+                            }
+                        ])}
+                    </div>
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Rule Reference</h4>
+                    <div class="metric-list">
+                        ${renderMetricRows([
+                            {
+                                label: "Low risk",
+                                value: "90-100"
+                            },
+                            {
+                                label: "Moderate risk",
+                                value: "70-89"
+                            },
+                            {
+                                label: "High risk",
+                                value: "below 70"
+                            },
+                            {
+                                label: "SpO2 warning",
+                                value: "below 94%"
+                            },
+                            {
+                                label: "HRV warning",
+                                value: "below 30 ms"
+                            }
+                        ])}
+                    </div>
+                </div>
+            </div>
+
+            <p class="ai-disclaimer">${escapeHtml(disclaimer)}</p>
+        </section>
+
+        <div class="panel chart-box ai-chart-box">
+            <h3>AI Timeline</h3>
+            <canvas id="aiTimelineChart"></canvas>
+            <div id="aiTimelineStatus"></div>
+        </div>
+    `
+
     const status =
         document.getElementById("aiTimelineStatus")
 
@@ -2047,25 +2643,41 @@ function renderAIVisualization(data) {
                     {
                         label: "SpO2 from CSV",
                         data: spo2,
-                        borderWidth: 2,
+                        borderColor: "#F59F35",
+                        backgroundColor: "#F59F35",
+                        borderWidth: 1.8,
+                        pointRadius: 0,
+                        yAxisID: "ySpo2",
                         spanGaps: true
                     },
                     {
                         label: "Pulse from CSV",
                         data: pulse,
-                        borderWidth: 2,
+                        borderColor: "#F05A7E",
+                        backgroundColor: "#F05A7E",
+                        borderWidth: 1.8,
+                        pointRadius: 0,
+                        yAxisID: "yVitals",
                         spanGaps: true
                     },
                     {
                         label: "HR from FIT",
                         data: heartRate,
-                        borderWidth: 2,
+                        borderColor: "#2F9EED",
+                        backgroundColor: "#2F9EED",
+                        borderWidth: 1.8,
+                        pointRadius: 0,
+                        yAxisID: "yVitals",
                         spanGaps: true
                     },
                     {
                         label: "HRV from FIT",
                         data: hrv,
-                        borderWidth: 2,
+                        borderColor: "#FFD05A",
+                        backgroundColor: "#FFD05A",
+                        borderWidth: 1.8,
+                        pointRadius: 0,
+                        yAxisID: "yHrv",
                         spanGaps: true
                     }
                 ]
@@ -2080,14 +2692,99 @@ function renderAIVisualization(data) {
                     intersect: false
                 },
 
+                elements: {
+                    line: {
+                        tension: 0.18
+                    },
+                    point: {
+                        hoverRadius: 4,
+                        hitRadius: 8
+                    }
+                },
+
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: "rgba(226, 232, 240, 0.76)",
+                            usePointStyle: true,
+                            pointStyle: "line"
+                        }
+                    }
+                },
+
                 scales: {
                     x: {
+                        grid: {
+                            display: false
+                        },
                         ticks: {
-                            maxTicksLimit: 10
+                            color: "rgba(226, 232, 240, 0.76)",
+                            maxTicksLimit: 9,
+                            maxRotation: 0,
+                            callback: (_value, index) => {
+                                const date = new Date(labels[index])
+
+                                if (Number.isNaN(date.getTime())) {
+                                    return labels[index] || ""
+                                }
+
+                                return date.toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit"
+                                })
+                            }
                         }
                     },
-                    y: {
-                        beginAtZero: false
+                    yVitals: {
+                        type: "linear",
+                        position: "left",
+                        suggestedMin: 40,
+                        suggestedMax: 120,
+                        title: {
+                            display: true,
+                            text: "HR / Pulse bpm",
+                            color: "rgba(226, 232, 240, 0.76)"
+                        },
+                        ticks: {
+                            color: "rgba(226, 232, 240, 0.76)"
+                        },
+                        grid: {
+                            color: "rgba(148, 163, 184, 0.14)"
+                        }
+                    },
+                    ySpo2: {
+                        type: "linear",
+                        position: "right",
+                        suggestedMin: 88,
+                        suggestedMax: 100,
+                        title: {
+                            display: true,
+                            text: "SpO2 %",
+                            color: "#F59F35"
+                        },
+                        ticks: {
+                            color: "#F59F35"
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    yHrv: {
+                        type: "linear",
+                        position: "right",
+                        suggestedMin: 0,
+                        suggestedMax: 120,
+                        title: {
+                            display: true,
+                            text: "HRV ms",
+                            color: "#FFD05A"
+                        },
+                        ticks: {
+                            color: "#FFD05A"
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     }
                 }
             }

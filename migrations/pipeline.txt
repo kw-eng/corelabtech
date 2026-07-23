@@ -1,0 +1,44 @@
+FIT FILE
+        │
+        ▼
+ fit_imports
+        │
+        ▼
+ fit_data
+
+CSV FILE
+        │
+        ▼
+ csv_imports
+        │
+        ▼
+ csv_data
+
+        ▼
+==========================
+      Merge Engine
+==========================
+
+merge_jobs
+        │
+        ▼
+merged_data
+
+        ▼
+==========================
+        AI Engine
+==========================
+
+ai_results
+
+        ▼
+
+Research Dashboard
+
+        ▼
+
+Research Report
+
+        ▼
+
+Playwright E2E Tests

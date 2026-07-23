@@ -2,16 +2,99 @@
 
 {% block content %}
 
-<h1>Profile</h1>
+<div class="profile-page">
 
-<div class="panel">
-    <p><strong>Email:</strong> {{ current_user.email }}</p>
-    <p><strong>User ID:</strong> {{ current_user.user_id }}</p>
-    <p><strong>Role:</strong> {{ current_user.role }}</p>
+    <section class="profile-hero">
+        <div>
+            <span class="profile-eyebrow">Authenticated account</span>
+            <h1>Profile</h1>
+            <p>
+                Account identity and access scope for the CoreLabTech HBOT
+                research platform.
+            </p>
+        </div>
+
+        <div class="profile-identity-card">
+            <div class="profile-avatar">
+                {{ (current_user.email or current_user.user_id or "U")[:1] | upper }}
+            </div>
+            <div>
+                <span>Signed in as</span>
+                <strong>{{ current_user.email }}</strong>
+                <small>{{ current_user.role | title }} access</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="profile-grid">
+        <div class="profile-card">
+            <div class="profile-card-header">
+                <h2>Account Details</h2>
+                <p>Core identity used by dashboards, sessions and audit views.</p>
+            </div>
+
+            <div class="profile-detail-list">
+                <div>
+                    <span>Email</span>
+                    <strong>{{ current_user.email }}</strong>
+                </div>
+                <div>
+                    <span>User ID</span>
+                    <strong>{{ current_user.user_id }}</strong>
+                </div>
+                <div>
+                    <span>Role</span>
+                    <strong>{{ current_user.role }}</strong>
+                </div>
+                <div>
+                    <span>Status</span>
+                    <strong>Active session</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-card-header">
+                <h2>Access Scope</h2>
+                <p>Available modules are controlled by your current role.</p>
+            </div>
+
+            <div class="profile-access-list">
+                <div>
+                    <span>Research workflow</span>
+                    <strong>Chamber Testing</strong>
+                </div>
+
+                {% if current_user.role in ["researcher", "admin"] %}
+                <div>
+                    <span>Analysis</span>
+                    <strong>AI Lab and AI QA Lab</strong>
+                </div>
+                {% endif %}
+
+                {% if current_user.role == "admin" %}
+                <div>
+                    <span>Administration</span>
+                    <strong>Mission Logs, DB Debug and Accounts</strong>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="profile-actions-panel">
+        <div>
+            <h2>Session Actions</h2>
+            <p>Continue working in the platform or end the current browser session.</p>
+        </div>
+
+        <div class="profile-actions">
+            <a class="profile-primary-action" href="/chamber">Open Chamber</a>
+            <a class="profile-secondary-action" href="/research">Open Mission Control</a>
+            <a class="profile-danger-action" href="/logout">Logout</a>
+        </div>
+    </section>
+
 </div>
-
-<a href="/logout">
-    <button>Logout</button>
-</a>
 
 {% endblock %}

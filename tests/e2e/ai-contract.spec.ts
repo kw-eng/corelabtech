@@ -24,10 +24,11 @@ test("AI analysis contract works for latest saved session", async ({ page }) => 
   });
 
   expect(response.ok()).toBeTruthy();
+  expect([200, 201]).toContain(response.status());
 
   const body = await response.json();
 
-  expect(body).toHaveProperty("status", "ok");
+  expect(["ok", "completed"]).toContain(body.status);
   expect(body).toHaveProperty("session_id");
   expect(body).toHaveProperty("score");
   expect(body).toHaveProperty("risk_level");

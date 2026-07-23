@@ -1,95 +1,144 @@
-<!--Landing page-->
 {% extends "layout.html" %}
 
 {% block content %}
 
-<h1>CoreLabTech</h1>
+<div class="home-page">
 
-<p>
-Research & AI Testing Laboratory
-</p>
+    <section class="home-hero">
+        <div class="home-hero-copy">
+            <span class="home-eyebrow">Research & AI Testing Laboratory</span>
 
-<section>
+            <h1>CoreLabTech</h1>
 
-<h2>Research Platform</h2>
-<p>
-Manage HBOT sessions, collect physiological data and control
-the full research workflow in a centralized environment.
-</p>
+            <p>
+                A centralized platform for HBOT session capture, physiological telemetry,
+                synchronized FIT/CSV analysis, and research-grade AI review.
+            </p>
 
-<a href="/platform">
-<button class="action-btn">Open Platform</button>
-</a>
+            <div class="home-actions">
+                <a class="home-primary-action" href="/chamber">
+                    Start HBOT Session
+                </a>
 
-</section>
+                <a class="home-secondary-action" href="/ai_lab">
+                    Open AI Lab
+                </a>
 
+                <a class="home-secondary-action" href="/platform">
+                    Research Platform
+                </a>
+            </div>
+        </div>
 
-<section>
+        <div class="home-hero-panel">
+            <div class="home-signal-row">
+                <span>Pipeline</span>
+                <strong>PRE -> DURING -> POST</strong>
+            </div>
 
-<h2>Mission Control</h2>
-<p>
-Monitor real-time telemetry including SpO2, HRV, pressure and
-temperature with AI-assisted insights.
-</p>
+            <div class="home-signal-grid">
+                <div>
+                    <span>SpO2</span>
+                    <strong>CSV</strong>
+                </div>
+                <div>
+                    <span>HR / HRV</span>
+                    <strong>FIT</strong>
+                </div>
+                <div>
+                    <span>Merge</span>
+                    <strong>Time sync</strong>
+                </div>
+                <div>
+                    <span>AI</span>
+                    <strong>Risk review</strong>
+                </div>
+            </div>
+        </div>
+    </section>
 
-<a href="/research">
-<button class="action-btn">Open Dashboard</button>
-</a>
+    <section class="home-status-strip">
+        <div>
+            <span>Session workflow</span>
+            <strong>Ready</strong>
+        </div>
+        <div>
+            <span>Data ingestion</span>
+            <strong>FIT + CSV</strong>
+        </div>
+        <div>
+            <span>Analysis mode</span>
+            <strong>Research only</strong>
+        </div>
+        <div>
+            <span>Dashboard</span>
+            <strong>Live telemetry</strong>
+        </div>
+    </section>
 
-</section>
+    <section class="home-section-header">
+        <h2>Core Modules</h2>
+        <p>
+            Move from data capture to synchronized analysis without leaving the platform.
+        </p>
+    </section>
 
+    <section class="home-module-grid">
+        <a class="home-module-card featured" href="/chamber">
+            <span>01</span>
+            <h3>Session Input</h3>
+            <p>
+                Record PRE, DURING and POST phases with chamber telemetry and wearable data.
+            </p>
+            <strong>Start Session</strong>
+        </a>
 
-<section>
+        <a class="home-module-card" href="/research">
+            <span>02</span>
+            <h3>Mission Control</h3>
+            <p>
+                Monitor SpO2, HRV, pressure, temperature and synchronized session status.
+            </p>
+            <strong>Open Dashboard</strong>
+        </a>
 
-<h2>AI Lab</h2>
-<p>
-Analyze HBOT session data using AI models to detect anomalies,
-generate scores and evaluate physiological response.
-</p>
+        <a class="home-module-card" href="/ai_lab">
+            <span>03</span>
+            <h3>AI Lab</h3>
+            <p>
+                Run deterministic research analysis, score quality and inspect anomalies.
+            </p>
+            <strong>Run Analysis</strong>
+        </a>
 
-<a href="/ai_lab">
-<button class="action-btn">Run AI Analysis</button>
-</a>
+        <a class="home-module-card" href="/platform">
+            <span>04</span>
+            <h3>Research Platform</h3>
+            <p>
+                Manage HBOT workflow, sessions, datasets and research-facing operations.
+            </p>
+            <strong>Open Platform</strong>
+        </a>
 
-</section>
+        <a class="home-module-card" href="/qa">
+            <span>05</span>
+            <h3>Software QA Lab</h3>
+            <p>
+                Validate automation, performance and reliability across backend and UI flows.
+            </p>
+            <strong>Open QA Lab</strong>
+        </a>
 
+        <a class="home-module-card" href="/ai-qa-lab">
+            <span>06</span>
+            <h3>AI QA Lab</h3>
+            <p>
+                Generate tests, inspect flaky behavior and validate data-pipeline behavior.
+            </p>
+            <strong>Open AI QA</strong>
+        </a>
+    </section>
 
-<section>
+</div>
 
-<h2>Session Input</h2>
-<p>
-Initialize and record a full HBOT session with physiological
-and chamber telemetry.
-</p>
-
-<a href="/chamber">
-<button class="action-btn">Start Session</button>
-</a>
-
-</section>
-
-<section>
-
-<h2>Software QA Lab</h2>
-<p>Automation, performance and system reliability testing for backend and UI workflows.</p>
-
-<a href="/qa">
-    <button class="action-btn">Open QA Lab</button>
-</a>
-
-</section>
-
-<section>
-
-<h2>AI QA Lab</h2>
-<p>
-AI-driven test generation, flaky test detection,<br>
-and validation of data pipelines and system behavior.
-</p>
-
-<a href="/ai-qa-lab">
-    <button class="action-btn">Open AI QA Lab</button>
-</a>
-
-</section>
 {% endblock %}

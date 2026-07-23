@@ -1,6 +1,14 @@
 // static/js/ai_lab.js
 
 let aiTimelineChart = null
+const AI_LAB_COLORS = {
+    heartRate: "#2F9EED",
+    pulse: "#F05A7E",
+    spo2: "#F59F35",
+    hrv: "#FFD05A",
+    text: "rgba(226, 232, 240, 0.76)",
+    grid: "rgba(148, 163, 184, 0.14)"
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     loadSessions()
@@ -25,6 +33,113 @@ async function parseJsonResponse(res, label){
     }
 }
 
+function escapeHtml(value){
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;")
+}
+
+function pickMetric(features, ...keys){
+    for(const key of keys){
+        const value = features[key]
+
+        if(value !== undefined && value !== null && value !== ""){
+            return value
+        }
+    }
+
+    return null
+}
+
+function formatMetric(value, unit = ""){
+    if(value === undefined || value === null || value === ""){
+        return `<span class="muted-value">Not available</span>`
+    }
+
+    const suffix = unit ? ` <span class="metric-unit">${unit}</span>` : ""
+
+    return `${escapeHtml(value)}${suffix}`
+}
+
+function formatScore(data){
+    const value =
+        data.score ??
+        data.overall_score
+
+    if(value === undefined || value === null || value === ""){
+        return `<span class="muted-value">Pending</span>`
+    }
+
+    return `${escapeHtml(value)}<span class="metric-unit">/100</span>`
+}
+
+function riskLabel(data){
+    const score =
+        data.score ??
+        data.overall_score
+
+    return data.risk_level || (
+        score >= 90
+            ? "Low"
+            : score >= 70
+                ? "Moderate"
+                : "High"
+    )
+}
+
+function riskClass(label){
+    const normalized = String(label || "").toLowerCase()
+
+    if(normalized.includes("high")) return "status-high"
+    if(normalized.includes("moderate")) return "status-moderate"
+
+    return "status-low"
+}
+
+function renderFindingList(items, fallback, className = ""){
+    const cleanItems =
+        Array.isArray(items)
+            ? items.filter(Boolean)
+            : []
+
+    if(!cleanItems.length){
+        return `<div class="empty-state">${escapeHtml(fallback)}</div>`
+    }
+
+    return `
+        <ul class="ai-finding-list ${className}">
+            ${cleanItems
+                .map(item => `<li>${escapeHtml(item)}</li>`)
+                .join("")}
+        </ul>
+    `
+}
+
+function renderMetricRows(rows){
+    return rows.map(row => `
+        <div class="metric-row">
+            <span>${escapeHtml(row.label)}</span>
+            <strong>${formatMetric(row.value, row.unit)}</strong>
+        </div>
+    `).join("")
+}
+
+function formatShortTime(value){
+    const date = new Date(value)
+
+    if(Number.isNaN(date.getTime())){
+        return value || ""
+    }
+
+    return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+    })
+}
+
 async function loadSessions(){
 
     try{
@@ -42,6 +157,11 @@ async function loadSessions(){
                     : []
 
         const tbody = document.getElementById("sessionsBody")
+        const sessionCount = document.getElementById("sessionCount")
+
+        if(sessionCount){
+            sessionCount.textContent = `${sessions.length} sessions`
+        }
 
         if(!tbody){
             console.error("sessionsBody not found")
@@ -60,6 +180,11 @@ async function loadSessions(){
         }
 
         sessions.forEach(s => {
+            const completedLabel =
+                s.completed
+                    ? `<span class="status-pill status-low">Completed</span>`
+                    : `<span class="status-pill status-moderate">Open</span>`
+
             tbody.innerHTML += `
                 <tr>
                     <td>
@@ -70,13 +195,13 @@ async function loadSessions(){
                         >
                     </td>
 
-                    <td>${s.session_id || "-"}</td>
-                    <td>${s.user_id || "-"}</td>
-                    <td>${s.date || "-"}</td>
-                    <td>${s.completed ? "YES" : "NO"}</td>
+                    <td class="session-id-cell">${escapeHtml(s.session_id || "-")}</td>
+                    <td>${escapeHtml(s.user_id || "-")}</td>
+                    <td>${escapeHtml(s.date || s.created_at || "-")}</td>
+                    <td>${completedLabel}</td>
 
                     <td>
-                        <button onclick="runAnalysis('${s.session_id}')">
+                        <button class="tiny-action" onclick="runAnalysis('${escapeHtml(s.session_id)}')">
                             AI
                         </button>
                     </td>
@@ -116,11 +241,13 @@ async function loadLatestAI(){
 
         if(box){
             box.innerHTML = `
-                <b>AI Score:</b> ${data.score ?? "-"} / 100 |
-                <b>Risk:</b> ${data.risk_level ?? "-"} |
-                <b>Anomaly:</b> ${anomalyText}
-                <br>
-                ${data.summary || ""}
+                <div class="live-score">
+                    <strong>${formatScore(data)}</strong>
+                    <span class="status-badge ${riskClass(riskLabel(data))}">
+                        ${escapeHtml(riskLabel(data))} risk
+                    </span>
+                </div>
+                <p>${escapeHtml(data.summary || anomalyText)}</p>
             `
         }
 
@@ -275,89 +402,184 @@ function renderAIVisualization(data){
             ? data.timeline
             : []
 
+    const anomalyDetected =
+        data.anomaly ??
+        data.anomaly_detected
+
     const anomalyText =
-        data.anomaly
+        anomalyDetected
             ? "YES - abnormal response detected"
             : "NO critical anomaly detected"
 
     const warnings =
-        data.reasons && data.reasons.length
-            ? data.reasons.join("<br>")
-            : "No rule-based warning detected"
+        Array.isArray(data.reasons)
+            ? data.reasons
+            : []
 
     const positives =
-        data.positive_findings && data.positive_findings.length
-            ? data.positive_findings.join("<br>")
-            : "No additional positive findings"
+        Array.isArray(data.positive_findings)
+            ? data.positive_findings
+            : []
+
+    const label = riskLabel(data)
+    const keyFinding =
+        data.summary ||
+        warnings[0] ||
+        positives[0] ||
+        "No critical rule-based finding was detected."
+    const dataQuality =
+        data.data_quality_score ??
+        features.data_quality_score
 
     container.innerHTML = `
-        <div class="panel">
-            <h3>AI Session Summary</h3>
+        <section class="ai-report">
+            <div class="ai-report-header">
+                <div>
+                    <h3>AI Session Summary</h3>
+                    <p>${escapeHtml(data.score_type || "Research risk score")}</p>
+                </div>
+                <span class="status-badge ${riskClass(label)}">
+                    ${escapeHtml(label)} risk
+                </span>
+            </div>
 
-            <table border="1" style="width:100%;">
-                <tbody>
-                    <tr>
-                        <td><b>Score type</b></td>
-                        <td>${data.score_type || "AI Research Risk Score"}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Score</b></td>
-                        <td>${data.score ?? "-"} / 100</td>
-                    </tr>
-                    <tr>
-                        <td><b>Score reference</b></td>
-                        <td>
-                            90-100 = Low risk / stable session<br>
-                            70-89 = Moderate warning / observe session<br>
-                            below 70 = High risk / review required
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><b>Risk level</b></td>
-                        <td>${data.risk_level || "-"}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Anomaly</b></td>
-                        <td>${anomalyText}</td>
-                    </tr>
-                    <tr>
-                        <td><b>AI warnings</b></td>
-                        <td>${warnings}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Positive findings</b></td>
-                        <td>${positives}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Disclaimer</b></td>
-                        <td>${data.medical_disclaimer || "Research-only score. Not a medical diagnosis."}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+            <div class="ai-kpi-grid">
+                <div class="ai-kpi-card">
+                    <span>Risk score</span>
+                    <strong>${formatScore(data)}</strong>
+                </div>
+                <div class="ai-kpi-card">
+                    <span>Anomaly status</span>
+                    <strong>${escapeHtml(anomalyText)}</strong>
+                </div>
+                <div class="ai-kpi-card">
+                    <span>Data quality</span>
+                    <strong>${formatMetric(dataQuality, "/100")}</strong>
+                </div>
+                <div class="ai-kpi-card">
+                    <span>Timeline samples</span>
+                    <strong>${formatMetric(timeline.length)}</strong>
+                </div>
+            </div>
 
-        <div class="panel">
-            <h3>Physiology Metrics</h3>
+            <div class="ai-summary-grid">
+                <div class="ai-summary-card ai-summary-card-wide">
+                    <h4>Key Finding</h4>
+                    <p>${escapeHtml(keyFinding)}</p>
+                </div>
 
-            <table border="1" style="width:100%;">
-                <tbody>
-                    <tr><td>FIT samples</td><td>${features.fit_samples ?? "-"}</td></tr>
-                    <tr><td>CSV samples</td><td>${features.csv_samples ?? "-"}</td></tr>
-                    <tr><td>Avg SpO2 from CSV</td><td>${features.avg_csv_spo2 ?? "-"} %</td></tr>
-                    <tr><td>Min SpO2 from CSV</td><td>${features.min_spo2 ?? "-"} %</td></tr>
-                    <tr><td>Max SpO2 from CSV</td><td>${features.max_spo2 ?? "-"} %</td></tr>
-                    <tr><td>Avg Pulse from CSV</td><td>${features.avg_csv_pulse ?? "-"} bpm</td></tr>
-                    <tr><td>Max Pulse from CSV</td><td>${features.max_csv_pulse ?? "-"} bpm</td></tr>
-                    <tr><td>Avg HR from FIT</td><td>${features.avg_fit_hr ?? "-"} bpm</td></tr>
-                    <tr><td>Max HR from FIT</td><td>${features.max_fit_hr ?? "-"} bpm</td></tr>
-                    <tr><td>Avg HRV from FIT</td><td>${features.avg_hrv ?? "-"} ms</td></tr>
-                </tbody>
-            </table>
-        </div>
+                <div class="ai-summary-card">
+                    <h4>Warnings</h4>
+                    ${renderFindingList(
+                        warnings,
+                        "No rule-based warning detected.",
+                        warnings.length ? "warning-list" : ""
+                    )}
+                </div>
 
-        <div class="panel ai-chart-panel">
+                <div class="ai-summary-card">
+                    <h4>Positive Findings</h4>
+                    ${renderFindingList(
+                        positives,
+                        "No additional positive findings."
+                    )}
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Signal Quality</h4>
+                    <div class="metric-list">
+                        ${renderMetricRows([
+                            {
+                                label: "Total samples",
+                                value: pickMetric(features, "samples_total")
+                            },
+                            {
+                                label: "Synchronized samples",
+                                value: pickMetric(features, "samples_synchronized")
+                            },
+                            {
+                                label: "Match rate",
+                                value: pickMetric(features, "match_rate"),
+                                unit: "%"
+                            },
+                            {
+                                label: "Timeline samples",
+                                value: timeline.length
+                            }
+                        ])}
+                    </div>
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Physiology Metrics</h4>
+                    <div class="metric-list">
+                        ${renderMetricRows([
+                            {
+                                label: "Average SpO2",
+                                value: pickMetric(features, "avg_spo2", "avg_csv_spo2"),
+                                unit: "%"
+                            },
+                            {
+                                label: "SpO2 range",
+                                value: (
+                                    pickMetric(features, "min_spo2") !== null &&
+                                    pickMetric(features, "max_spo2") !== null
+                                )
+                                    ? `${pickMetric(features, "min_spo2")}-${pickMetric(features, "max_spo2")}`
+                                    : null,
+                                unit: "%"
+                            },
+                            {
+                                label: "Average pulse",
+                                value: pickMetric(features, "avg_pulse", "avg_csv_pulse"),
+                                unit: "bpm"
+                            },
+                            {
+                                label: "Pulse range",
+                                value: (
+                                    pickMetric(features, "min_pulse", "min_csv_pulse") !== null &&
+                                    pickMetric(features, "max_pulse", "max_csv_pulse") !== null
+                                )
+                                    ? `${pickMetric(features, "min_pulse", "min_csv_pulse")}-${pickMetric(features, "max_pulse", "max_csv_pulse")}`
+                                    : null,
+                                unit: "bpm"
+                            },
+                            {
+                                label: "Average HR",
+                                value: pickMetric(features, "avg_heart_rate", "avg_fit_hr"),
+                                unit: "bpm"
+                            },
+                            {
+                                label: "Average HRV",
+                                value: pickMetric(features, "avg_hrv"),
+                                unit: "ms"
+                            }
+                        ])}
+                    </div>
+                </div>
+
+                <div class="ai-summary-card">
+                    <h4>Rule Reference</h4>
+                    <div class="metric-list">
+                        ${renderMetricRows([
+                            { label: "Low risk", value: "90-100" },
+                            { label: "Moderate risk", value: "70-89" },
+                            { label: "High risk", value: "below 70" },
+                            { label: "SpO2 warning", value: "below 94%" },
+                            { label: "HRV warning", value: "below 30 ms" }
+                        ])}
+                    </div>
+                </div>
+            </div>
+
+            <p class="ai-disclaimer">
+                ${escapeHtml(data.medical_disclaimer || "Research-only score. Not a medical diagnosis.")}
+            </p>
+        </section>
+
+        <div class="ai-chart-panel">
             <h3>AI Timeline</h3>
-            <canvas id="aiTimelineChart" style="width:100%; height:320px;"></canvas>
+            <canvas id="aiTimelineChart"></canvas>
             <div id="aiTimelineStatus"></div>
         </div>
     `
@@ -465,25 +687,41 @@ function renderTimelineChart(timeline){
                 {
                     label: "SpO2 from CSV",
                     data: spo2,
-                    borderWidth: 2,
+                    borderColor: AI_LAB_COLORS.spo2,
+                    backgroundColor: AI_LAB_COLORS.spo2,
+                    borderWidth: 1.8,
+                    pointRadius: 0,
+                    yAxisID: "ySpo2",
                     spanGaps: true
                 },
                 {
                     label: "Pulse from CSV",
                     data: pulse,
-                    borderWidth: 2,
+                    borderColor: AI_LAB_COLORS.pulse,
+                    backgroundColor: AI_LAB_COLORS.pulse,
+                    borderWidth: 1.8,
+                    pointRadius: 0,
+                    yAxisID: "yVitals",
                     spanGaps: true
                 },
                 {
                     label: "HR from FIT",
                     data: hr,
-                    borderWidth: 2,
+                    borderColor: AI_LAB_COLORS.heartRate,
+                    backgroundColor: AI_LAB_COLORS.heartRate,
+                    borderWidth: 1.8,
+                    pointRadius: 0,
+                    yAxisID: "yVitals",
                     spanGaps: true
                 },
                 {
                     label: "HRV from FIT",
                     data: hrv,
-                    borderWidth: 2,
+                    borderColor: AI_LAB_COLORS.hrv,
+                    backgroundColor: AI_LAB_COLORS.hrv,
+                    borderWidth: 1.8,
+                    pointRadius: 0,
+                    yAxisID: "yHrv",
                     spanGaps: true
                 }
             ]
@@ -498,14 +736,88 @@ function renderTimelineChart(timeline){
                 intersect: false
             },
 
+            elements: {
+                line: {
+                    tension: 0.18
+                },
+                point: {
+                    hoverRadius: 4,
+                    hitRadius: 8
+                }
+            },
+
+            plugins: {
+                legend: {
+                    labels: {
+                        color: AI_LAB_COLORS.text,
+                        usePointStyle: true,
+                        pointStyle: "line"
+                    }
+                }
+            },
+
             scales: {
                 x: {
+                    grid: {
+                        display: false
+                    },
                     ticks: {
-                        maxTicksLimit: 10
+                        color: AI_LAB_COLORS.text,
+                        maxTicksLimit: 9,
+                        maxRotation: 0,
+                        callback: (_value, index) => formatShortTime(labels[index])
                     }
                 },
-                y: {
-                    beginAtZero: false
+                yVitals: {
+                    type: "linear",
+                    position: "left",
+                    suggestedMin: 40,
+                    suggestedMax: 120,
+                    title: {
+                        display: true,
+                        text: "HR / Pulse bpm",
+                        color: AI_LAB_COLORS.text
+                    },
+                    ticks: {
+                        color: AI_LAB_COLORS.text
+                    },
+                    grid: {
+                        color: AI_LAB_COLORS.grid
+                    }
+                },
+                ySpo2: {
+                    type: "linear",
+                    position: "right",
+                    suggestedMin: 88,
+                    suggestedMax: 100,
+                    title: {
+                        display: true,
+                        text: "SpO2 %",
+                        color: AI_LAB_COLORS.spo2
+                    },
+                    ticks: {
+                        color: AI_LAB_COLORS.spo2
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                yHrv: {
+                    type: "linear",
+                    position: "right",
+                    suggestedMin: 0,
+                    suggestedMax: 120,
+                    title: {
+                        display: true,
+                        text: "HRV ms",
+                        color: AI_LAB_COLORS.hrv
+                    },
+                    ticks: {
+                        color: AI_LAB_COLORS.hrv
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
                 }
             }
         }
@@ -525,7 +837,7 @@ function renderBatchVisualization(results){
     const container = document.getElementById("chartsContainer")
 
     const labels = results.map(r => r.session_id)
-    const scores = results.map(r => r.score ?? null)
+    const scores = results.map(r => r.score ?? r.overall_score ?? null)
     const postSpo2 = results.map(r => r.post?.spo2 ?? null)
 
     container.innerHTML = `
@@ -536,7 +848,7 @@ function renderBatchVisualization(results){
                 <tbody>
                     <tr><td>Sessions analyzed</td><td>${results.length}</td></tr>
                     <tr><td>Average score</td><td>${avg(scores)} / 100</td></tr>
-                    <tr><td>Anomalies</td><td>${results.filter(r => r.anomaly).length}</td></tr>
+                    <tr><td>Anomalies</td><td>${results.filter(r => r.anomaly ?? r.anomaly_detected).length}</td></tr>
                 </tbody>
             </table>
         </div>

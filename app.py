@@ -1,4 +1,9 @@
-# app.py
+"""Flask application factory-style entrypoint for CoreLabTech.
+
+This module wires security extensions, blueprints and Flask-Login together.
+It is imported by Docker/Gunicorn and can also be run directly for local dev.
+"""
+
 import os
 from flask import render_template, redirect, url_for
 from flask_login import LoginManager
@@ -21,14 +26,32 @@ from routes.qa_routes import qa_bp
 from routes.publication_routes import pub_bp
 #  from routes.user_routes import user_bp
 from routes.telemetry_routes import telemetry_bp
-from routes.upload_routes import upload_bp
 from routes.performance_routes import performance_bp
 from routes.health_routes import health_bp
+
+def ensure_runtime_directories():
+    """Create folders that the app writes to at runtime.
+
+    Docker images may start with an empty mounted volume, so uploads, logs and
+    performance result directories must exist before the first request.
+    """
+
+    for path in (
+        "logs",
+        "data",
+        "data/uploads",
+        "data/uploads/fit",
+        "data/uploads/csv",
+        "data/uploads/temp",
+        "data/performance",
+    ):
+        os.makedirs(path, exist_ok=True)
+
 
 # =========================
 # APP
 # =========================
-from init_db import *
+ensure_runtime_directories()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
 # =========================================================
@@ -63,7 +86,6 @@ app.register_blueprint(qa_bp)
 app.register_blueprint(pub_bp)
 # app.register_blueprint(user_bp)
 app.register_blueprint(telemetry_bp)
-app.register_blueprint(upload_bp)
 app.register_blueprint(performance_bp)
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -83,25 +105,19 @@ login_manager.login_message = "Please log in to access this page."
 
 @login_manager.user_loader
 def load_user(user_id):
+    """Resolve Flask-Login's session user id into a User object."""
+
     return get_user_by_id(user_id)
                           
                           
 # =========================
 # PAGES
 # =========================
-@app.route("/research")
-def research_dashboard():
-    return render_template("research_dashboard.html")
-
-
 @app.route("/ai")
 def ai_monitoring():
+    """Public alias for the physiology monitoring view."""
+
     return render_template("physiology_monitoring.html")
-
-
-@app.route("/qa")
-def qa_dashboard():
-    return render_template("ai_qa_lab.html")
 
 
 # =========================
@@ -109,17 +125,27 @@ def qa_dashboard():
 # =========================
 print(app.url_map)
 
-# =========================
-# RUN
-# =========================
-if __name__ == "__main__":
-    app.run(debug=True)
-    
 @app.errorhandler(403)
 def forbidden(e):
+    """Render the role/permission error page."""
+
     return render_template("unauthorized.html"), 403
 
 
 @app.errorhandler(401)
 def unauthorized(e):
+    """Redirect anonymous users to login instead of returning raw 401 HTML."""
+
     return redirect(url_for("auth.login"))
+
+
+# =========================
+# RUN
+# =========================
+if __name__ == "__main__":
+    debug_enabled = os.getenv("FLASK_DEBUG", "False") == "True"
+
+    app.run(
+        debug=debug_enabled,
+        use_reloader=debug_enabled
+    )

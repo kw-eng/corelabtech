@@ -4,81 +4,137 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}"
+    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}?v=admin-polish-20260721"
 >
 
-<div class="qa-hero">
-    <h1>Mission Admin Panel</h1>
+<div class="admin-page">
 
-    <p class="section-desc">
-        Administrative overview of saved HBOT sessions, AI results, telemetry quality and database status.
-    </p>
+    <section class="admin-hero">
+        <div>
+            <span class="admin-eyebrow">Administrative oversight</span>
+            <h1>Mission Admin Panel</h1>
+            <p>
+                Operational view of saved HBOT sessions, latest AI results,
+                telemetry coverage and database diagnostics.
+            </p>
+        </div>
+
+        <div class="admin-kpi-grid">
+            <div>
+                <span>Total sessions</span>
+                <strong id="kpiSessions">-</strong>
+            </div>
+            <div>
+                <span>Analyzed</span>
+                <strong id="kpiAnalyzed">-</strong>
+            </div>
+            <div>
+                <span>Anomalies</span>
+                <strong id="kpiAnomalies">-</strong>
+            </div>
+            <div>
+                <span>High risk</span>
+                <strong id="kpiHighRisk">-</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="admin-toolbar">
+        <div class="admin-field">
+            <label for="filter">Risk filter</label>
+            <select id="filter" onchange="renderSessions()">
+                <option value="all">All sessions</option>
+                <option value="low">Low risk</option>
+                <option value="moderate">Moderate risk</option>
+                <option value="high">High risk</option>
+                <option value="anomaly">Anomaly only</option>
+                <option value="missing">Without AI result</option>
+            </select>
+        </div>
+
+        <div class="admin-actions">
+            <button onclick="loadAdminData()">Refresh</button>
+            <button class="ai-qa-secondary" onclick="loadDebugDB()">DB Status</button>
+        </div>
+    </section>
+
+    <div id="adminStatus" class="admin-status"></div>
+
+    <section class="admin-section">
+        <div class="admin-section-header">
+            <div>
+                <h2>Mission Sessions</h2>
+                <p>Latest saved sessions with the newest available AI result.</p>
+            </div>
+        </div>
+
+        <div class="admin-table-wrap">
+            <table id="sessionsTable" class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Session</th>
+                        <th>User</th>
+                        <th>Score</th>
+                        <th>Risk</th>
+                        <th>Anomaly</th>
+                        <th>Avg SpO2</th>
+                        <th>Avg Pulse</th>
+                        <th>Timeline</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="admin-grid-2">
+        <div class="admin-section">
+            <div class="admin-section-header">
+                <div>
+                    <h2>Experiment Timeline</h2>
+                    <p>Recent session risk trend based on stored AI output.</p>
+                </div>
+            </div>
+
+            <div id="timeline" class="admin-timeline"></div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-header">
+                <div>
+                    <h2>Selected Session Details</h2>
+                    <p>Compact diagnostic payload for the selected session.</p>
+                </div>
+            </div>
+
+            <pre id="details" class="qa-report">No session selected.</pre>
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <div class="admin-section-header">
+            <div>
+                <h2>Database Status</h2>
+                <p>Lightweight database counters for admin diagnostics.</p>
+            </div>
+        </div>
+
+        <div id="dbStatusCards" class="admin-db-grid">
+            <div class="qa-card qa-empty-state">
+                Click DB Status to load database counters.
+            </div>
+        </div>
+
+        <details class="admin-raw-details">
+            <summary>Raw diagnostic payload</summary>
+            <pre id="dbStatus" class="qa-code">No database status loaded.</pre>
+        </details>
+    </section>
+
 </div>
-
-<div class="qa-actions">
-
-    <select id="filter" onchange="renderSessions()">
-        <option value="all">All sessions</option>
-        <option value="low">Low risk</option>
-        <option value="moderate">Moderate risk</option>
-        <option value="high">High risk</option>
-        <option value="anomaly">Anomaly only</option>
-    </select>
-
-    <button onclick="loadAdminData()">
-        Refresh
-    </button>
-
-    <button onclick="loadDebugDB()">
-        DB Status
-    </button>
-
-</div>
-
-<hr>
-
-<h2>Mission Sessions</h2>
-
-<table border="1" width="100%" id="sessionsTable">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Session</th>
-            <th>User</th>
-            <th>Score</th>
-            <th>Risk</th>
-            <th>Anomaly</th>
-            <th>Avg SpO2</th>
-            <th>Avg Pulse</th>
-            <th>Timeline</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-
-    <tbody></tbody>
-</table>
-
-<hr>
-
-<h2>Experiment Timeline</h2>
-
-<div id="timeline"></div>
-
-<hr>
-
-<h2>Selected Session Details</h2>
-
-<pre id="details" class="qa-report">
-No session selected.
-</pre>
-
-<hr>
-
-<h2>Database Status</h2>
-
-<pre id="dbStatus" class="qa-code">
-No database status loaded.
-</pre>
 
 <script>
 
@@ -89,8 +145,42 @@ function pretty(data){
     return JSON.stringify(data, null, 2)
 }
 
-function riskFromScore(score){
+function compactTimeline(timeline){
+    if(!Array.isArray(timeline)){
+        return timeline
+    }
 
+    return {
+        total_samples: timeline.length,
+        first_samples: timeline.slice(0, 3),
+        last_samples: timeline.slice(-3)
+    }
+}
+
+function compactSessionPayload(session){
+    const result = session.ai?.result || {}
+
+    return {
+        session_id: session.session_id,
+        user_id: session.user_id,
+        created_at: session.created_at,
+        completed: session.completed,
+        score: session.score,
+        risk_level: session.risk_level,
+        anomaly: session.anomaly,
+        data_quality_score: session.ai?.data_quality_score ?? null,
+        summary: session.ai?.summary || null,
+        recommendations: session.ai?.recommendations || null,
+        features: session.features || {},
+        timeline: compactTimeline(session.timeline || result.timeline || []),
+        ai_result_id: session.ai?.ai_result_id || null,
+        ai_created_at: session.ai?.created_at || null,
+        ai_status: session.ai?.status || null,
+        ai_error: session.ai?.error || null
+    }
+}
+
+function riskFromScore(score){
     if(score === null || score === undefined){
         return "-"
     }
@@ -106,86 +196,161 @@ function riskFromScore(score){
     return "High"
 }
 
+function normalizeAnalysis(ai){
+    const result = ai?.result || {}
+    const score =
+        typeof ai?.overall_score === "number"
+            ? ai.overall_score
+            : typeof result.overall_score === "number"
+                ? result.overall_score
+                : typeof result.score === "number"
+                    ? result.score
+                    : null
+
+    const anomaly =
+        typeof ai?.anomaly_detected === "boolean"
+            ? ai.anomaly_detected
+            : typeof result.anomaly_detected === "boolean"
+                ? result.anomaly_detected
+                : typeof result.anomaly === "boolean"
+                    ? result.anomaly
+                    : false
+
+    const features = ai?.features || result.features || {}
+    const timeline = Array.isArray(result.timeline) ? result.timeline : []
+
+    return {
+        score,
+        anomaly,
+        features,
+        timeline,
+        risk_level: ai?.risk_level || result.risk_level || riskFromScore(score)
+    }
+}
+
 function anomalyText(value){
-    return value
-        ? "YES"
-        : "NO"
+    return value ? "YES" : "NO"
+}
+
+function formatMetric(value, unit){
+    if(value === null || value === undefined || value === ""){
+        return "-"
+    }
+
+    return unit ? `${value} ${unit}` : value
+}
+
+function setAdminStatus(message, type){
+    const box = document.getElementById("adminStatus")
+
+    if(!box){
+        return
+    }
+
+    if(!message){
+        box.innerHTML = ""
+        return
+    }
+
+    box.innerHTML = `
+        <div class="qa-step ${type || "warn"}">
+            ${message}
+        </div>
+    `
+}
+
+async function loadLatestAnalysis(session){
+    try{
+        const res = await fetch(`/api/analysis/${session.session_id}/latest`, {
+            credentials: "same-origin"
+        })
+
+        if(!res.ok){
+            return {
+                ...session,
+                ai: {
+                    status: "missing",
+                    error: "No stored AI result"
+                },
+                score: null,
+                risk_level: "-",
+                anomaly: false,
+                features: {},
+                timeline: []
+            }
+        }
+
+        const ai = await res.json()
+        const normalized = normalizeAnalysis(ai)
+
+        return {
+            ...session,
+            ai,
+            score: normalized.score,
+            risk_level: normalized.risk_level,
+            anomaly: normalized.anomaly,
+            features: normalized.features,
+            timeline: normalized.timeline
+        }
+    }catch(err){
+        return {
+            ...session,
+            ai: {
+                status: "error",
+                error: String(err)
+            },
+            score: null,
+            risk_level: "-",
+            anomaly: false,
+            features: {},
+            timeline: []
+        }
+    }
 }
 
 async function loadAdminData(){
+    setAdminStatus("Loading sessions and latest AI results...", "warn")
 
-    const res =
-        await fetch("/api/sessions")
+    try{
+        const res = await fetch("/api/sessions", {
+            credentials: "same-origin"
+        })
+        const data = await res.json()
 
-    const data =
-        await res.json()
+        adminSessions =
+            Array.isArray(data)
+                ? data
+                : Array.isArray(data.sessions)
+                    ? data.sessions
+                    : []
 
-    adminSessions =
-        Array.isArray(data)
-            ? data
-            : []
+        analyzedSessions = await Promise.all(
+            adminSessions.map(loadLatestAnalysis)
+        )
 
-    analyzedSessions = []
-
-    for(const session of adminSessions){
-
-        try{
-
-            const aiRes = await fetch("/api/run_analysis", {
-                method:"POST",
-                headers:{
-                    "Content-Type":"application/json"
-                },
-                body:JSON.stringify({
-                    session_id:session.session_id
-                })
-            })
-
-            const ai =
-                await aiRes.json()
-
-            analyzedSessions.push({
-                ...session,
-                ai:ai,
-                score:ai.score,
-                risk_level:ai.risk_level || riskFromScore(ai.score),
-                anomaly:ai.anomaly,
-                features:ai.features || {},
-                timeline:ai.timeline || []
-            })
-
-        }catch(err){
-
-            analyzedSessions.push({
-                ...session,
-                ai:{
-                    error:String(err)
-                },
-                score:null,
-                risk_level:"-",
-                anomaly:false,
-                features:{},
-                timeline:[]
-            })
-        }
+        renderSessions()
+        renderTimeline()
+        renderKpis()
+        setAdminStatus("", "")
+    }catch(err){
+        setAdminStatus(`Failed to load admin data: ${err}`, "fail")
     }
-
-    renderSessions()
-    renderTimeline()
 }
 
-function renderSessions(){
+function renderKpis(){
+    const analyzed = analyzedSessions.filter(s => s.score !== null && s.score !== undefined)
+    const anomalies = analyzedSessions.filter(s => s.anomaly === true)
+    const highRisk = analyzedSessions.filter(s => s.risk_level === "High")
 
-    const filter =
-        document.getElementById("filter").value
+    document.getElementById("kpiSessions").innerText = analyzedSessions.length
+    document.getElementById("kpiAnalyzed").innerText = analyzed.length
+    document.getElementById("kpiAnomalies").innerText = anomalies.length
+    document.getElementById("kpiHighRisk").innerText = highRisk.length
+}
 
-    const tbody =
-        document.querySelector("#sessionsTable tbody")
-
-    tbody.innerHTML = ""
-
-    let rows =
-        analyzedSessions
+function filteredRows(){
+    const filter = document.getElementById("filter").value
+    let rows = analyzedSessions
 
     if(filter === "low"){
         rows = rows.filter(s => s.risk_level === "Low")
@@ -203,39 +368,51 @@ function renderSessions(){
         rows = rows.filter(s => s.anomaly === true)
     }
 
-    if(rows.length === 0){
+    if(filter === "missing"){
+        rows = rows.filter(s => s.score === null || s.score === undefined)
+    }
 
+    return rows
+}
+
+function renderSessions(){
+    const tbody = document.querySelector("#sessionsTable tbody")
+    const rows = filteredRows()
+
+    tbody.innerHTML = ""
+
+    if(rows.length === 0){
         tbody.innerHTML = `
             <tr>
-                <td colspan="10">
-                    No sessions found.
-                </td>
+                <td colspan="10">No sessions found.</td>
             </tr>
         `
-
         return
     }
 
     rows.forEach(row => {
-
-        const features =
-            row.features || {}
+        const features = row.features || {}
+        const timelineCount =
+            Array.isArray(row.timeline)
+                ? row.timeline.length
+                : 0
 
         tbody.innerHTML += `
             <tr>
-                <td>${row.date || "-"}</td>
-                <td>${row.session_id || "-"}</td>
+                <td>${row.created_at || row.date || "-"}</td>
+                <td><code>${row.session_id || "-"}</code></td>
                 <td>${row.user_id || "-"}</td>
                 <td>${row.score ?? "-"}</td>
-                <td>${row.risk_level || "-"}</td>
+                <td><span class="admin-risk ${String(row.risk_level || "-").toLowerCase()}">${row.risk_level || "-"}</span></td>
                 <td>${anomalyText(row.anomaly)}</td>
-                <td>${features.avg_csv_spo2 ?? "-"} %</td>
-                <td>${features.avg_csv_pulse ?? "-"} bpm</td>
-                <td>${Array.isArray(row.timeline) ? row.timeline.length : 0}</td>
+                <td>${formatMetric(features.avg_spo2 ?? features.avg_csv_spo2, "%")}</td>
+                <td>${formatMetric(features.avg_pulse ?? features.avg_csv_pulse, "bpm")}</td>
+                <td>${timelineCount}</td>
                 <td>
-                    <button onclick="showDetails('${row.session_id}')">
-                        Details
-                    </button>
+                    <div class="admin-row-actions">
+                        <button onclick="showDetails('${row.session_id}')">Details</button>
+                        <button class="ai-qa-secondary" onclick="runAnalysisForSession('${row.session_id}')">Analyze</button>
+                    </div>
                 </td>
             </tr>
         `
@@ -243,77 +420,165 @@ function renderSessions(){
 }
 
 function renderTimeline(){
-
-    const div =
-        document.getElementById("timeline")
+    const div = document.getElementById("timeline")
+    const rows = analyzedSessions.slice(0, 12)
 
     div.innerHTML = ""
 
-    if(analyzedSessions.length === 0){
-
+    if(rows.length === 0){
         div.innerHTML = `
-            <div class="qa-card">
+            <div class="qa-card qa-empty-state">
                 No sessions available.
             </div>
         `
-
         return
     }
 
-    analyzedSessions.forEach(s => {
-
-        const risk =
-            s.risk_level || "-"
-
+    rows.forEach(s => {
+        const risk = s.risk_level || "-"
         const cls =
             risk === "High"
                 ? "fail"
                 : risk === "Moderate"
                     ? "warn"
-                    : "pass"
+                    : s.score === null || s.score === undefined
+                        ? "warn"
+                        : "pass"
 
         div.innerHTML += `
-            <div class="qa-step ${cls}" style="margin-bottom:10px;">
-                <b>${s.date || "-"}</b><br>
-                Session: ${s.session_id}<br>
-                User: ${s.user_id || "-"}<br>
-                Score: ${s.score ?? "-"} / 100 |
-                Risk: ${risk} |
-                Anomaly: ${anomalyText(s.anomaly)}
+            <div class="qa-step ${cls}">
+                <b>${s.created_at || s.date || "-"}</b>
+                <span>Session: ${s.session_id}</span>
+                <span>User: ${s.user_id || "-"}</span>
+                <span>Score: ${s.score ?? "-"} / 100 | Risk: ${risk} | Anomaly: ${anomalyText(s.anomaly)}</span>
             </div>
         `
     })
 }
 
 function showDetails(sessionId){
-
-    const session =
-        analyzedSessions.find(
-            s => s.session_id === sessionId
-        )
+    const session = analyzedSessions.find(s => s.session_id === sessionId)
 
     if(!session){
         return
     }
 
     document.getElementById("details").innerText =
-        pretty(session)
+        pretty(compactSessionPayload(session))
+}
+
+async function runAnalysisForSession(sessionId){
+    setAdminStatus(`Running AI analysis for ${sessionId}...`, "warn")
+
+    try{
+        const res = await fetch("/api/run_analysis", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                session_id: sessionId
+            })
+        })
+        const ai = await res.json()
+
+        if(!res.ok || ai.error){
+            setAdminStatus(`AI analysis failed: ${ai.error || res.status}`, "fail")
+            return
+        }
+
+        const normalized = normalizeAnalysis(ai)
+        analyzedSessions = analyzedSessions.map(session => (
+            session.session_id === sessionId
+                ? {
+                    ...session,
+                    ai,
+                    score: normalized.score,
+                    risk_level: normalized.risk_level,
+                    anomaly: normalized.anomaly,
+                    features: normalized.features,
+                    timeline: normalized.timeline
+                }
+                : session
+        ))
+
+        renderSessions()
+        renderTimeline()
+        renderKpis()
+        showDetails(sessionId)
+        setAdminStatus(`AI analysis completed for ${sessionId}.`, "pass")
+    }catch(err){
+        setAdminStatus(`AI analysis crashed: ${err}`, "fail")
+    }
 }
 
 async function loadDebugDB(){
-
     try{
+        const cards = document.getElementById("dbStatusCards")
 
-        const res =
-            await fetch("/debug/db")
+        if(cards){
+            cards.innerHTML = `
+                <div class="qa-card qa-empty-state">
+                    Loading database counters...
+                </div>
+            `
+        }
 
-        const data =
-            await res.json()
+        const res = await fetch("/debug/db", {
+            credentials: "same-origin"
+        })
+        const data = await res.json()
+        const tables = data.tables || {}
+        const items = [
+            {
+                label: "FIT records",
+                value: tables.fit_data ?? "-",
+                hint: "Wearable FIT telemetry rows"
+            },
+            {
+                label: "CSV records",
+                value: tables.csv_data ?? "-",
+                hint: "Pulse oximeter CSV rows"
+            },
+            {
+                label: "Full sessions",
+                value: tables.full_sessions ?? "-",
+                hint: "Saved HBOT session records"
+            },
+            {
+                label: "Users / subjects",
+                value: tables.users ?? "-",
+                hint: "Accounts and research subjects"
+            },
+            {
+                label: "Tests",
+                value: tables.tests ?? "-",
+                hint: "QA and diagnostic test rows"
+            }
+        ]
 
-        document.getElementById("dbStatus").innerText =
-            pretty(data)
+        if(cards){
+            cards.innerHTML = items.map(item => `
+                <div class="admin-db-card">
+                    <span>${item.label}</span>
+                    <strong>${item.value}</strong>
+                    <small>${item.hint}</small>
+                </div>
+            `).join("")
+        }
 
+        document.getElementById("dbStatus").innerText = pretty(data)
     }catch(err){
+        const cards = document.getElementById("dbStatusCards")
+
+        if(cards){
+            cards.innerHTML = `
+                <div class="qa-step fail">
+                    DB status failed: ${err}
+                </div>
+            `
+        }
 
         document.getElementById("dbStatus").innerText =
             "DB status failed: " + err

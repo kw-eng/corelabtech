@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS telemetry (
 
 # =========================================
 # FIT RAW DATA
-# Garmin/FIT timeline
+# Wearable FIT timeline
 # =========================================
 
 c.execute("""

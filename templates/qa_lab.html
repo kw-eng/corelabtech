@@ -4,209 +4,232 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}"
+    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}?v=software-qa-polish-20260721"
 >
 
-<div class="qa-hero">
-    <h1>Software QA Lab</h1>
+<div class="software-qa-page">
 
-    <p class="section-desc">
-        Overview of the CoreLabTech automated QA architecture: Playwright, API validation,
-        AI contract testing and HBOT telemetry pipeline checks.
-    </p>
-</div>
+    <section class="software-qa-hero">
+        <div>
+            <span class="software-qa-eyebrow">Software quality control</span>
+            <h1>Software QA Lab</h1>
+            <p>
+                Central QA workspace for validating HBOT session capture, telemetry uploads,
+                FIT and CSV synchronization, AI contracts and end-to-end research workflows.
+            </p>
 
-<div class="qa-actions">
-    <a href="/ai-qa-lab">
-        <button>
-            Open AI QA Lab
-        </button>
-    </a>
+            <div class="software-qa-actions">
+                <a class="software-qa-primary" href="/ai-qa-lab">Open AI QA Lab</a>
+                <a class="software-qa-secondary" href="/chamber">Chamber Testing</a>
+                <a class="software-qa-secondary" href="/performance-tests">Performance Tests</a>
+            </div>
+        </div>
 
-    <a href="/chamber">
-        <button>
-            Open Chamber Testing
-        </button>
-    </a>
+        <div class="software-qa-status-panel">
+            <div>
+                <span>Automation status</span>
+                <strong>Ready</strong>
+            </div>
+            <div>
+                <span>Local suite</span>
+                <strong>11 checks</strong>
+            </div>
+            <div>
+                <span>Validation scope</span>
+                <strong>UI + API + AI</strong>
+            </div>
+        </div>
+    </section>
 
-    <a href="/research">
-        <button>
-            Open Mission Control
-        </button>
-    </a>
-</div>
+    <section class="software-qa-summary-grid">
+        <div>
+            <span>Primary flow</span>
+            <strong>HBOT session lifecycle</strong>
+        </div>
+        <div>
+            <span>Data pipeline</span>
+            <strong>FIT + CSV merge</strong>
+        </div>
+        <div>
+            <span>AI contract</span>
+            <strong>Score, risk, timeline</strong>
+        </div>
+        <div>
+            <span>Release posture</span>
+            <strong>Manual review ready</strong>
+        </div>
+    </section>
 
-<hr>
+    <section class="software-qa-section">
+        <div class="software-qa-section-header">
+            <div>
+                <h2>QA Architecture</h2>
+                <p>Focused checks for the paths that matter most in live research work.</p>
+            </div>
+        </div>
 
-<h2>Current QA Architecture</h2>
+        <div class="software-qa-module-grid">
+            <article class="software-qa-module-card">
+                <span class="software-qa-icon">UI</span>
+                <h3>UI Automation</h3>
+                <p>Playwright validates Chamber Testing, AI QA Lab, session lists, telemetry flow and AI rendering.</p>
+                <strong>End-to-end coverage</strong>
+            </article>
 
-<div class="qa-grid">
+            <article class="software-qa-module-card">
+                <span class="software-qa-icon">API</span>
+                <h3>API Contract Testing</h3>
+                <p>Active endpoints are checked against the current session and telemetry pipeline contracts.</p>
+                <strong>Schema consistency</strong>
+            </article>
 
-    <div class="qa-card">
-        <h3>UI Automation</h3>
-        <p>
-            Playwright validates Chamber Testing, AI QA Lab, sessions list,
-            telemetry flow and AI analysis rendering.
-        </p>
-    </div>
+            <article class="software-qa-module-card">
+                <span class="software-qa-icon">AI</span>
+                <h3>AI Validation</h3>
+                <p>Risk score, anomaly state, summary text, features and timeline payload are validated after analysis.</p>
+                <strong>Research output checks</strong>
+            </article>
 
-    <div class="qa-card">
-    <h3>Performance Testing</h3>
-    <p>Gatling-ready performance testing for API, AI and telemetry pipeline.</p>
+            <article class="software-qa-module-card">
+                <span class="software-qa-icon">PF</span>
+                <h3>Performance Testing</h3>
+                <p>Gatling-ready load paths cover API, AI and telemetry processing under realistic usage patterns.</p>
+                <a href="/performance-tests">Open performance dashboard</a>
+            </article>
+        </div>
+    </section>
 
-    <a href="/performance-tests">
-        <button>Open Performance Testing</button>
-    </a>
-</div>
+    <section class="software-qa-section">
+        <div class="software-qa-section-header">
+            <div>
+                <h2>Validated Workflow</h2>
+                <p>Each step maps to an operational part of the HBOT research session.</p>
+            </div>
+        </div>
 
-    <div class="qa-card">
-        <h3>API Contract Testing</h3>
-        <p>
-            Active endpoints are validated against the current full_sessions pipeline.
-        </p>
-    </div>
+        <div class="software-qa-flow">
+            <span>Open chamber page</span>
+            <span>Upload CSV</span>
+            <span>Upload FIT</span>
+            <span>Merge timeline</span>
+            <span>Save full session</span>
+            <span>Run AI analysis</span>
+            <strong>Review report</strong>
+        </div>
+    </section>
 
-    <div class="qa-card">
-        <h3>AI Validation</h3>
-        <p>
-            AI score, risk_level, anomaly, summary, features and timeline are checked
-            after session creation.
-        </p>
-    </div>
+    <section class="software-qa-section">
+        <div class="software-qa-section-header">
+            <div>
+                <h2>Active Endpoints</h2>
+                <p>Core interfaces monitored by the QA flow.</p>
+            </div>
+        </div>
 
-</div>
+        <div class="software-qa-table-card">
+            <table class="software-qa-table">
+                <thead>
+                    <tr>
+                        <th>Area</th>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Sessions</td>
+                        <td><span class="software-qa-method">GET</span></td>
+                        <td><code>/api/sessions</code></td>
+                        <td>Load completed HBOT sessions.</td>
+                    </tr>
+                    <tr>
+                        <td>CSV Upload</td>
+                        <td><span class="software-qa-method post">POST</span></td>
+                        <td><code>/upload_csv</code></td>
+                        <td>Import Checkme/pulse oximeter telemetry.</td>
+                    </tr>
+                    <tr>
+                        <td>FIT Upload</td>
+                        <td><span class="software-qa-method post">POST</span></td>
+                        <td><code>/upload_fit</code></td>
+                        <td>Import FIT heart rate, RR and HRV data from compatible wearables.</td>
+                    </tr>
+                    <tr>
+                        <td>Timeline Merge</td>
+                        <td><span class="software-qa-method post">POST</span></td>
+                        <td><code>/api/during_merge</code></td>
+                        <td>Synchronize wearable FIT and pulse oximeter CSV samples.</td>
+                    </tr>
+                    <tr>
+                        <td>AI Analysis</td>
+                        <td><span class="software-qa-method post">POST</span></td>
+                        <td><code>/api/run_analysis</code></td>
+                        <td>Calculate research risk score and anomaly logic.</td>
+                    </tr>
+                    <tr>
+                        <td>Latest AI</td>
+                        <td><span class="software-qa-method">GET</span></td>
+                        <td><code>/api/ai_latest</code></td>
+                        <td>Load the latest completed session AI summary.</td>
+                    </tr>
+                    <tr>
+                        <td>User Trends</td>
+                        <td><span class="software-qa-method">GET</span></td>
+                        <td><code>/api/user_trends/&lt;user_id&gt;</code></td>
+                        <td>Analyze longitudinal results for one subject.</td>
+                    </tr>
+                    <tr>
+                        <td>Playwright</td>
+                        <td><span class="software-qa-method post">POST</span></td>
+                        <td><code>/api/qa/run_playwright</code></td>
+                        <td>Run automated UI, API and E2E checks.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-<hr>
-
-<h2>Active Endpoints</h2>
-
-<div class="qa-card">
-
-    <table border="1" style="width:100%;">
-        <thead>
-            <tr>
-                <th>Area</th>
-                <th>Endpoint</th>
-                <th>Purpose</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            <tr>
-                <td>Sessions</td>
-                <td><code>/api/sessions</code></td>
-                <td>Load completed HBOT sessions</td>
-            </tr>
-
-            <tr>
-                <td>CSV Upload</td>
-                <td><code>/upload_csv</code></td>
-                <td>Upload pulseox CSV telemetry</td>
-            </tr>
-
-            <tr>
-                <td>FIT Upload</td>
-                <td><code>/upload_fit</code></td>
-                <td>Upload Garmin FIT telemetry</td>
-            </tr>
-
-            <tr>
-                <td>Merge</td>
-                <td><code>/api/during_merge</code></td>
-                <td>Merge Garmin FIT and pulseox CSV timeline</td>
-            </tr>
-
-            <tr>
-                <td>AI Analysis</td>
-                <td><code>/api/run_analysis</code></td>
-                <td>Run AI research risk score and anomaly logic</td>
-            </tr>
-
-            <tr>
-                <td>Latest AI</td>
-                <td><code>/api/ai_latest</code></td>
-                <td>Load latest completed session AI summary</td>
-            </tr>
-
-            <tr>
-                <td>User Trends</td>
-                <td><code>/api/user_trends/&lt;user_id&gt;</code></td>
-                <td>Analyze multiple sessions for one user</td>
-            </tr>
-
-            <tr>
-                <td>Playwright</td>
-                <td><code>/api/run_playwright</code></td>
-                <td>Run automated UI/API/E2E tests</td>
-            </tr>
-        </tbody>
-    </table>
-
-</div>
-
-<hr>
-
-<h2>Validated E2E Flow</h2>
-
-<div class="qa-card">
-    <ol>
-        <li>Open Chamber Testing page</li>
-        <li>Upload pulseox CSV telemetry</li>
-        <li>Merge telemetry timeline</li>
-        <li>Save full PRE / DURING / POST session</li>
-        <li>Run AI analysis</li>
-        <li>Validate score, risk level, anomaly flag, features and timeline</li>
-        <li>Validate user trend endpoint</li>
-    </ol>
-</div>
-
-<hr>
-
-<h2>Playwright Test Coverage</h2>
-
-<div class="qa-card">
-
-<pre class="qa-code">
-tests/e2e/ai_qa.spec.ts
-- AI QA Lab page loads
-- /api/sessions returns JSON
-- /api/ai_latest returns JSON or 404
-- AI QA buttons are visible
+    <section class="software-qa-section software-qa-two-column">
+        <div class="software-qa-card">
+            <h2>Playwright Coverage</h2>
+            <pre class="software-qa-code">tests/e2e/ai_qa.spec.ts
+AI QA Lab loads
+Sessions API returns JSON
+Latest AI endpoint returns JSON or 404
+AI QA controls are visible
 
 tests/e2e/chamber_flow.spec.ts
-- Chamber page loads
-- CSV upload works
-- Timeline merge works
-- Full session save works
-- AI analysis works
-- User trend works
-</pre>
+Chamber page loads
+CSV upload works
+Timeline merge works
+Full session save works
+AI analysis works
+User trend works</pre>
+        </div>
 
-</div>
-
-<hr>
-
-<h2>Status</h2>
-
-<div class="qa-grid">
-
-    <div class="qa-card">
-        <h3>Local Playwright</h3>
-        <div class="qa-kpi">PASS</div>
-        <p>11 tests passing locally.</p>
-    </div>
-
-    <div class="qa-card">
-        <h3>AI Contract</h3>
-        <div class="qa-kpi">ACTIVE</div>
-        <p>Validates score, anomaly, risk_level, features and timeline.</p>
-    </div>
-
-    <div class="qa-card">
-        <h3>CI/CD</h3>
-        <div class="qa-kpi">READY</div>
-        <p>Ready for GitHub Actions via <code>.github/workflows/qa.yml</code>.</p>
-    </div>
+        <div class="software-qa-card">
+            <h2>Execution Status</h2>
+            <div class="software-qa-health-list">
+                <div>
+                    <span>Local Playwright</span>
+                    <strong class="is-pass">PASS</strong>
+                </div>
+                <div>
+                    <span>AI Contract</span>
+                    <strong>ACTIVE</strong>
+                </div>
+                <div>
+                    <span>CI/CD</span>
+                    <strong>READY</strong>
+                </div>
+                <div>
+                    <span>Workflow risk</span>
+                    <strong class="is-review">Requires review before release</strong>
+                </div>
+            </div>
+        </div>
+    </section>
 
 </div>
 

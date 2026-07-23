@@ -1,8 +1,11 @@
+"""User model and lookup helpers used by Flask-Login."""
+
 from flask_login import UserMixin
 from database_postgres import db
 
 
 class User(UserMixin):
+    """Minimal authenticated user object loaded from PostgreSQL."""
 
     def __init__(self, id, user_id, email, password_hash, role, is_active=True):
         self.id = str(id)
@@ -14,10 +17,13 @@ class User(UserMixin):
 
     @property
     def is_active(self):
+        """Expose account active state using Flask-Login's expected property."""
+
         return bool(self._is_active)
 
 
 def row_to_user(row):
+    """Convert a PostgreSQL user row into a User object."""
 
     if not row:
         return None
@@ -33,6 +39,7 @@ def row_to_user(row):
 
 
 def get_user_by_id(id):
+    """Load a user by database id for Flask-Login session restoration."""
 
     con = db()
     c = con.cursor()
@@ -53,6 +60,7 @@ def get_user_by_id(id):
 
 
 def get_user_by_email(email):
+    """Load a user by email during password login."""
 
     con = db()
     c = con.cursor()

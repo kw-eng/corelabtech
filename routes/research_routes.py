@@ -1,264 +1,168 @@
-from flask_login import login_required, current_user
+# routes/research_routes.py
+"""Research-facing Flask routes.
+
+This blueprint serves the chamber workflow, upload APIs, merge/analysis APIs,
+admin compatibility endpoints and public research pages.
+"""
+
+import os
+import traceback
+import uuid
+from pathlib import Path
+
+from psycopg2 import IntegrityError
+from flask import (
+    Blueprint,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+)
+from flask_login import current_user, login_required
+from werkzeug.security import generate_password_hash
+
 from auth.decorators import role_required
-from flask import Blueprint, render_template, jsonify, request, send_file
 from database_postgres import db
 
-from reports.report_generator import generate_report
-
-from ai.anomaly_detection import detect_anomaly
-from ai.hbot_prediction import predict_hbot_response
-from ai.physiology_ai import analyze_physiology
-from ai.explain_engine import explain_anomaly
-
-from services.fit_parser import parse_fit_file
-from services.csv_parser import parse_csv_file
-from services.ai_engine import run_ai_analysis
-from services.test_generator import generate_playwright_test
-
-from core.pipeline.pipeline_runner import run_full_pipeline
-from core.qa.playwright_runner import run_playwright_tests
-
-from security.upload_validation import (
-    validate_extension,
-    safe_upload_filename,
-    validate_file_size
+from repositories.analysis_repository import (
+    get_latest_ai_result,
+    list_analyses,
 )
-from flask import send_from_directory
-from pathlib import Path
+
+from repositories.data_repository import (
+    load_csv,
+    load_fit,
+)
+
+from repositories.merge_repository import (
+    get_latest_completed_merge_job,
+    load_merged_measurements,
+)
 
 from security.csrf import csrf
 from security.limiter import limiter
-
-from psycopg2 import IntegrityError
-
-import os
-import uuid
-import json
-import datetime
-import traceback
-
-
-research_bp = Blueprint("research", __name__)
-
-
-# =========================================
-# PERFORMANCE MODE LIMITS
-# =========================================
-
-PERFORMANCE_TESTING = (
-    os.getenv("PERFORMANCE_TESTING", "false")
-    .lower() == "true"
+from security.upload_validation import (
+    safe_upload_filename,
+    validate_extension,
+    validate_file_size,
 )
 
-PERF_LIMIT = (
-    "5000 per minute"
-    if PERFORMANCE_TESTING
-    else "300 per minute"
+from services.analysis_service import (
+    AnalysisInputMissingError,
+    run_session_analysis,
 )
 
-UPLOAD_LIMIT = (
-    "5000 per minute"
-    if PERFORMANCE_TESTING
-    else "60 per minute"
+from services.data_ingestion import (
+    DataIngestionError,
+    DuplicateImportError,
+    import_csv_file,
+    import_fit_file,
+)
+
+from services.data_merge import (
+    MergeInputMissingError,
+    merge_session_data,
+)
+
+from services.session_service import (
+    complete_session,
+    delete_research_sessions,
+    generate_session_report,
+    get_research_session,
+    list_research_sessions,
+    save_session_phase,
 )
 
 
-# =========================================================
-# HELPERS
-# =========================================================
+#------------------------------
+#HELPERS
+#------------------------------
 
-def avg(values):
-    clean = [
-        v for v in values
-        if v is not None
-    ]
+research_bp = Blueprint(
+    "research",
+    __name__,
+)
 
+TEMP_UPLOAD_DIRECTORY = Path(
+    "data/uploads/temp"
+)
+
+UPLOAD_LIMIT = "60 per minute"
+PERF_LIMIT = "300 per minute"
+DEFAULT_PREVIEW_LIMIT = 500
+MAX_PREVIEW_LIMIT = 5000
+
+
+def clean_value(value) -> str:
     return (
-        round(sum(clean) / len(clean), 2)
-        if clean
-        else None
+        str(value).strip()
+        if value is not None
+        else ""
     )
 
 
-def calculate_session_score(pre, post, features):
+def parse_preview_limit(
+    value,
+    *,
+    default: int = DEFAULT_PREVIEW_LIMIT,
+    maximum: int = MAX_PREVIEW_LIMIT,
+) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
 
-    pre_spo2 = pre.get("spo2")
-    post_spo2 = post.get("spo2")
-    post_pulse = post.get("pulse")
+    if parsed <= 0:
+        return default
 
-    score = 100
-    reasons = []
-    positive_findings = []
+    return min(parsed, maximum)
 
-    # DURING SpO2
-    if features.get("min_spo2") is not None:
 
-        if features["min_spo2"] < 90:
-            score -= 40
-            reasons.append(
-                "DURING SpO2 dropped below 90% - high warning"
-            )
+def parse_optional_int(value) -> int | None:
+    if value in (None, ""):
+        return None
 
-        elif features["min_spo2"] < 92:
-            score -= 30
-            reasons.append(
-                "DURING SpO2 dropped to 90-91% - warning"
-            )
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
 
-        elif features["min_spo2"] < 94:
-            score -= 15
-            reasons.append(
-                "DURING SpO2 is borderline low"
-            )
+    return parsed if parsed > 0 else None
 
-    # POST SpO2
-    if post_spo2 is not None:
 
-        if post_spo2 < 90:
-            score -= 40
-            reasons.append(
-                "POST SpO2 below 90% - high warning"
-            )
-
-        elif post_spo2 < 92:
-            score -= 30
-            reasons.append(
-                "POST SpO2 90-91% - warning"
-            )
-
-        elif post_spo2 < 94:
-            score -= 15
-            reasons.append(
-                "POST SpO2 92-93% - borderline"
-            )
-
-    # PRE -> POST SpO2 drop
-    if pre_spo2 is not None and post_spo2 is not None:
-
-        spo2_drop = pre_spo2 - post_spo2
-
-        if spo2_drop >= 5:
-            score -= 25
-            reasons.append(
-                f"SpO2 dropped by {spo2_drop}% from PRE to POST"
-            )
-
-        elif spo2_drop >= 3:
-            score -= 10
-            reasons.append(
-                f"SpO2 dropped by {spo2_drop}% from PRE to POST"
-            )
-
-    # HRV
-    if (
-        features.get("avg_hrv") is not None
-        and features["avg_hrv"] < 30
-    ):
-        score -= 20
-        reasons.append(
-            "Average HRV is below 30 ms"
-        )
-
-    # FIT HR
-    if (
-        features.get("max_fit_hr") is not None
-        and features["max_fit_hr"] > 160
-    ):
-        score -= 15
-        reasons.append(
-            "FIT HR exceeded 160 bpm"
-        )
-
-    # CSV Pulse
-    if (
-        features.get("max_csv_pulse") is not None
-        and features["max_csv_pulse"] > 160
-    ):
-        score -= 15
-        reasons.append(
-            "CSV pulse exceeded 160 bpm"
-        )
-
-    # POST Pulse
-    if post_pulse is not None and post_pulse > 120:
-        score -= 10
-        reasons.append(
-            "POST pulse is elevated above 120 bpm"
-        )
-
-    # Positive findings
-    if features.get("avg_csv_spo2") is not None:
-
-        if features["avg_csv_spo2"] >= 97:
-            positive_findings.append(
-                "Excellent oxygen saturation during session"
-            )
-
-        elif features["avg_csv_spo2"] >= 95:
-            positive_findings.append(
-                "Normal oxygen saturation maintained"
-            )
-
-    if post_spo2 is not None:
-
-        if post_spo2 >= 95:
-            positive_findings.append(
-                "Post-session SpO2 recovered to normal range"
-            )
-
-        elif post_spo2 >= 92:
-            positive_findings.append(
-                "Post-session SpO2 acceptable"
-            )
-
-    if (
-        features.get("max_fit_hr") is not None
-        and features["max_fit_hr"] < 140
-    ):
-        positive_findings.append(
-            "Heart rate response remained stable"
-        )
-
-    if (
-        features.get("avg_hrv") is not None
-        and features["avg_hrv"] >= 40
-    ):
-        positive_findings.append(
-            "HRV indicates good autonomic recovery"
-        )
-
-    score = max(score, 0)
-
-    risk_level = (
-        "Low"
-        if score >= 90
-        else "Moderate"
-        if score >= 70
-        else "High"
+def current_user_id() -> str | None:
+    return (
+        getattr(current_user, "user_id", None)
+        or getattr(current_user, "email", None)
     )
 
-    all_messages = []
 
-    if reasons:
-        all_messages.extend(reasons)
-
-    if positive_findings:
-        all_messages.extend(positive_findings)
-
-    summary = (
-        " | ".join(all_messages)
-        if all_messages
-        else "No significant physiological deviations detected"
+def create_temp_path(filename: str) -> Path:
+    TEMP_UPLOAD_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
-    return {
-        "score": score,
-        "risk_level": risk_level,
-        "anomaly": score < 70,
-        "reasons": reasons,
-        "positive_findings": positive_findings,
-        "summary": summary,
-    }
+    return TEMP_UPLOAD_DIRECTORY / (
+        f"{uuid.uuid4()}_{filename}"
+    )
+
+
+def remove_temp_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        traceback.print_exc()
+
+
+def error_response(
+    message: str,
+    status_code: int,
+):
+    return jsonify({
+        "status": "error",
+        "error": message,
+    }), status_code
 
 
 # =========================================================
@@ -267,125 +171,104 @@ def calculate_session_score(pre, post, features):
 
 @research_bp.route("/platform")
 def research_platform():
-    return render_template("research_platform.html")
+    return render_template(
+        "research_platform.html"
+    )
 
 
 @research_bp.route("/research")
 @login_required
-@role_required("viewer", "operator", "researcher", "admin")
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
 def research_dashboard():
-    return render_template("research_dashboard.html")
-
-
-@research_bp.route("/admin")
-@login_required
-@role_required("admin")
-def admin_panel():
-    return render_template("admin_panel.html")
+    return render_template(
+        "research_dashboard.html"
+    )
 
 
 @research_bp.route("/chamber")
 @login_required
-@role_required("operator", "researcher", "admin")
+@role_required(
+    "operator",
+    "researcher",
+    "admin",
+)
 def chamber_testing():
-    return render_template("chamber_testing.html")
+    return render_template(
+        "chamber_testing.html"
+    )
+
+
+@research_bp.route("/ai-lab")
+@login_required
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
+def ai_lab():
+    return render_template(
+        "ai_lab.html"
+    )
+
+
+@research_bp.route("/ai-testing-lab")
+def ai_testing_lab_public():
+    return render_template(
+        "ai_testing_lab_public.html"
+    )
 
 
 @research_bp.route("/performance-tests")
 @login_required
 @role_required("admin")
 def performance_tests():
-    return render_template("performance_tests.html")
+    return render_template(
+        "performance_tests.html"
+    )
 
 
-@research_bp.route("/ai-testing-lab")
-def ai_testing_lab_public():
-    return render_template("ai_testing_lab_public.html")
+@research_bp.route("/admin")
+@login_required
+@role_required("admin")
+def admin_panel():
+    return render_template(
+        "admin_panel.html"
+    )
+
+
+@research_bp.route("/admin/accounts")
+@login_required
+@role_required("admin")
+def admin_accounts():
+    return render_template(
+        "admin_accounts.html"
+    )
 
 
 # =========================================================
-# PERFORMANCE-ONLY SESSIONS
+# SUBJECTS
 # =========================================================
 
-@research_bp.route("/api/performance/sessions", methods=["GET"])
-def performance_sessions():
-
-    if os.getenv("PERFORMANCE_TESTING", "false").lower() != "true":
-        return jsonify({
-            "status": "error",
-            "error": "performance testing disabled"
-        }), 403
-
-    con = None
-
-    try:
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            SELECT
-                session_id,
-                COALESCE(user_id, 'UNKNOWN') as user_id,
-                completed,
-                created_at
-            FROM full_sessions
-            ORDER BY created_at DESC
-        """)
-
-        rows = c.fetchall()
-
-        data = []
-
-        for r in rows:
-
-            data.append({
-                "session_id": r[0],
-                "user_id": r[1],
-                "completed": bool(r[2]),
-                "date": r[3].isoformat() if r[3] else None,
-            })
-
-        c.close()
-        con.close()
-
-        return jsonify({
-            "status": "ok",
-            "count": len(data),
-            "sessions": data
-        })
-
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-# =========================================================
-# USERS - LIST
-# admin + researcher can view users
-# =========================================================
-
-@research_bp.route("/api/users", methods=["GET"])
+@csrf.exempt
 @research_bp.route("/api/subjects", methods=["GET"])
+@research_bp.route("/api/users", methods=["GET"])
 @login_required
 @role_required("admin", "researcher", "operator")
 @limiter.limit("120 per minute")
 def subjects():
+    """Return research subjects for the chamber subject selector."""
 
-    con = None
+    connection = db()
+    cursor = connection.cursor()
 
     try:
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
+        cursor.execute("""
             SELECT
                 id,
                 user_id,
@@ -396,79 +279,55 @@ def subjects():
                 weight,
                 notes,
                 role,
-                is_active
+                is_active,
+                created_at
             FROM users
             ORDER BY id DESC
         """)
 
-        rows = c.fetchall()
-
-        c.close()
-        con.close()
-
         return jsonify([
             {
-                "id": r[0],
-                "user_id": r[1] or str(r[0]),
-                "email": r[2],
-                "subject_id": r[3],
-                "sex": r[4],
-                "age": r[5],
-                "weight": r[6],
-                "notes": r[7],
-                "role": r[8],
-                "is_active": r[9],
+                "id": row[0],
+                "user_id": row[1],
+                "email": row[2],
+                "subject_id": row[3],
+                "sex": row[4],
+                "age": row[5],
+                "weight": row[6],
+                "notes": row[7],
+                "role": row[8],
+                "is_active": row[9],
+                "created_at": str(row[10]) if row[10] else None,
             }
-            for r in rows
+            for row in cursor.fetchall()
         ])
 
-    except Exception as e:
+    finally:
+        cursor.close()
+        connection.close()
 
-        traceback.print_exc()
-
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-
-# =========================================================
-# USERS - CREATE
-# only admin can create users
-# =========================================================
 
 @csrf.exempt
-@research_bp.route("/api/users", methods=["POST"])
 @research_bp.route("/api/subjects", methods=["POST"])
+@research_bp.route("/api/users", methods=["POST"])
 @login_required
-@role_required("admin", "researcher")
+@role_required("admin", "researcher", "operator")
 @limiter.limit("60 per minute")
 def create_subject():
+    """Create a subject-only user row from the chamber form."""
 
-    con = None
+    data = request.get_json(silent=True) or {}
+    subject_id = clean_value(data.get("subject_id"))
+
+    if not subject_id:
+        return error_response("missing subject_id", 400)
+
+    connection = db()
+    cursor = connection.cursor()
 
     try:
-        con = db()
-        c = con.cursor()
-
-        data = request.get_json() or {}
-
-        subject_id = (data.get("subject_id") or "").strip()
-
-        if not subject_id:
-         return jsonify({
-        "status": "error",
-        "error": "missing subject_id"
-        }), 400
-
-        user_id = subject_id
-
-        c.execute("""
-            INSERT INTO users(
+        cursor.execute("""
+            INSERT INTO users (
                 user_id,
                 subject_id,
                 sex,
@@ -478,1225 +337,757 @@ def create_subject():
                 role,
                 is_active
             )
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            user_id,
             subject_id,
-            data.get("sex"),
-            data.get("age"),
-            data.get("weight"),
-            data.get("notes"),
-            data.get("role", "viewer"),
+            subject_id,
+            clean_value(data.get("sex")) or None,
+            data.get("age") or None,
+            data.get("weight") or None,
+            clean_value(data.get("notes")) or None,
+            "viewer",
             True,
         ))
 
-        con.commit()
-
-        c.close()
-        con.close()
+        connection.commit()
 
         return jsonify({
             "status": "ok",
-            "user_id": user_id
-        })
+            "user_id": subject_id,
+            "subject_id": subject_id,
+        }), 201
 
     except IntegrityError:
+        connection.rollback()
+        return error_response("Subject already exists", 400)
 
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": "User already exists"
-        }), 400
-
-    except Exception as e:
-
+    except Exception as exc:
+        connection.rollback()
         traceback.print_exc()
+        return error_response(str(exc), 500)
 
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 
 @csrf.exempt
-@research_bp.route("/api/delete_user", methods=["POST"])
 @research_bp.route("/api/delete_subject", methods=["POST"])
+@research_bp.route("/api/delete_user", methods=["POST"])
 @login_required
-@role_required("admin")
-@limiter.limit("10 per minute")
+@role_required("admin", "researcher", "operator")
+@limiter.limit("30 per minute")
 def delete_subject():
+    """Delete one subject and its related research data."""
 
-    data = request.get_json() or {}
-    user_id = data.get("user_id")
+    data = request.get_json(silent=True) or {}
+    user_id = clean_value(data.get("user_id"))
 
     if not user_id:
-        return jsonify({
-            "error": "missing user_id"
-        }), 400
+        return error_response("missing user_id", 400)
 
-    con = None
+    connection = db()
+    cursor = connection.cursor()
 
     try:
-
-        con = db()
-        c = con.cursor()
-
-        c.execute(
-            "DELETE FROM tests WHERE user_id=%s",
-            (user_id,)
+        session_ids = collect_subject_session_ids(
+            cursor,
+            user_id=user_id,
         )
 
-        c.execute(
-            "DELETE FROM fit_data WHERE user_id=%s",
-            (user_id,)
+        delete_subject_related_rows(
+            cursor,
+            user_id=user_id,
+            session_ids=session_ids,
         )
 
-        c.execute(
-            "DELETE FROM csv_data WHERE user_id=%s",
-            (user_id,)
+        cursor.execute(
+            "DELETE FROM users WHERE user_id = %s",
+            (user_id,),
         )
 
-        c.execute(
-            "DELETE FROM full_sessions WHERE user_id=%s",
-            (user_id,)
-        )
-
-        c.execute(
-            "DELETE FROM users WHERE user_id=%s",
-            (user_id,)
-        )
-
-        con.commit()
-
-        c.close()
-        con.close()
+        deleted_subjects = cursor.rowcount
+        connection.commit()
 
         return jsonify({
             "status": "ok",
-            "user_id": user_id
+            "user_id": user_id,
+            "deleted_subjects": deleted_subjects,
+            "deleted_sessions": len(session_ids),
         })
 
-    except Exception as e:
-
+    except Exception as exc:
+        connection.rollback()
         traceback.print_exc()
+        return error_response(str(exc), 500)
 
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "error": str(e)
-        }), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 
 # =========================================================
-# UPLOAD FIT / CSV RAW
+# FIT UPLOAD
 # =========================================================
 
 @csrf.exempt
-@research_bp.route("/upload_fit", methods=["POST"])
+@research_bp.route(
+    "/upload_fit",
+    methods=["POST"],
+)
 @login_required
-@role_required("admin", "researcher", "operator")
+@role_required(
+    "admin",
+    "researcher",
+    "operator",
+)
 @limiter.limit(UPLOAD_LIMIT)
 def upload_fit():
+    """Accept a FIT upload and store validated wearable telemetry."""
 
     file = request.files.get("file")
-    session_id = request.form.get("session_id")
+
+    session_id = clean_value(
+        request.form.get("session_id")
+    )
+
+    user_id = clean_value(
+        request.form.get("user_id")
+    ) or None
 
     if not file or not session_id:
-        return jsonify({
-            "error": "missing file or session_id"
-        }), 400
+        return error_response(
+            "missing file or session_id",
+            400,
+        )
 
-    if not validate_extension(file.filename, {"fit"}):
-        return jsonify({
-            "error": "invalid FIT extension"
-        }), 400
+    if not validate_extension(
+        file.filename,
+        {"fit"},
+    ):
+        return error_response(
+            "invalid FIT extension",
+            400,
+        )
 
-    if not validate_file_size(file, 100 * 1024 * 1024):
-        return jsonify({
-            "error": "FIT file too large"
-        }), 400
-
-    user_id = (
-        session_id.split("_")[0]
-        if "_" in session_id
-        else session_id
-    )
+    if not validate_file_size(
+        file,
+        100 * 1024 * 1024,
+    ):
+        return error_response(
+            "FIT file too large",
+            400,
+        )
 
     filename = safe_upload_filename(
         file.filename.lower()
     )
 
-    os.makedirs(
-        "data/uploads/temp",
-        exist_ok=True
-    )
-
-    temp_path = os.path.join(
-        "data/uploads/temp",
-        f"{uuid.uuid4()}_{filename}"
-    )
-
-    con = None
+    temp_path = create_temp_path(filename)
 
     try:
-
         file.save(temp_path)
 
-        rows = parse_fit_file(temp_path)
+        result = import_fit_file(
+            path=temp_path,
+            filename=filename,
+            session_id=session_id,
+            user_id=user_id,
+        )
 
-        print("=" * 50)
-        print("FIT PARSED:", len(rows))
-        print("SESSION:", session_id)
-        print("=" * 50)
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            INSERT INTO users (
-                user_id,
-                subject_id,
-                role,
-                is_active,
-                notes
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id) DO NOTHING
-        """, (
-            user_id,
-            user_id,
-            "operator",
-            True,
-            "Auto-created during FIT upload"
-        ))
-
-        for r in rows:
-
-            c.execute("""
-                INSERT INTO fit_data (
-                    session_id,
-                    user_id,
-                    timestamp,
-                    heart_rate,
-                    pulse,
-                    hr,
-                    spo2,
-                    rr_interval,
-                    hrv,
-                    source,
-                    filename,
-                    raw_json
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                session_id,
-                user_id,
-                str(r.get("timestamp")) if r.get("timestamp") else None,
-                r.get("heart_rate"),
-                r.get("pulse"),
-                r.get("heart_rate") or r.get("pulse"),
-                r.get("spo2"),
-                r.get("rr_interval"),
-                r.get("hrv"),
-                r.get("source", "fit"),
-                filename,
-                json.dumps(r, default=str),
-            ))
-
-        con.commit()
-
-        c.close()
-        con.close()
+        payload = result.to_dict()
 
         return jsonify({
             "status": "fit_saved",
-            "records": len(rows),
-            "session_id": session_id,
-            "user_id": user_id,
-            "file": filename,
-        })
+            "records": payload.get("records_saved", 0),
+            **payload,
+        }), 201
 
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.rollback()
-            con.close()
-
+    except DuplicateImportError as exc:
         return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+            "status": "duplicate",
+            "error": str(exc),
+            "import_type": exc.import_type,
+            "import_id": exc.import_id,
+            "records": exc.records_saved,
+            "records_saved": exc.records_saved,
+        }), 409
+
+    except DataIngestionError as exc:
+        return error_response(str(exc), 400)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
 
     finally:
+        remove_temp_file(temp_path)
 
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
+# =========================================================
+# CSV UPLOAD
+# =========================================================
 
 @csrf.exempt
-@research_bp.route("/upload_csv", methods=["POST"])
+@research_bp.route(
+    "/upload_csv",
+    methods=["POST"],
+)
 @login_required
-@role_required("admin", "researcher", "operator")
+@role_required(
+    "admin",
+    "researcher",
+    "operator",
+)
 @limiter.limit(UPLOAD_LIMIT)
 def upload_csv():
+    """Accept a CSV upload and store validated pulse oximeter telemetry."""
 
     file = request.files.get("file")
-    session_id = request.form.get("session_id")
+
+    session_id = clean_value(
+        request.form.get("session_id")
+    )
+
+    user_id = clean_value(
+        request.form.get("user_id")
+    ) or None
 
     if not file or not session_id:
-        return jsonify({
-            "error": "missing file or session_id"
-        }), 400
+        return error_response(
+            "missing file or session_id",
+            400,
+        )
 
-    if not validate_extension(file.filename, {"csv"}):
-        return jsonify({
-            "error": "invalid CSV extension"
-        }), 400
+    if not validate_extension(
+        file.filename,
+        {"csv"},
+    ):
+        return error_response(
+            "invalid CSV extension",
+            400,
+        )
 
-    if not validate_file_size(file, 20 * 1024 * 1024):
-        return jsonify({
-            "error": "CSV file too large"
-        }), 400
-
-    user_id = (
-        session_id.split("_")[0]
-        if "_" in session_id
-        else session_id
-    )
+    if not validate_file_size(
+        file,
+        20 * 1024 * 1024,
+    ):
+        return error_response(
+            "CSV file too large",
+            400,
+        )
 
     filename = safe_upload_filename(
         file.filename.lower()
     )
 
-    os.makedirs(
-        "data/uploads/temp",
-        exist_ok=True
-    )
-
-    temp_path = os.path.join(
-        "data/uploads/temp",
-        f"{uuid.uuid4()}_{filename}"
-    )
-
-    con = None
+    temp_path = create_temp_path(filename)
 
     try:
-
         file.save(temp_path)
 
-        rows = parse_csv_file(temp_path)
+        result = import_csv_file(
+            path=temp_path,
+            filename=filename,
+            session_id=session_id,
+            user_id=user_id,
+        )
 
-        print("=" * 50)
-        print("CSV PARSED:", len(rows))
-        print("SESSION:", session_id)
-        print("=" * 50)
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            INSERT INTO users (
-                user_id,
-                subject_id,
-                role,
-                is_active,
-                notes
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id) DO NOTHING
-        """, (
-            user_id,
-            user_id,
-            "operator",
-            True,
-            "Auto-created during CSV upload"
-        ))
-
-        for r in rows:
-
-            c.execute("""
-                INSERT INTO csv_data (
-                    session_id,
-                    user_id,
-                    timestamp,
-                    pulse,
-                    heart_rate,
-                    spo2,
-                    source,
-                    filename,
-                    raw_json
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                session_id,
-                user_id,
-                str(r.get("timestamp")) if r.get("timestamp") else None,
-                r.get("pulse"),
-                r.get("heart_rate") or r.get("pulse"),
-                r.get("spo2"),
-                r.get("source", "csv"),
-                filename,
-                json.dumps(r, default=str),
-            ))
-
-        con.commit()
-
-        c.close()
-        con.close()
+        payload = result.to_dict()
 
         return jsonify({
             "status": "csv_saved",
-            "records": len(rows),
-            "session_id": session_id,
-            "user_id": user_id,
-            "file": filename,
-        })
+            "records": payload.get("records_saved", 0),
+            **payload,
+        }), 201
 
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.rollback()
-            con.close()
-
+    except DuplicateImportError as exc:
         return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+            "status": "duplicate",
+            "error": str(exc),
+            "import_type": exc.import_type,
+            "import_id": exc.import_id,
+            "records": exc.records_saved,
+            "records_saved": exc.records_saved,
+        }), 409
+
+    except DataIngestionError as exc:
+        return error_response(str(exc), 400)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
 
     finally:
-
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        remove_temp_file(temp_path)
 
 
 # =========================================================
-# RAW DATA API
+# RAW FIT
 # =========================================================
 
 @research_bp.route("/api/fit_data")
 @login_required
-@role_required("viewer", "operator", "researcher", "admin")
 @limiter.limit(PERF_LIMIT)
 def fit_data():
+    """Return raw FIT data for table/chart previews."""
 
-    session_id = request.args.get("session_id")
+    session_id = clean_value(
+        request.args.get("session_id")
+    )
 
-    con = None
+    if not session_id:
+        return error_response(
+            "missing session_id",
+            400,
+        )
+
+    connection = db()
+    cursor = connection.cursor()
+    limit = parse_preview_limit(
+        request.args.get("limit")
+    )
+    import_id = parse_optional_int(
+        request.args.get("import_id")
+    )
 
     try:
+        return jsonify(
+            load_fit(
+                cursor,
+                session_id=session_id,
+                import_id=import_id,
+                limit=limit,
+            )
+        )
 
-        con = db()
-        c = con.cursor()
+    finally:
+        cursor.close()
+        connection.close()
 
-        c.execute("""
-            SELECT timestamp, heart_rate, pulse, hr, spo2, rr_interval, hrv
-            FROM fit_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (
-            session_id,
-        ))
-
-        rows = c.fetchall()
-
-        c.close()
-        con.close()
-
-        return jsonify([
-            {
-                "timestamp": r[0],
-                "heart_rate": r[1] or r[2] or r[3],
-                "pulse": r[2] or r[1] or r[3],
-                "hr": r[3] or r[1] or r[2],
-                "spo2": r[4],
-                "rr_interval": r[5],
-                "rr": r[5],
-                "hrv": r[6],
-            }
-            for r in rows
-        ])
-
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
+# =========================================================
+# RAW CSV
+# =========================================================
 
 @research_bp.route("/api/csv_data")
 @login_required
-@role_required("viewer", "operator", "researcher", "admin")
 @limiter.limit(PERF_LIMIT)
 def csv_data():
+    """Return raw CSV data for table/chart previews."""
 
-    session_id = request.args.get("session_id")
+    session_id = clean_value(
+        request.args.get("session_id")
+    )
 
-    con = None
+    if not session_id:
+        return error_response(
+            "missing session_id",
+            400,
+        )
+
+    connection = db()
+    cursor = connection.cursor()
+    limit = parse_preview_limit(
+        request.args.get("limit")
+    )
+    import_id = parse_optional_int(
+        request.args.get("import_id")
+    )
 
     try:
+        return jsonify(
+            load_csv(
+                cursor,
+                session_id=session_id,
+                import_id=import_id,
+                limit=limit,
+            )
+        )
 
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            SELECT timestamp, pulse, heart_rate, spo2
-            FROM csv_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (
-            session_id,
-        ))
-
-        rows = c.fetchall()
-
-        c.close()
-        con.close()
-
-        return jsonify([
-            {
-                "timestamp": r[0],
-                "pulse": r[1] or r[2],
-                "heart_rate": r[2] or r[1],
-                "spo2": r[3],
-            }
-            for r in rows
-        ])
-
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 
 @research_bp.route("/api/fit_timeseries/<session_id>")
 @login_required
-@role_required("viewer", "operator", "researcher", "admin")
 @limiter.limit(PERF_LIMIT)
 def fit_timeseries(session_id):
+    """Return FIT data in chart-friendly arrays."""
 
-    con = None
+    session_id = clean_value(session_id)
 
-    try:
+    if not session_id:
+        return error_response(
+            "missing session_id",
+            400,
+        )
 
-        con = db()
-        c = con.cursor()
+    limit = parse_preview_limit(
+        request.args.get("limit"),
+        default=1000,
+    )
+    import_id = parse_optional_int(
+        request.args.get("import_id")
+    )
 
-        c.execute("""
-            SELECT timestamp, pulse, heart_rate, spo2, hrv
-            FROM fit_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (
-            session_id,
-        ))
-
-        rows = c.fetchall()
-
-        c.close()
-        con.close()
-
-        data = {
-            "time": [],
-            "pulse": [],
-            "spo2": [],
-            "hrv": [],
-            "status": [],
-        }
-
-        for r in rows:
-
-            pulse = r[1] or r[2]
-            spo2 = r[3]
-            hrv = r[4]
-
-            if spo2 is not None and spo2 < 90:
-                status = "hypoxia"
-
-            elif hrv is not None and hrv < 30:
-                status = "stress"
-
-            else:
-                status = "good"
-
-            data["time"].append(r[0])
-            data["pulse"].append(pulse)
-            data["spo2"].append(spo2)
-            data["hrv"].append(hrv)
-            data["status"].append(status)
-
-        return jsonify(data)
-
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-
-# =========================================================
-# SAVE PHASES
-# =========================================================
-
-@csrf.exempt
-@research_bp.route("/api/save_phase", methods=["POST"])
-@login_required
-@role_required("admin", "researcher", "operator")
-@limiter.limit("120 per minute")
-def save_phase():
-
-    con = None
+    connection = db()
+    cursor = connection.cursor()
 
     try:
-
-        data = request.json or {}
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            INSERT INTO users (
-                user_id,
-                subject_id,
-                role,
-                is_active,
-                notes
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id) DO NOTHING
-        """, (
-            data.get("user_id"),
-            data.get("user_id"),
-            "operator",
-            True,
-            "Auto-created during phase save"
-        ))
-
-        phase = data.get("phase")
-
-        c.execute("""
-            INSERT INTO tests (
-                session_id,
-                user_id,
-                phase,
-                device,
-                status,
-                spo2,
-                pulse,
-                hrv,
-                pressure,
-                pressure_ata,
-                ata,
-                oxygen_flow_lpm,
-                oxygen_percent,
-                temperature,
-                body_temperature,
-                humidity,
-                telemetry_json,
-                source,
-                timestamp
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-        """, (
-            data.get("session_id"),
-            data.get("user_id"),
-            phase,
-            "garmin" if phase == "during" else "pulseox",
-            "COMPLETED",
-            data.get("spo2"),
-            data.get("pulse"),
-            data.get("hrv"),
-            data.get("pressure_kpa"),
-            data.get("pressure_ata"),
-            data.get("pressure_ata"),
-            data.get("oxygen_flow_lpm"),
-            data.get("oxygen_mask_percent"),
-            data.get("chamber_temperature"),
-            data.get("body_temperature"),
-            data.get("humidity"),
-            json.dumps(data, default=str),
-            "manual_phase",
-        ))
-
-        con.commit()
-
-        c.close()
-        con.close()
+        rows = load_fit(
+            cursor,
+            session_id=session_id,
+            import_id=import_id,
+            limit=limit,
+        )
 
         return jsonify({
-            "status": "saved"
+            "time": [
+                row.get("timestamp") or row.get("time")
+                for row in rows
+            ],
+            "pulse": [
+                row.get("pulse") or row.get("heart_rate")
+                for row in rows
+            ],
+            "spo2": [
+                row.get("spo2")
+                for row in rows
+            ],
+            "hrv": [
+                row.get("hrv")
+                for row in rows
+            ],
+            "limit": limit,
+            "records": len(rows),
         })
 
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 
 # =========================================================
-# SAVE FULL SESSION — RAW + FEATURE PACKAGE
+# MERGE
 # =========================================================
 
 @csrf.exempt
-@research_bp.route("/api/save_full_session", methods=["POST"])
+@research_bp.route(
+    "/api/during_merge",
+    methods=["POST"],
+)
 @login_required
-@role_required("admin", "researcher", "operator")
-@limiter.limit("60 per minute")
-def save_full_session():
+@role_required(
+    "operator",
+    "researcher",
+    "admin",
+)
+@limiter.limit("60 per hour")
+def during_merge():
+    """Run the FIT/CSV synchronization step for the DURING phase."""
 
-    con = None
+    data = request.get_json(silent=True) or {}
+
+    session_id = clean_value(
+        data.get("session_id")
+    )
+
+    if not session_id:
+        return error_response(
+            "missing session_id",
+            400,
+        )
 
     try:
+        result = merge_session_data(
+            session_id=session_id,
+            user_id=clean_value(
+                data.get("user_id")
+            ) or None,
+            tolerance_ms=int(
+                data.get("tolerance_ms", 2500)
+            ),
+        )
 
-        data = request.get_json() or {}
+        connection = db()
+        cursor = connection.cursor()
 
-        if not data:
-            return jsonify({"error": "no data"}), 400
-
-        session_id = data.get("session_id")
-        user_id = data.get("user_id")
-
-        if not session_id:
-            return jsonify({"error": "missing session_id"}), 400
-
-        if not user_id:
-            return jsonify({"error": "missing user_id"}), 400
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            INSERT INTO users (
-                user_id,
-                subject_id,
-                role,
-                is_active,
-                notes
+        try:
+            merged_rows = load_merged_measurements(
+                cursor,
+                merge_id=result.merge_id,
+                limit=parse_preview_limit(
+                    data.get("limit"),
+                    default=MAX_PREVIEW_LIMIT,
+                ),
             )
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id) DO NOTHING
-        """, (
-            user_id,
-            user_id,
-            "operator",
-            True,
-            "Auto-created during full session save"
-        ))
 
-        c.execute("""
-            SELECT timestamp, pulse, heart_rate, spo2, hrv, rr_interval
-            FROM fit_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (
-            session_id,
-        ))
-
-        fit_rows = c.fetchall()
-
-        print("FIT DB ROWS:", len(fit_rows))
-
-        c.execute("""
-            SELECT timestamp, pulse, heart_rate, spo2
-            FROM csv_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (
-            session_id,
-        ))
-
-        csv_rows = c.fetchall()
-
-        print("CSV DB ROWS:", len(csv_rows))
-
-        fit_timeline = []
-
-        for r in fit_rows:
-
-            fit_timeline.append({
-                "timestamp": r[0],
-                "pulse": r[1] or r[2],
-                "heart_rate": r[2] or r[1],
-                "spo2": r[3],
-                "hrv": r[4],
-                "rr_interval": r[5],
-                "source": "fit",
-            })
-
-        csv_timeline = []
-
-        for r in csv_rows:
-
-            csv_timeline.append({
-                "timestamp": r[0],
-                "pulse": r[1] or r[2],
-                "heart_rate": r[2] or r[1],
-                "spo2": r[3],
-                "source": "csv",
-            })
-
-        csv_pulse_clean = [
-            x.get("pulse")
-            for x in csv_timeline
-            if x.get("pulse") is not None and x.get("pulse") >= 30
-        ]
-
-        csv_spo2_clean = [
-            x.get("spo2")
-            for x in csv_timeline
-            if x.get("spo2") is not None
-        ]
-
-        fit_pulse_clean = [
-            x.get("pulse")
-            for x in fit_timeline
-            if x.get("pulse") is not None and x.get("pulse") >= 30
-        ]
-
-        fit_hrv_clean = [
-            x.get("hrv")
-            for x in fit_timeline
-            if x.get("hrv") is not None
-        ]
-
-        feature_package = {
-            "fit_samples": len(fit_timeline),
-            "csv_samples": len(csv_timeline),
-
-            "avg_fit_hr": avg(fit_pulse_clean),
-            "min_fit_hr": min(fit_pulse_clean, default=None),
-            "max_fit_hr": max(fit_pulse_clean, default=None),
-
-            "avg_csv_pulse": avg(csv_pulse_clean),
-            "min_csv_pulse": min(csv_pulse_clean, default=None),
-            "max_csv_pulse": max(csv_pulse_clean, default=None),
-
-            "avg_csv_spo2": avg(csv_spo2_clean),
-            "min_spo2": min(csv_spo2_clean, default=None),
-            "max_spo2": max(csv_spo2_clean, default=None),
-
-            "avg_hrv": avg(fit_hrv_clean),
-
-            "csv_pulse_artifacts": len([
-                x for x in csv_timeline
-                if x.get("pulse") is not None and x.get("pulse") < 30
-            ]),
-        }
-
-        during_payload = {
-            "phase_data": data.get("during", {}),
-            "fit_timeline": fit_timeline,
-            "csv_timeline": csv_timeline,
-            "merged_timeline": data.get("during", {}).get("merged", []),
-            "features": feature_package,
-        }
-
-        c.execute("""
-            INSERT INTO full_sessions (
-                session_id,
-                user_id,
-                session_status,
-                pre_json,
-                during_json,
-                post_json,
-                summary,
-                completed,
-                created_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, CURRENT_TIMESTAMP)
-
-            ON CONFLICT (session_id)
-            DO UPDATE SET
-                user_id = EXCLUDED.user_id,
-                session_status = EXCLUDED.session_status,
-                pre_json = EXCLUDED.pre_json,
-                during_json = EXCLUDED.during_json,
-                post_json = EXCLUDED.post_json,
-                summary = EXCLUDED.summary,
-                completed = EXCLUDED.completed
-        """, (
-            session_id,
-            user_id,
-            "completed",
-            json.dumps(data.get("pre", {}), default=str),
-            json.dumps(during_payload, default=str),
-            json.dumps(data.get("post", {}), default=str),
-            json.dumps(feature_package, default=str),
-        ))
-
-        con.commit()
-
-        c.execute("""
-            SELECT COUNT(*)
-            FROM full_sessions
-            WHERE session_id=%s
-        """, (
-            session_id,
-        ))
-
-        saved_count = c.fetchone()[0]
-
-        print("FULL SESSION SAVED:", session_id)
-        print("FULL SESSION COUNT:", saved_count)
-
-        c.close()
-        con.close()
-
-        if saved_count == 0:
-            return jsonify({
-                "error": "full session was not saved"
-            }), 500
+        finally:
+            cursor.close()
+            connection.close()
 
         return jsonify({
             "status": "ok",
-            "session_id": session_id,
-            "user_id": user_id,
-            "saved_count": saved_count,
-            "features": feature_package,
-        })
+            "result_status": "merge_completed",
+            "mode": result.mode,
+            "fit_samples": result.fit_records,
+            "csv_samples": result.csv_records,
+            "merged": merged_rows,
+            **result.to_dict(),
+        }), 201
 
-    except Exception as e:
+    except MergeInputMissingError as exc:
+        return error_response(str(exc), 409)
 
+    except Exception as exc:
         traceback.print_exc()
-
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        return error_response(str(exc), 500)
 
 
 # =========================================================
-# SESSIONS API
+# MERGE DATA
+# =========================================================
+
+@research_bp.route(
+    "/api/merged_data/<session_id>",
+)
+@login_required
+@limiter.limit(PERF_LIMIT)
+def merged_data(session_id: str):
+    """Return the latest completed merged timeline for a session."""
+
+    connection = db()
+    cursor = connection.cursor()
+    limit = parse_preview_limit(
+        request.args.get("limit")
+    )
+
+    try:
+        merge_job = get_latest_completed_merge_job(
+            cursor,
+            session_id=session_id,
+        )
+
+        if not merge_job:
+            return error_response(
+                "No completed merge found",
+                404,
+            )
+
+        rows = load_merged_measurements(
+            cursor,
+            merge_id=merge_job["merge_id"],
+            limit=limit,
+        )
+
+        return jsonify({
+            "status": "ok",
+            "merge": merge_job,
+            "records": len(rows),
+            "data": rows,
+        })
+
+    finally:
+        cursor.close()
+        connection.close()
+
+# =========================================================
+# SESSION PHASES
+# =========================================================
+
+@csrf.exempt
+@research_bp.route(
+    "/api/save_phase",
+    methods=["POST"],
+)
+@login_required
+@role_required(
+    "admin",
+    "researcher",
+    "operator",
+)
+@limiter.limit("120 per minute")
+def save_phase():
+    """Save one PRE, DURING or POST phase payload."""
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        result = save_session_phase(
+            payload=data,
+            initiated_by=get_current_user_id(),
+        )
+
+        return jsonify({
+            "status": "saved",
+            "phase_id": result.phase_id,
+            "session_id": result.session_id,
+            "phase": result.phase,
+        }), 201
+
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+
+@csrf.exempt
+@research_bp.route(
+    "/api/save_full_session",
+    methods=["POST"],
+)
+@login_required
+@role_required(
+    "admin",
+    "researcher",
+    "operator",
+)
+@limiter.limit("60 per minute")
+def save_full_session():
+    """Persist the full research session after all phases are saved."""
+
+    data = request.get_json(silent=True) or {}
+
+    session_id = clean_value(
+        data.get("session_id")
+    )
+    user_id = clean_value(
+        data.get("user_id")
+    )
+
+    if not session_id:
+        return error_response(
+            "missing session_id",
+            400,
+        )
+
+    if not user_id:
+        return error_response(
+            "missing user_id",
+            400,
+        )
+
+    try:
+        result = complete_session(
+            session_id=session_id,
+            user_id=user_id,
+            pre=data.get("pre") or {},
+            during=data.get("during") or {},
+            post=data.get("post") or {},
+            initiated_by=get_current_user_id(),
+        )
+
+        return jsonify({
+            "status": "ok",
+            "session_id": result.session_id,
+            "user_id": result.user_id,
+            "saved_count": 1,
+            "fit_samples": result.fit_samples,
+            "csv_samples": result.csv_samples,
+            "merged_samples": result.merged_samples,
+            "features": result.features,
+            "completed": True,
+        })
+
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+
+# =========================================================
+# SESSIONS
 # =========================================================
 
 @research_bp.route("/api/sessions")
 @login_required
 @limiter.limit(PERF_LIMIT)
 def sessions():
-
-    con = None
+    """List sessions available to the authenticated user."""
 
     try:
-
-        con = db()
-        c = con.cursor()
-
-        if current_user.role in ["admin", "researcher"]:
-
-            c.execute("""
-                SELECT
-                    session_id,
-                    COALESCE(user_id, 'UNKNOWN') as user_id,
-                    completed,
-                    created_at
-                FROM full_sessions
-                ORDER BY created_at DESC
-            """)
-
-        else:
-
-            c.execute("""
-                SELECT
-                    session_id,
-                    COALESCE(user_id, 'UNKNOWN') as user_id,
-                    completed,
-                    created_at
-                FROM full_sessions
-                WHERE user_id=%s
-                ORDER BY created_at DESC
-            """, (
-                current_user.user_id,
-            ))
-
-        rows = c.fetchall()
-
-        data = []
-
-        for r in rows:
-
-            data.append({
-                "session_id": r[0],
-                "user_id": r[1],
-                "completed": bool(r[2]),
-                "date": r[3].isoformat() if r[3] else None,
-            })
-
-        c.close()
-        con.close()
+        rows = list_research_sessions(
+            requesting_user_id=get_current_user_id(),
+            requesting_role=current_user.role,
+        )
 
         return jsonify({
             "status": "ok",
-            "count": len(data),
-            "sessions": data
+            "count": len(rows),
+            "sessions": rows,
         })
 
-    except Exception as e:
-
+    except Exception as exc:
         traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        return error_response(str(exc), 500)
 
 
-# =========================================================
-# DELETE SESSIONS
-# =========================================================
+@research_bp.route(
+    "/api/sessions/<session_id>",
+)
+@login_required
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
+def get_session(session_id: str):
+    """Return one session if the user has permission to see it."""
+
+    result = get_research_session(
+        session_id=session_id,
+        requesting_user_id=get_current_user_id(),
+        requesting_role=current_user.role,
+    )
+
+    if not result:
+        return error_response(
+            "session not found",
+            404,
+        )
+
+    return jsonify(result)
+
 
 @csrf.exempt
-@research_bp.route("/api/delete_sessions", methods=["POST"])
+@research_bp.route(
+    "/api/delete_sessions",
+    methods=["POST"],
+)
 @login_required
 @role_required("admin")
 @limiter.limit("30 per minute")
 def delete_sessions():
+    """Delete selected completed sessions from the dashboard."""
 
-    con = None
+    data = request.get_json(silent=True) or {}
+    session_ids = data.get("sessions") or []
+
+    if not session_ids:
+        return error_response(
+            "missing sessions",
+            400,
+        )
 
     try:
-
-        data = request.get_json() or {}
-
-        sessions = data.get("sessions", [])
-
-        if not sessions:
-            return jsonify({
-                "error": "missing sessions"
-            }), 400
-
-        con = db()
-        c = con.cursor()
-
-        for session_id in sessions:
-
-            c.execute("""
-                DELETE FROM fit_data
-                WHERE session_id=%s
-            """, (
-                session_id,
-            ))
-
-            c.execute("""
-                DELETE FROM csv_data
-                WHERE session_id=%s
-            """, (
-                session_id,
-            ))
-
-            c.execute("""
-                DELETE FROM tests
-                WHERE session_id=%s
-            """, (
-                session_id,
-            ))
-
-            c.execute("""
-                DELETE FROM full_sessions
-                WHERE session_id=%s
-            """, (
-                session_id,
-            ))
-
-        con.commit()
-
-        c.close()
-        con.close()
+        deleted = delete_research_sessions(
+            session_ids=session_ids,
+        )
 
         return jsonify({
             "status": "deleted",
-            "deleted": sessions
+            "deleted": deleted,
         })
 
-    except Exception as e:
-
+    except Exception as exc:
         traceback.print_exc()
-
-        if con:
-            con.rollback()
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-
-# =========================================================
-# MERGE TIMELINE
-# =========================================================
-
-@csrf.exempt
-@research_bp.route("/api/during_merge", methods=["POST"])
-@login_required
-@role_required("operator", "researcher", "admin")
-@limiter.limit("120 per minute")
-def during_merge():
-
-    try:
-        data = request.get_json() or {}
-        session_id = data.get("session_id")
-
-        if not session_id:
-            return jsonify({"error": "missing session_id"}), 400
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            SELECT timestamp, heart_rate, pulse, hr, rr_interval, hrv, spo2
-            FROM fit_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (session_id,))
-        fit_rows = c.fetchall()
-
-        c.execute("""
-            SELECT timestamp, pulse, heart_rate, spo2
-            FROM csv_data
-            WHERE session_id=%s
-            ORDER BY id ASC
-        """, (session_id,))
-        csv_rows = c.fetchall()
-
-        con.close()
-
-        fit = []
-
-        for r in fit_rows:
-            fit.append({
-                "timestamp": r[0],
-                "heart_rate": r[1] or r[2] or r[3],
-                "hr": r[3] or r[1] or r[2],
-                "pulse": r[2] or r[1] or r[3],
-                "rr_interval": r[4],
-                "hrv": r[5],
-                "spo2": r[6],
-                "source": "fit",
-            })
-
-        csv = []
-
-        for r in csv_rows:
-            csv.append({
-                "timestamp": r[0],
-                "pulse": r[1] or r[2],
-                "heart_rate": r[2] or r[1],
-                "spo2": r[3],
-                "source": "csv",
-            })
-
-        if not fit and not csv:
-            return jsonify({"error": "no fit or csv data"}), 404
-
-        if fit and not csv:
-            return jsonify({
-                "status": "ok",
-                "mode": "fit_only",
-                "fit_samples": len(fit),
-                "csv_samples": 0,
-                "merged_samples": len(fit),
-                "merged": fit,
-            })
-
-        if csv and not fit:
-            return jsonify({
-                "status": "ok",
-                "mode": "csv_only",
-                "fit_samples": 0,
-                "csv_samples": len(csv),
-                "merged_samples": len(csv),
-                "merged": csv,
-            })
-
-        csv_by_time = {
-            str(row["timestamp"]): row
-            for row in csv
-        }
-
-        merged = []
-
-        for f in fit:
-            t = str(f.get("timestamp"))
-            c_row = csv_by_time.get(t)
-
-            row = {
-                "timestamp": f.get("timestamp"),
-                "heart_rate": f.get("heart_rate"),
-                "hr": f.get("hr"),
-                "pulse": f.get("pulse"),
-                "rr_interval": f.get("rr_interval"),
-                "hrv": f.get("hrv"),
-                "spo2": f.get("spo2"),
-                "source": "merged",
-            }
-
-            if c_row:
-                row["pulse"] = c_row.get("pulse") or row.get("pulse")
-                row["spo2"] = c_row.get("spo2") or row.get("spo2")
-
-            merged.append(row)
-
-        return jsonify({
-            "status": "ok",
-            "mode": "fit_csv",
-            "fit_samples": len(fit),
-            "csv_samples": len(csv),
-            "merged_samples": len(merged),
-            "merged": merged,
-        })
-
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        return error_response(str(exc), 500)
 
 
 # =========================================================
@@ -1704,401 +1095,906 @@ def during_merge():
 # =========================================================
 
 @csrf.exempt
-@research_bp.route("/api/run_analysis", methods=["POST"])
+@research_bp.route(
+    "/api/run_analysis",
+    methods=["POST"],
+)
 @login_required
-@role_required("operator", "researcher", "admin")
+@role_required(
+    "operator",
+    "researcher",
+    "admin",
+)
 @limiter.limit("60 per hour")
 def run_analysis():
-
-    con = None
-
-    try:
-        data = request.get_json() or {}
-        session_id = data.get("session_id")
-
-        if not session_id:
-            return jsonify({"error": "missing session_id"}), 400
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            SELECT pre_json, during_json, post_json, summary
-            FROM full_sessions
-            WHERE session_id=%s
-        """, (session_id,))
-
-        row = c.fetchone()
-
-        c.close()
-        con.close()
-
-        if not row:
-            return jsonify({"error": "no full session data"}), 404
-
-        pre = json.loads(row[0]) if row[0] else {}
-        during = json.loads(row[1]) if row[1] else {}
-        post = json.loads(row[2]) if row[2] else {}
-        features = json.loads(row[3]) if row[3] else {}
-
-        fit_timeline = during.get("fit_timeline", [])
-        csv_timeline = during.get("csv_timeline", [])
-        merged_timeline = during.get("merged_timeline", [])
-
-        timeline = merged_timeline or csv_timeline or fit_timeline or []
-
-        result = calculate_session_score(pre, post, features)
-
-        return jsonify({
-            "status": "ok",
-            "session_id": session_id,
-            "summary": result["summary"],
-            "score": result["score"],
-            "risk_level": result["risk_level"],
-            "anomaly": result["anomaly"],
-            "reasons": result["reasons"],
-            "positive_findings": result["positive_findings"],
-            "score_type": "AI Research Risk Score",
-            "medical_disclaimer": "Research-only score. Not a medical diagnosis.",
-            "features": features,
-            "timeline": timeline,
-            "pre": pre,
-            "during": during,
-            "post": post,
-        })
-
-    except Exception as e:
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-# =========================================================
-# AI LATEST
-# =========================================================
-
-@research_bp.route("/api/ai_latest")
-@login_required
-@role_required("viewer", "operator", "researcher", "admin")
-@limiter.limit("60 per minute")
-def ai_latest():
-
-    con = None
-
-    try:
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            SELECT
-                session_id,
-                pre_json,
-                post_json,
-                summary
-            FROM full_sessions
-            WHERE completed=1
-            ORDER BY id DESC
-            LIMIT 1
-        """)
-
-        row = c.fetchone()
-
-        c.close()
-        con.close()
-
-        if not row:
-            return jsonify({"error": "no data"}), 404
-
-        session_id = row[0]
-        pre = json.loads(row[1]) if row[1] else {}
-        post = json.loads(row[2]) if row[2] else {}
-        features = json.loads(row[3]) if row[3] else {}
-
-        result = calculate_session_score(pre, post, features)
-
-        return jsonify({
-            "status": "ok",
-            "session_id": session_id,
-            "score": result["score"],
-            "risk_level": result["risk_level"],
-            "anomaly": result["anomaly"],
-            "summary": result["summary"],
-            "reasons": result["reasons"],
-            "positive_findings": result["positive_findings"],
-            "score_type": "AI Research Risk Score",
-            "medical_disclaimer": "Research-only score. Not a medical diagnosis.",
-            "features": features,
-        })
-
-    except Exception as e:
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-
-# =========================================================
-# USER TRENDS
-# =========================================================
-
-@research_bp.route("/api/user_trends/<user_id>")
-@login_required
-@role_required("viewer", "operator", "researcher", "admin")
-@limiter.limit("120 per minute")
-def user_trends(user_id):
-
-    con = None
-
-    try:
-
-        con = db()
-        c = con.cursor()
-
-        c.execute("""
-            SELECT
-                session_id,
-                summary,
-                created_at
-            FROM full_sessions
-            WHERE user_id=%s
-            ORDER BY created_at ASC
-        """, (
-            user_id,
-        ))
-
-        rows = c.fetchall()
-
-        c.close()
-        con.close()
-
-        timeline = []
-
-        for r in rows:
-
-            summary = json.loads(r[1]) if r[1] else {}
-
-            timeline.append({
-                "session_id": r[0],
-                "score": summary.get("score"),
-                "risk_level": summary.get("risk_level"),
-                "created_at": r[2].isoformat() if r[2] else None,
-            })
-
-        return jsonify({
-            "status": "ok",
-            "user_id": user_id,
-            "records": len(timeline),
-            "timeline": timeline,
-        })
-
-    except Exception as e:
-
-        traceback.print_exc()
-
-        if con:
-            con.close()
-
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
-
-# =========================================================
-# PLAYWRIGHT QA
-# =========================================================
-
-@csrf.exempt
-@research_bp.route("/api/run_playwright", methods=["POST"])
-@login_required
-@role_required("admin")
-@limiter.limit("10 per hour")
-def run_playwright():
-
-    import subprocess
-
-    try:
-
-        env = {
-            **os.environ,
-            "ENV_FILE": os.getenv("ENV_FILE", ".env.local"),
-        }
-
-        result = subprocess.run(
-            ["npm", "run", "test:e2e:list"],
-            cwd=os.getcwd(),
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-        )
-
-        return jsonify({
-            "status": "success" if result.returncode == 0 else "error",
-            "returncode": result.returncode,
-            "stdout": result.stdout[-12000:],
-            "stderr": result.stderr[-5000:],
-            "command": "npm run test:e2e:list",
-            "report_path": "/admin/playwright-report/index.html"
-        })
-        
-    except subprocess.TimeoutExpired as e:
-
-        traceback.print_exc()
-
-        return jsonify({
-            "status": "error",
-            "returncode": None,
-            "error": "Playwright execution timeout",
-            "stdout": (e.stdout or "")[-12000:] if e.stdout else "",
-            "stderr": (e.stderr or "")[-5000:] if e.stderr else "",
-            "command": "npm run test:e2e:list"
-        }), 504
-        
-    except Exception as e:
-
-        traceback.print_exc()
-
-        return jsonify({
-            "status": "error",
-            "returncode": None,
-            "error": str(e),
-            "command": "npm run test:e2e:list"
-        }), 500
-
-# =========================================================
-# AI TEST GENERATOR
-# =========================================================
-
-@csrf.exempt
-@research_bp.route("/api/generate_test", methods=["POST"])
-@login_required
-@role_required("researcher", "admin")
-@limiter.limit("30 per hour")
-def generate_test():
+    """Run deterministic AI analysis for one merged session."""
 
     data = request.get_json(silent=True) or {}
 
-    prompt = data.get("prompt", "")
-    session_id = data.get("session_id")
-    user_id = data.get("user_id")
-    target = data.get("target", "hbot_ai_pipeline")
-
-    generated = generate_playwright_test(
-        prompt=prompt,
-        session_id=session_id,
-        user_id=user_id,
-        target=target,
+    session_id = clean_value(
+        data.get("session_id")
     )
 
-    return jsonify({
-        "status": "generated",
-        "session_id": session_id,
-        "user_id": user_id,
-        "target": target,
-        "prompt": prompt,
-        "test": generated,
-    })
+    if not session_id:
+        return error_response(
+            "missing session_id",
+            400,
+        )
+
+    try:
+        analysis = run_session_analysis(
+            session_id=session_id,
+            user_id=get_current_user_id(),
+        )
+
+        result = {
+            **analysis.result,
+        }
+
+        score = result.get("overall_score")
+
+        result.setdefault(
+            "score",
+            score,
+        )
+
+        result.setdefault(
+            "anomaly",
+            bool(result.get("anomaly_detected")),
+        )
+
+        result.setdefault(
+            "risk_level",
+            risk_level_from_score(score),
+        )
+
+        return jsonify({
+            "status": "completed",
+            "analysis_id": analysis.ai_result_id,
+            "session_id": analysis.session_id,
+            "merge_id": analysis.merge_id,
+            **result,
+        }), 201
+
+    except AnalysisInputMissingError as exc:
+        return error_response(str(exc), 422)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
 
 
 # =========================================================
-# DEBUG DB
+# AI
 # =========================================================
+
+@research_bp.route(
+    "/api/analysis/<session_id>/latest",
+)
+@login_required
+@limiter.limit(PERF_LIMIT)
+def latest_analysis(session_id: str):
+    """Return the newest analysis result for a session."""
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        result = get_latest_ai_result(
+            cursor,
+            session_id=session_id,
+        )
+
+        if not result:
+            return error_response(
+                "AI result not found",
+                404,
+            )
+
+        timeline_sample = request.args.get(
+            "timeline_sample",
+            type=int,
+        )
+
+        if timeline_sample and timeline_sample > 1:
+            analysis_result = result.get("result") or {}
+            timeline = analysis_result.get("timeline")
+
+            if isinstance(timeline, list) and len(timeline) > timeline_sample:
+                last_index = len(timeline) - 1
+                sampled_timeline = [
+                    timeline[
+                        round(i * last_index / (timeline_sample - 1))
+                    ]
+                    for i in range(timeline_sample)
+                ]
+
+                result["timeline_total"] = len(timeline)
+                result["timeline_sampled"] = len(sampled_timeline)
+                result["result"] = {
+                    **analysis_result,
+                    "timeline": sampled_timeline,
+                    "timeline_total": len(timeline),
+                    "timeline_sampled": len(sampled_timeline),
+                }
+
+        return jsonify({
+            "status": "ok",
+            **result,
+        })
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route(
+    "/api/user_trends/<user_id>",
+)
+@login_required
+@limiter.limit(PERF_LIMIT)
+def user_trends(user_id: str):
+    """Return longitudinal AI trend data for one research subject."""
+
+    subject_id = clean_value(user_id)
+
+    if not subject_id:
+        return error_response(
+            "missing user_id",
+            400,
+        )
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        if (
+            current_user.role not in ("admin", "researcher")
+            and subject_id != get_current_user_id()
+        ):
+            return error_response(
+                "forbidden",
+                403,
+            )
+
+        cursor.execute(
+            """
+            SELECT
+                session_id,
+                overall_score,
+                data_quality_score,
+                anomaly_detected,
+                summary,
+                features_json,
+                created_at
+            FROM ai_results
+            WHERE user_id = %s
+            ORDER BY created_at ASC, ai_result_id ASC
+            """,
+            (subject_id,),
+        )
+
+        analysis_rows = cursor.fetchall()
+
+        analyses = []
+        scores = []
+        hrv_values = []
+        spo2_values = []
+        pulse_values = []
+
+        for row in analysis_rows:
+            features = row[5] or {}
+
+            score = row[1]
+            avg_hrv = pick_feature(
+                features,
+                "avg_hrv",
+            )
+            avg_spo2 = pick_feature(
+                features,
+                "avg_spo2",
+                "avg_csv_spo2",
+            )
+            avg_pulse = pick_feature(
+                features,
+                "avg_pulse",
+                "avg_csv_pulse",
+            )
+
+            append_numeric(scores, score)
+            append_numeric(hrv_values, avg_hrv)
+            append_numeric(spo2_values, avg_spo2)
+            append_numeric(pulse_values, avg_pulse)
+
+            analyses.append({
+                "session_id": row[0],
+                "overall_score": score,
+                "data_quality_score": row[2],
+                "anomaly_detected": bool(row[3]),
+                "summary": row[4],
+                "avg_spo2": avg_spo2,
+                "avg_pulse": avg_pulse,
+                "avg_hrv": avg_hrv,
+                "created_at": (
+                    row[6].isoformat()
+                    if row[6]
+                    else None
+                ),
+            })
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM full_sessions
+            WHERE user_id = %s
+            """,
+            (subject_id,),
+        )
+
+        session_count = cursor.fetchone()[0]
+
+        return jsonify({
+            "status": "ok",
+            "user_id": subject_id,
+            "records": len(analyses),
+            "session_count": session_count,
+            "avg_score": average_or_none(scores),
+            "latest_score": scores[-1] if scores else None,
+            "avg_spo2": average_or_none(spo2_values),
+            "avg_pulse": average_or_none(pulse_values),
+            "avg_hrv": average_or_none(hrv_values),
+            "anomaly_count": sum(
+                1
+                for row in analyses
+                if row["anomaly_detected"]
+            ),
+            "trend_direction": calculate_trend_direction(scores),
+            "analyses": analyses,
+            "timeline": analyses,
+        })
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route(
+    "/api/analysis/<session_id>/history",
+)
+@login_required
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
+def analysis_history(session_id: str):
+    """Return all saved analysis runs for a session."""
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        analyses = list_analyses(
+            cursor,
+            session_id=session_id,
+        )
+
+        return jsonify({
+            "status": "ok",
+            "session_id": session_id,
+            "count": len(analyses),
+            "analyses": analyses,
+        })
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# =========================================================
+# REPORT
+# =========================================================
+
+@research_bp.route(
+    "/report/<session_id>",
+)
+@login_required
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
+@limiter.limit("20 per hour")
+def report(session_id: str):
+    """Generate and download a PDF report for a session."""
+
+    try:
+        path = generate_session_report(
+            session_id=session_id,
+            requesting_user_id=get_current_user_id(),
+            requesting_role=current_user.role,
+        )
+
+        return send_file(
+            path,
+            as_attachment=True,
+            download_name=(
+                f"corelabtech_{session_id}_report.pdf"
+            ),
+        )
+
+    except FileNotFoundError as exc:
+        return error_response(str(exc), 404)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+
+# =========================================================
+# ADMIN COMPATIBILITY ROUTES
+# =========================================================
+
+@csrf.exempt
+@research_bp.route("/api/admin/accounts", methods=["GET"])
+@login_required
+@role_required("admin")
+@limiter.limit("120 per minute")
+def admin_accounts_list():
+    """Return account rows for the admin accounts page."""
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT user_id, email, role, is_active, created_at
+            FROM users
+            WHERE email IS NOT NULL
+            ORDER BY id ASC
+        """)
+
+        return jsonify([
+            {
+                "user_id": row[0],
+                "email": row[1],
+                "role": row[2],
+                "is_active": row[3],
+                "created_at": str(row[4]) if row[4] else None,
+            }
+            for row in cursor.fetchall()
+        ])
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/admin/accounts", methods=["POST"])
+@login_required
+@role_required("admin")
+@limiter.limit("30 per minute")
+def admin_create_account():
+    """Create an authenticated application account."""
+
+    data = request.get_json(silent=True) or {}
+    email = clean_value(data.get("email")).lower()
+    password = data.get("password") or ""
+    role = clean_value(data.get("role")) or "viewer"
+    allowed_roles = {"admin", "researcher", "operator", "viewer"}
+
+    if not email:
+        return error_response("missing email", 400)
+
+    if not password:
+        return error_response("missing password", 400)
+
+    if role not in allowed_roles:
+        return error_response("invalid role", 400)
+
+    user_id = email.split("@", 1)[0]
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO users (
+                user_id,
+                email,
+                subject_id,
+                password_hash,
+                role,
+                is_active
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            user_id,
+            email,
+            user_id.upper(),
+            generate_password_hash(password),
+            role,
+            True,
+        ))
+
+        connection.commit()
+
+        return jsonify({
+            "status": "ok",
+            "email": email,
+            "role": role,
+        }), 201
+
+    except IntegrityError:
+        connection.rollback()
+        return error_response("Account already exists", 400)
+
+    except Exception as exc:
+        connection.rollback()
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/admin/accounts/reset_password", methods=["POST"])
+@login_required
+@role_required("admin")
+@limiter.limit("30 per minute")
+def admin_reset_password():
+    """Set a new password hash for an existing account."""
+
+    data = request.get_json(silent=True) or {}
+    email = clean_value(data.get("email")).lower()
+    password = data.get("password") or ""
+
+    if not email:
+        return error_response("missing email", 400)
+
+    if not password:
+        return error_response("missing password", 400)
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE users
+            SET password_hash = %s
+            WHERE email = %s
+        """, (
+            generate_password_hash(password),
+            email,
+        ))
+
+        connection.commit()
+
+        if cursor.rowcount != 1:
+            return error_response("account not found", 404)
+
+        return jsonify({
+            "status": "ok",
+            "email": email,
+        })
+
+    except Exception as exc:
+        connection.rollback()
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/admin/accounts/update_role", methods=["POST"])
+@login_required
+@role_required("admin")
+@limiter.limit("30 per minute")
+def admin_update_role():
+    """Change a user's role, except the current admin's own role."""
+
+    data = request.get_json(silent=True) or {}
+    email = clean_value(data.get("email")).lower()
+    role = clean_value(data.get("role"))
+    allowed_roles = {"admin", "researcher", "operator", "viewer"}
+    current_email = clean_value(current_user.email).lower()
+
+    if not email:
+        return error_response("missing email", 400)
+
+    if email == current_email:
+        return error_response("You cannot change your own role", 400)
+
+    if role not in allowed_roles:
+        return error_response("invalid role", 400)
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE users
+            SET role = %s
+            WHERE email = %s
+        """, (
+            role,
+            email,
+        ))
+
+        connection.commit()
+
+        if cursor.rowcount != 1:
+            return error_response("account not found", 404)
+
+        return jsonify({
+            "status": "ok",
+            "email": email,
+            "role": role,
+        })
+
+    except Exception as exc:
+        connection.rollback()
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/admin/accounts/toggle_active", methods=["POST"])
+@login_required
+@role_required("admin")
+@limiter.limit("30 per minute")
+def admin_toggle_account_active():
+    """Activate or deactivate an account, protecting the current admin."""
+
+    data = request.get_json(silent=True) or {}
+    email = clean_value(data.get("email")).lower()
+    is_active = bool(data.get("is_active"))
+    current_email = clean_value(current_user.email).lower()
+
+    if not email:
+        return error_response("missing email", 400)
+
+    if email == current_email and not is_active:
+        return error_response(
+            "You cannot deactivate your own account",
+            400,
+        )
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE users
+            SET is_active = %s
+            WHERE email = %s
+        """, (
+            is_active,
+            email,
+        ))
+
+        connection.commit()
+
+        if cursor.rowcount != 1:
+            return error_response("account not found", 404)
+
+        return jsonify({
+            "status": "ok",
+            "email": email,
+            "is_active": is_active,
+        })
+
+    except Exception as exc:
+        connection.rollback()
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+    finally:
+        cursor.close()
+        connection.close()
+
 
 @research_bp.route("/debug/db")
 @login_required
 @role_required("admin")
-@limiter.limit("30 per minute")
 def debug_db():
+    """Return lightweight row counts for admin database diagnostics."""
 
-    con = None
+    connection = db()
+    cursor = connection.cursor()
+    result = {}
 
     try:
-
-        con = db()
-        c = con.cursor()
-
-        result = {}
-
-        for table in [
+        for table in (
+            "users",
             "tests",
             "fit_data",
             "csv_data",
             "full_sessions",
-            "users"
-        ]:
+        ):
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            result[table] = cursor.fetchone()[0]
 
-            c.execute(
-                f"SELECT COUNT(*) FROM {table}"
+        accept = request.headers.get("Accept", "")
+
+        if (
+            "text/html" in accept
+            and "application/json" not in accept
+        ):
+            return render_template(
+                "debug_db.html",
+                tables=result,
             )
-
-            result[table] = c.fetchone()[0]
-
-        c.close()
-        con.close()
 
         return jsonify({
             "status": "ok",
-            "database": result
+            "tables": result,
         })
 
-    except Exception as e:
+    finally:
+        cursor.close()
+        connection.close()
 
+
+# =========================================================
+# CONTROLLER HELPERS
+# =========================================================
+
+def clean_value(value) -> str:
+    return (
+        str(value).strip()
+        if value is not None
+        else ""
+    )
+
+
+def get_current_user_id() -> str | None:
+    return (
+        getattr(current_user, "user_id", None)
+        or getattr(current_user, "email", None)
+    )
+
+
+def pick_feature(
+    features: dict,
+    *keys: str,
+):
+    """Return the first non-empty feature value from possible key names."""
+
+    for key in keys:
+        value = features.get(key)
+
+        if value is not None:
+            return value
+
+    return None
+
+
+def append_numeric(
+    values: list[float],
+    value,
+) -> None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return
+
+    values.append(numeric)
+
+
+def average_or_none(
+    values: list[float],
+) -> float | None:
+    if not values:
+        return None
+
+    return round(
+        sum(values) / len(values),
+        2,
+    )
+
+
+def risk_level_from_score(score) -> str:
+    try:
+        numeric_score = float(score)
+    except (TypeError, ValueError):
+        return "Unknown"
+
+    if numeric_score >= 90:
+        return "Low"
+
+    if numeric_score >= 70:
+        return "Moderate"
+
+    return "High"
+
+
+def calculate_trend_direction(
+    scores: list[float],
+) -> str:
+    if len(scores) < 2:
+        return "insufficient_data"
+
+    delta = scores[-1] - scores[0]
+
+    if delta >= 5:
+        return "improving"
+
+    if delta <= -5:
+        return "declining"
+
+    return "stable"
+
+
+def create_temp_path(
+    filename: str,
+) -> Path:
+    TEMP_UPLOAD_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    return TEMP_UPLOAD_DIRECTORY / (
+        f"{uuid.uuid4()}_{filename}"
+    )
+
+
+def remove_temp_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
         traceback.print_exc()
 
-        if con:
-            con.close()
 
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+def validate_upload_request(
+    *,
+    file,
+    session_id: str,
+    allowed_extensions: set[str],
+    max_size: int,
+):
+    if not file or not session_id:
+        return error_response(
+            "missing file or session_id",
+            400,
+        )
 
-# =========================================================
-# ADMIN PLAYWRIGHT REPORT
-# =========================================================
+    if not validate_extension(
+        file.filename,
+        allowed_extensions,
+    ):
+        return error_response(
+            "invalid file extension",
+            400,
+        )
 
-@research_bp.route("/admin/playwright-report/<path:filename>")
-@login_required
-@role_required("admin")
-def playwright_report(filename):
+    if not validate_file_size(
+        file,
+        max_size,
+    ):
+        return error_response(
+            "file too large",
+            400,
+        )
 
-    report_dir = os.path.join(
-        os.getcwd(),
-        "playwright-report"
+    return None
+
+
+def table_exists(cursor, table_name: str) -> bool:
+    """Check optional migration tables before compatibility deletes use them."""
+
+    cursor.execute(
+        "SELECT to_regclass(%s)",
+        (f"public.{table_name}",),
     )
 
-    return send_from_directory(
-        report_dir,
-        filename
-    ) 
-    
-# =========================================================
-# GATLING HTML REPORT
-# =========================================================
+    return cursor.fetchone()[0] is not None
 
-@research_bp.route(
-    "/admin/gatling-report/<path:filename>"
-)
-@login_required
-@role_required("admin")
-def gatling_report(filename):
 
-    report_dir = Path(
-        "tests/performance/gatling/target/gatling"
+def collect_subject_session_ids(
+    cursor,
+    *,
+    user_id: str,
+) -> list[str]:
+    """Find every session id connected with a subject across known tables."""
+
+    session_ids = set()
+
+    for table in (
+        "full_sessions",
+        "tests",
+        "fit_data",
+        "csv_data",
+        "fit_imports",
+        "csv_imports",
+        "merge_jobs",
+        "merged_data",
+        "ai_results",
+    ):
+        if not table_exists(cursor, table):
+            continue
+
+        cursor.execute(
+            f"""
+            SELECT DISTINCT session_id
+            FROM {table}
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        )
+
+        session_ids.update(
+            row[0]
+            for row in cursor.fetchall()
+            if row[0]
+        )
+
+    return sorted(session_ids)
+
+
+def delete_subject_related_rows(
+    cursor,
+    *,
+    user_id: str,
+    session_ids: list[str],
+) -> None:
+    """Delete subject-owned data while tolerating absent optional tables."""
+
+    tables = (
+        "ai_results",
+        "merged_data",
+        "merge_jobs",
+        "fit_data",
+        "csv_data",
+        "tests",
+        "full_sessions",
+        "fit_imports",
+        "csv_imports",
     )
 
-    return send_from_directory(
-        report_dir,
-        filename
-    )
+    for table in tables:
+        if not table_exists(cursor, table):
+            continue
+
+        if session_ids:
+            cursor.execute(
+                f"""
+                DELETE FROM {table}
+                WHERE user_id = %s
+                OR session_id = ANY(%s)
+                """,
+                (user_id, session_ids),
+            )
+        else:
+            cursor.execute(
+                f"""
+                DELETE FROM {table}
+                WHERE user_id = %s
+                """,
+                (user_id,),
+            )
+
+
+def error_response(
+    message: str,
+    status_code: int,
+):
+    return jsonify({
+        "status": "error",
+        "error": message,
+    }), status_code

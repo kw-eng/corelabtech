@@ -8,7 +8,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='css/style.css') }}"
+        href="{{ url_for('static', filename='css/style.css') }}?v=publications-polish-20260721"
     >
 
     {% block styles %}{% endblock %}
@@ -32,95 +32,62 @@
 
     </div>
 
-    <nav>
+    <nav class="main-nav" aria-label="Primary navigation">
 
-        <!-- PUBLIC -->
-        <a href="{{ url_for('main.home') }}">Home</a>
+        <div class="nav-group">
+            <a href="{{ url_for('main.home') }}">Home</a>
+            <a href="{{ url_for('main.about') }}">About</a>
+            <a href="{{ url_for('main.technology') }}">Technology</a>
+            <a href="{{ url_for('pub.publications') }}">Research</a>
+            <a href="{{ url_for('main.contact') }}">Contact</a>
+        </div>
 
-        <a href="{{ url_for('main.about') }}">About Lab</a>
-
-        <a href="{{ url_for('main.technology') }}">Technology</a>
-
-        <a href="{{ url_for('pub.publications') }}">Research</a>
-
-        <a href="{{ url_for('main.contact') }}">Contact</a>
-
-
-        <!-- NOT LOGGED IN -->
         {% if not current_user.is_authenticated %}
-
-            <a href="{{ url_for('auth.login') }}">Login</a>
-
-            <a href="{{ url_for('research.ai_testing_lab_public') }}">
-                AI Testing Lab
-            </a>
-
+            <div class="nav-group nav-group-right">
+                <a href="{{ url_for('research.ai_testing_lab_public') }}">AI Testing Lab</a>
+                <a class="nav-primary" href="{{ url_for('auth.login') }}">Login</a>
+            </div>
         {% endif %}
 
-
-        <!-- LOGGED IN -->
         {% if current_user.is_authenticated %}
+            <div class="nav-group nav-dropdown">
+                <button type="button">Research</button>
+                <div class="nav-menu">
+                    <a href="{{ url_for('research.research_platform') }}">Research Platform</a>
+                    <a href="{{ url_for('research.research_dashboard') }}">Mission Control</a>
+                    {% if current_user.role in ["operator", "researcher", "admin"] %}
+                        <a href="{{ url_for('research.chamber_testing') }}">Chamber Testing</a>
+                    {% endif %}
+                </div>
+            </div>
 
-            <a href="{{ url_for('research.research_platform') }}">
-                Research Platform
-            </a>
-
-            <a href="{{ url_for('research.research_dashboard') }}">
-                Mission Control
-            </a>
-
-
-            <!-- OPERATOR / RESEARCHER / ADMIN -->
-            {% if current_user.role in ["operator", "researcher", "admin"] %}
-
-                <a href="{{ url_for('research.chamber_testing') }}">
-                    Chamber Testing
-                </a>
-
-            {% endif %}
-
-
-            <!-- RESEARCHER / ADMIN -->
             {% if current_user.role in ["researcher", "admin"] %}
-
-                <a href="{{ url_for('ai.ai_lab') }}">
-                    AI Lab
-                </a>
-
-                <a href="{{ url_for('ai_qa.ai_qa_lab') }}">
-                    AI QA Lab
-                </a>
-
-                <a href="{{ url_for('qa.qa_lab') }}">
-                    Software QA Lab
-                </a>
-
+                <div class="nav-group nav-dropdown">
+                    <button type="button">AI & QA</button>
+                    <div class="nav-menu">
+                        <a href="{{ url_for('ai.ai_lab') }}">AI Lab</a>
+                        <a href="{{ url_for('ai_qa.ai_qa_lab') }}">AI QA Lab</a>
+                        <a href="{{ url_for('qa.qa_lab') }}">Software QA Lab</a>
+                    </div>
+                </div>
             {% endif %}
 
-
-            <!-- ADMIN ONLY -->
             {% if current_user.role == "admin" %}
-
-                <a href="{{ url_for('research.performance_tests') }}">
-                    Performance Tests
-                </a>
-
-                <a href="{{ url_for('research.admin_panel') }}">
-                    Mission Logs
-                </a>
-
-                <a href="{{ url_for('research.debug_db') }}">
-                    DB Debug
-                </a>
-
+                <div class="nav-group nav-dropdown">
+                    <button type="button">Admin</button>
+                    <div class="nav-menu">
+                        <a href="{{ url_for('research.performance_tests') }}">Performance Tests</a>
+                        <a href="{{ url_for('research.admin_panel') }}">Mission Logs</a>
+                        <a href="{{ url_for('research.debug_db') }}">DB Debug</a>
+                        <a href="{{ url_for('research.admin_accounts') }}">Accounts</a>
+                    </div>
+                </div>
             {% endif %}
 
-
-            <!-- ACCOUNT -->
-            <a href="{{ url_for('auth.profile') }}">Profile</a>
-
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
-
+            <div class="nav-group nav-group-right nav-account">
+                <a href="{{ url_for('auth.profile') }}">Profile</a>
+                <a class="nav-danger" href="{{ url_for('auth.logout') }}">Logout</a>
+            </div>
         {% endif %}
 
     </nav>
@@ -139,7 +106,8 @@
 </main>
 
 <footer>
-    <p>© CoreLabTech Laboratory 2026</p>
+    <p>&copy; CoreLabTech Laboratory 2026</p>
+    <p class="brand-disclaimer">FIT/wearable compatibility does not imply affiliation, endorsement or sponsorship by any device manufacturer, including Garmin.</p>
 </footer>
 
 </body>

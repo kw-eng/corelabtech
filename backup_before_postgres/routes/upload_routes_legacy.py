@@ -1,4 +1,4 @@
-# routes/upload_routes.py
+# Legacy routes/upload_routes.py kept for PostgreSQL migration reference.
 
 from flask import (
     Blueprint,
