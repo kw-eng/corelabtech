@@ -7,6 +7,7 @@ on:
 jobs:
   qa:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16
@@ -100,8 +101,24 @@ jobs:
           name: flask-e2e-log
           path: flask-e2e.log
 
+
   performance:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: corelabtech
+          POSTGRES_PASSWORD: corelabtech
+          POSTGRES_DB: corelabtech_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U corelabtech -d corelabtech_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -123,13 +140,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Initialize performance database
+        env:
+          DATABASE_URL: "postgresql://corelabtech:corelabtech@127.0.0.1:5432/corelabtech_test"
+        run: |
+          python run_database_setup.py
+
       - name: Start Flask
         env:
           FLASK_ENV: production
-          APP_ENV: production
+          APP_ENV: test
           PERFORMANCE_TESTING: "true"
+          SECRET_KEY: performance-secret-key-2026
           SESSION_COOKIE_SECURE: "False"
-          DATABASE_URL: sqlite:///ci_test.db
+          DATABASE_URL: "postgresql://corelabtech:corelabtech@127.0.0.1:5432/corelabtech_test"
         run: |
           python app.py > flask-performance.log 2>&1 &
           for i in {1..30}; do
@@ -161,3 +185,4 @@ jobs:
         with:
           name: flask-performance-log
           path: flask-performance.log
+          
