@@ -39,11 +39,11 @@
         </div>
         <div>
             <span>Wearable input</span>
-            <strong>Wearable FIT</strong>
+            <strong>HR & HRV Timeline</strong>
         </div>
         <div>
             <span>Oximeter input</span>
-            <strong>CSV SpO2 / Pulse</strong>
+            <strong>SpO2 & Pulse Timeline</strong>
         </div>
         <div>
             <span>Analysis output</span>
@@ -72,7 +72,7 @@
             <article class="about-card">
                 <img src="{{ url_for('static', filename='img/heart.svg') }}" alt="">
                 <h3>Pulse & Heart Rate</h3>
-                <p>Pulse from oximeter CSV and heart rate from FIT-compatible wearable telemetry.</p>
+                <p>Pulse from the SpO2/pulse timeline and heart rate from the HR/HRV timeline.</p>
             </article>
 
             <article class="about-card">
@@ -120,7 +120,7 @@
             <div>
                 <span>DURING</span>
                 <strong>Chamber Monitoring</strong>
-                <p>Collect wearable FIT and pulse oximeter CSV data during the session.</p>
+                <p>Collect HR/HRV and SpO2/pulse timelines during the session.</p>
             </div>
             <div>
                 <span>POST</span>
@@ -129,8 +129,8 @@
             </div>
             <div>
                 <span>AI</span>
-                <strong>Research Analysis</strong>
-                <p>Generate score, anomaly flags, findings and research-only report output.</p>
+                <strong>Wellness Analysis</strong>
+                <p>Generate score, session flags, findings and wellness report output.</p>
             </div>
         </div>
     </section>
@@ -159,7 +159,7 @@
 
             <article class="about-card">
                 <h3>Safety Review Layer</h3>
-                <p>Low SpO2, high pulse, high HR or low HRV are highlighted for review.</p>
+                <p>Low SpO2, elevated pulse/HR or low HRV are highlighted for review.</p>
             </article>
         </div>
     </section>
@@ -167,7 +167,7 @@
     <section class="about-note">
         <strong>Important note</strong>
         <p>
-            CoreLabTech is a research and monitoring platform. AI scores and anomaly
+            CoreLabTech is a wellness monitoring platform. AI scores and session
             flags are not a medical diagnosis and should not replace clinical evaluation.
         </p>
     </section>

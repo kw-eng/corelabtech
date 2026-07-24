@@ -8,7 +8,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='css/style.css') }}?v=publications-polish-20260721"
+        href="{{ url_for('static', filename='css/style.css') }}?v=ai-testing-public-20260724"
     >
 
     {% block styles %}{% endblock %}
@@ -78,7 +78,9 @@
                     <div class="nav-menu">
                         <a href="{{ url_for('research.performance_tests') }}">Performance Tests</a>
                         <a href="{{ url_for('research.admin_panel') }}">Mission Logs</a>
+                        {% if config.DEBUG_ROUTES_ENABLED %}
                         <a href="{{ url_for('research.debug_db') }}">DB Debug</a>
+                        {% endif %}
                         <a href="{{ url_for('research.admin_accounts') }}">Accounts</a>
                     </div>
                 </div>

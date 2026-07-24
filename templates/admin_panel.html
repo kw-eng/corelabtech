@@ -29,11 +29,11 @@
                 <strong id="kpiAnalyzed">-</strong>
             </div>
             <div>
-                <span>Anomalies</span>
+                <span>Flagged sessions</span>
                 <strong id="kpiAnomalies">-</strong>
             </div>
             <div>
-                <span>High risk</span>
+                <span>Elevated load</span>
                 <strong id="kpiHighRisk">-</strong>
             </div>
         </div>
@@ -47,7 +47,7 @@
                 <option value="low">Low risk</option>
                 <option value="moderate">Moderate risk</option>
                 <option value="high">High risk</option>
-                <option value="anomaly">Anomaly only</option>
+                <option value="anomaly">Flagged only</option>
                 <option value="missing">Without AI result</option>
             </select>
         </div>
@@ -77,7 +77,7 @@
                         <th>User</th>
                         <th>Score</th>
                         <th>Risk</th>
-                        <th>Anomaly</th>
+                        <th>Session flag</th>
                         <th>Avg SpO2</th>
                         <th>Avg Pulse</th>
                         <th>Timeline</th>
@@ -450,7 +450,7 @@ function renderTimeline(){
                 <b>${s.created_at || s.date || "-"}</b>
                 <span>Session: ${s.session_id}</span>
                 <span>User: ${s.user_id || "-"}</span>
-                <span>Score: ${s.score ?? "-"} / 100 | Risk: ${risk} | Anomaly: ${anomalyText(s.anomaly)}</span>
+                <span>Score: ${s.score ?? "-"} / 100 | Status: ${risk} | Session flag: ${anomalyText(s.anomaly)}</span>
             </div>
         `
     })
@@ -528,16 +528,28 @@ async function loadDebugDB(){
         const res = await fetch("/debug/db", {
             credentials: "same-origin"
         })
+
+        if(res.status === 404){
+            if(cards){
+                cards.innerHTML = `
+                    <div class="qa-card qa-empty-state">
+                        Database diagnostics are disabled in this environment.
+                    </div>
+                `
+            }
+            return
+        }
+
         const data = await res.json()
         const tables = data.tables || {}
         const items = [
             {
-                label: "FIT records",
+                label: "HR/HRV records",
                 value: tables.fit_data ?? "-",
-                hint: "Wearable FIT telemetry rows"
+                hint: "HR/HRV timeline telemetry rows"
             },
             {
-                label: "CSV records",
+                label: "SpO2/pulse records",
                 value: tables.csv_data ?? "-",
                 hint: "Pulse oximeter CSV rows"
             },

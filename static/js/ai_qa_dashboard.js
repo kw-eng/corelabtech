@@ -70,8 +70,8 @@ function statusLabel(pass){
 
 function anomalyText(value){
     return value
-        ? "Yes - abnormal response detected"
-        : "NO critical anomaly detected"
+        ? "Yes - review session quality"
+        : "NO critical session flag detected"
 }
 
 function riskLevelFromScore(score){
@@ -160,7 +160,7 @@ function renderQAScorecard(data){
             </div>
 
             <div class="qa-card">
-                <h3>Anomaly</h3>
+                <h3>Session Flag</h3>
                 <div class="qa-kpi">${normalized.anomaly ? "YES" : "NO"}</div>
                 <div class="qa-muted">${anomalyText(normalized.anomaly)}</div>
             </div>
@@ -188,7 +188,7 @@ function renderPipelineSteps(data){
         { label: "Session selected", pass: !!normalized.session_id },
         { label: "AI score returned", pass: typeof normalized.score === "number" },
         { label: "Risk level available", pass: !!normalized.risk_level },
-        { label: "Anomaly flag returned", pass: typeof normalized.anomaly === "boolean" },
+        { label: "Session flag returned", pass: typeof normalized.anomaly === "boolean" },
         { label: "Features package returned", pass: !!normalized.features },
         { label: "Timeline returned", pass: Array.isArray(normalized.timeline) },
         { label: "Medical disclaimer returned", pass: !!normalized.medical_disclaimer }
@@ -480,11 +480,6 @@ async function runApiHealthCheck(){
         "/api/sessions",
         "/api/ai_latest"
     ]
-    const isAdmin = document.body.dataset.role === "admin"
-
-    if(isAdmin){
-        checks.push("/debug/db")
-    }
 
     const results = []
 
@@ -656,6 +651,13 @@ async function loadDebugDB(){
         const res = await fetch("/debug/db", {
             credentials: "same-origin"
         })
+
+        if(res.status === 404){
+            document.getElementById("debugDbOutput").innerText =
+                "Debug database diagnostics are disabled in this environment."
+            return
+        }
+
         const data = await parseJsonResponse(res, "DEBUG DB")
 
         document.getElementById("debugDbOutput").innerText = pretty(data)

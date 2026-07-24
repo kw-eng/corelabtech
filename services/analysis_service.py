@@ -1,16 +1,19 @@
-"""Rule-based physiology analysis for merged HBOT telemetry.
+"""Rule-based wellness analysis for merged session telemetry.
 
 The service reads synchronized FIT/CSV measurements, computes quality and
-physiology signals, and persists an AI-style result for dashboards/reports.
+session physiology signals, and persists an AI-style result for dashboards/reports.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
+from datetime import date
 from statistics import mean
 from typing import Any
 
 from database_postgres import db
+from core.analytics.adaptation_analysis import classify_recovery_status
 
 from repositories.analysis_repository import (
     complete_ai_result,
@@ -21,10 +24,18 @@ from repositories.merge_repository import (
     get_latest_completed_merge_job,
     load_merged_measurements,
 )
+from repositories.wellness_repository import (
+    refresh_daily_baseline,
+    upsert_session_features,
+)
 
 
-MODEL_NAME = "CoreLabTech Physiology Analysis"
-MODEL_VERSION = "rules-v1"
+MODEL_NAME = "CoreLabTech Wellness Session Analysis"
+MODEL_VERSION = "wellness-rules-v1"
+WELLNESS_DISCLAIMER = (
+    "Wellness and educational insight only. "
+    "Not intended to diagnose, treat, cure, or prevent disease."
+)
 
 
 class AnalysisError(Exception):
@@ -100,9 +111,15 @@ def run_session_analysis(
             or session_id
         )
 
+        session_context = load_session_context(
+            cursor,
+            session_id=session_id,
+        )
+
         result = analyze_measurements(
             measurements=measurements,
             usable=usable,
+            session_context=session_context,
         )
 
         ai_result_id = create_ai_result(
@@ -118,6 +135,27 @@ def run_session_analysis(
             cursor,
             ai_result_id=ai_result_id,
             result=result,
+        )
+
+        upsert_session_features(
+            cursor,
+            session_id=session_id,
+            user_id=final_user_id,
+            phase="during",
+            window_start=result["features"].get("window_start"),
+            window_end=result["features"].get("window_end"),
+            features=result["features"],
+            result=result,
+        )
+
+        refresh_daily_baseline(
+            cursor,
+            user_id=final_user_id,
+            baseline_date=(
+                result["features"].get("window_start").date()
+                if result["features"].get("window_start")
+                else date.today()
+            ),
         )
 
         connection.commit()
@@ -142,11 +180,12 @@ def analyze_measurements(
     *,
     measurements: list[dict[str, Any]],
     usable: list[dict[str, Any]],
+    session_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Calculate scores and warnings from synchronized measurements.
 
-    The model is intentionally deterministic and research-only: it applies
-    thresholds for hypoxia, stress, cardiovascular warnings and sensor mismatch.
+    The model is intentionally deterministic and wellness-oriented: it applies
+    thresholds for oxygenation trends, load indicators and sensor mismatch.
     """
 
     spo2_values = numeric_values(
@@ -185,6 +224,12 @@ def analyze_measurements(
     avg_hrv = average(hrv_values)
     max_hr = maximum(hr_values)
     max_difference = maximum(differences)
+    rr_values = numeric_values(
+        usable,
+        "rr_interval",
+    )
+    window_start = first_timestamp(usable)
+    window_end = last_timestamp(usable)
 
     hypoxia_detected = (
         min_spo2 is not None
@@ -213,12 +258,12 @@ def analyze_measurements(
     if hypoxia_detected:
         score -= 40
         reasons.append(
-            "SpO2 dropped below 90%"
+            "SpO2 dropped below the configured low oxygenation threshold"
         )
     elif min_spo2 is not None and min_spo2 < 94:
         score -= 15
         reasons.append(
-            "SpO2 was below 94%"
+            "SpO2 was below the preferred wellness range"
         )
     else:
         positive_findings.append(
@@ -228,13 +273,13 @@ def analyze_measurements(
     if stress_detected:
         score -= 20
         reasons.append(
-            "Average HRV was below 30 ms"
+            "Average HRV was below the configured recovery threshold"
         )
 
     if cardiovascular_warning:
         score -= 15
         reasons.append(
-            "Heart rate exceeded 160 bpm"
+            "Heart rate exceeded the configured high-load threshold"
         )
 
     if sensor_mismatch:
@@ -251,12 +296,29 @@ def analyze_measurements(
         2,
     )
 
-    data_quality_score = match_rate
+    quality_warnings = build_quality_warnings(
+        samples_total=len(measurements),
+        samples_synchronized=len(usable),
+        match_rate=match_rate,
+        has_hrv=bool(hrv_values or rr_values),
+        has_spo2=bool(spo2_values),
+        sensor_mismatch=sensor_mismatch,
+    )
+
+    data_quality_score = calculate_data_quality_score(
+        match_rate=match_rate,
+        quality_warnings=quality_warnings,
+    )
+
+    context_features = summarize_session_context(session_context or {})
 
     features = {
         "samples_total": len(measurements),
         "samples_synchronized": len(usable),
         "match_rate": match_rate,
+        "quality_warnings": quality_warnings,
+        "window_start": window_start,
+        "window_end": window_end,
 
         "avg_spo2": average(spo2_values),
         "min_spo2": min_spo2,
@@ -273,11 +335,17 @@ def analyze_measurements(
         "avg_hrv": avg_hrv,
         "min_hrv": minimum(hrv_values),
         "max_hrv": maximum(hrv_values),
+        "rr_count": len(rr_values),
+        "sdnn": standard_deviation(rr_values),
+        "pnn50": pnn50(rr_values),
+        "artifact_ratio": artifact_ratio(rr_values),
 
         "avg_hr_pulse_difference": average(
             differences
         ),
         "max_hr_pulse_difference": max_difference,
+        "session_context": session_context or {},
+        "context_features": context_features,
     }
 
     anomaly_detected = bool(
@@ -285,6 +353,30 @@ def analyze_measurements(
         or stress_detected
         or cardiovascular_warning
         or sensor_mismatch
+    )
+    oxygenation_drop = bool(
+        min_spo2 is not None
+        and min_spo2 < 94
+    )
+    elevated_load = bool(
+        stress_detected
+        or cardiovascular_warning
+        or oxygenation_drop
+    )
+    wellness_status = (
+        "data_quality_warning"
+        if data_quality_score < 60
+        else (
+        "elevated_load"
+        if elevated_load
+        else classify_recovery_status(
+            features={
+                "data_quality_score": data_quality_score,
+                "min_spo2": min_spo2,
+                "recovery_delta": None,
+            },
+        )
+        )
     )
 
     summary = build_research_summary(
@@ -297,6 +389,7 @@ def analyze_measurements(
     recommendations = build_recommendations(
         anomaly_detected=anomaly_detected,
         sensor_mismatch=sensor_mismatch,
+        context_features=context_features,
     )
 
     return {
@@ -324,6 +417,23 @@ def analyze_measurements(
         "hypoxia_detected": hypoxia_detected,
         "arrhythmia_detected": False,
 
+        "product_mode": "wellness",
+        "wellness_status": wellness_status,
+        "session_flagged": anomaly_detected,
+        "elevated_load": elevated_load,
+        "oxygenation_drop": oxygenation_drop,
+        "sensor_alignment_warning": sensor_mismatch,
+        "wellness_flags": {
+            "session_flagged": anomaly_detected,
+            "elevated_load": elevated_load,
+            "oxygenation_drop": oxygenation_drop,
+            "sensor_alignment_warning": sensor_mismatch,
+            "data_quality_warning": wellness_status == "data_quality_warning",
+        },
+        "quality_warnings": quality_warnings,
+        "session_context": session_context or {},
+        "context_features": context_features,
+
         "summary": (
             summary
             or "No significant deviations detected."
@@ -345,10 +455,8 @@ def analyze_measurements(
         "model_version": MODEL_VERSION,
 
         "research_only": True,
-        "medical_disclaimer": (
-            "Research-only result. "
-            "Not a medical diagnosis."
-        ),
+        "medical_disclaimer": WELLNESS_DISCLAIMER,
+        "wellness_disclaimer": WELLNESS_DISCLAIMER,
     }
 
 
@@ -372,6 +480,123 @@ def numeric_values(
             continue
 
     return result
+
+
+def first_timestamp(
+    rows: list[dict[str, Any]],
+) -> Any:
+    timestamps = [
+        row.get("timestamp")
+        for row in rows
+        if row.get("timestamp") is not None
+    ]
+    return min(timestamps) if timestamps else None
+
+
+def last_timestamp(
+    rows: list[dict[str, Any]],
+) -> Any:
+    timestamps = [
+        row.get("timestamp")
+        for row in rows
+        if row.get("timestamp") is not None
+    ]
+    return max(timestamps) if timestamps else None
+
+
+def standard_deviation(
+    values: list[float],
+) -> float | None:
+    if len(values) < 2:
+        return None
+
+    avg = mean(values)
+    variance = sum((value - avg) ** 2 for value in values) / (len(values) - 1)
+    return round(variance ** 0.5, 2)
+
+
+def pnn50(
+    rr_values: list[float],
+) -> float | None:
+    if len(rr_values) < 2:
+        return None
+
+    differences = [
+        abs(current - previous)
+        for previous, current in zip(rr_values, rr_values[1:])
+    ]
+    if not differences:
+        return None
+
+    over_50 = sum(1 for value in differences if value > 50)
+    return round(over_50 / len(differences) * 100, 2)
+
+
+def artifact_ratio(
+    rr_values: list[float],
+) -> float | None:
+    if not rr_values:
+        return None
+
+    artifacts = [
+        value
+        for value in rr_values
+        if value < 300 or value > 2000
+    ]
+    return round(len(artifacts) / len(rr_values) * 100, 2)
+
+
+def build_quality_warnings(
+    *,
+    samples_total: int,
+    samples_synchronized: int,
+    match_rate: float,
+    has_hrv: bool,
+    has_spo2: bool,
+    sensor_mismatch: bool,
+) -> list[str]:
+    warnings = []
+
+    if samples_total < 5:
+        warnings.append("too_few_total_samples")
+
+    if samples_synchronized < 5:
+        warnings.append("too_few_synchronized_samples")
+
+    if match_rate < 80:
+        warnings.append("low_match_rate")
+
+    if not has_hrv:
+        warnings.append("missing_hrv_or_rr")
+
+    if not has_spo2:
+        warnings.append("missing_spo2")
+
+    if sensor_mismatch:
+        warnings.append("sensor_alignment_warning")
+
+    return warnings
+
+
+def calculate_data_quality_score(
+    *,
+    match_rate: float,
+    quality_warnings: list[str],
+) -> float:
+    penalties = {
+        "too_few_total_samples": 15,
+        "too_few_synchronized_samples": 20,
+        "low_match_rate": 15,
+        "missing_hrv_or_rr": 15,
+        "missing_spo2": 15,
+        "sensor_alignment_warning": 10,
+    }
+
+    score = match_rate - sum(
+        penalties.get(warning, 0)
+        for warning in quality_warnings
+    )
+    return round(max(0, min(score, 100)), 2)
 
 
 def build_research_summary(
@@ -399,7 +624,7 @@ def build_research_summary(
 
         sentences.append(
             "A notable discrepancy was detected between wearable heart rate "
-            "and pulse oximeter pulse, which may indicate sensor mismatch, "
+            "and pulse oximeter pulse, which may indicate sensor alignment, "
             f"time alignment issues, or signal artifact.{detail}"
         )
 
@@ -413,7 +638,7 @@ def build_research_summary(
 
     if other_reasons:
         sentences.append(
-            "Additional rule-based findings: "
+            "Additional wellness findings: "
             + "; ".join(other_reasons)
             + "."
         )
@@ -425,8 +650,11 @@ def build_recommendations(
     *,
     anomaly_detected: bool,
     sensor_mismatch: bool,
+    context_features: dict[str, Any] | None = None,
 ) -> str:
     """Return concise next-step guidance for the analysis card."""
+
+    context_features = context_features or {}
 
     if sensor_mismatch:
         return (
@@ -434,10 +662,120 @@ def build_recommendations(
             "alignment before interpreting HR/pulse trends."
         )
 
-    if anomaly_detected:
-        return "Review synchronized timeline and raw signals."
+    if context_features.get("poor_sleep"):
+        return (
+            "Sleep context suggests reduced recovery readiness. Consider an "
+            "easier day and compare tomorrow's HRV/resting response."
+        )
 
-    return "No additional research action indicated."
+    if context_features.get("high_training_load"):
+        return (
+            "Recent training load may influence HR/HRV response. Treat this "
+            "session as recovery support and watch the next baseline reading."
+        )
+
+    if context_features.get("high_stress_or_fatigue"):
+        return (
+            "Reported stress or fatigue is elevated. Prioritize recovery and "
+            "repeat measurement under calmer conditions."
+        )
+
+    if anomaly_detected:
+        return "Review the synchronized timeline, raw signals, and recovery context."
+
+    return "No additional wellness action indicated."
+
+
+def load_session_context(
+    cursor,
+    *,
+    session_id: str,
+) -> dict[str, Any]:
+    """Load optional PRE/POST questionnaire context for AI coaching."""
+
+    cursor.execute(
+        """
+        SELECT pre_json, post_json
+        FROM full_sessions
+        WHERE session_id = %s
+        LIMIT 1
+        """,
+        (session_id,),
+    )
+
+    row = cursor.fetchone()
+
+    if not row:
+        return {}
+
+    pre = decode_json(row[0])
+    post = decode_json(row[1])
+
+    return {
+        "pre_check_in": pre.get("check_in") or {},
+        "post_check_out": post.get("check_out") or {},
+    }
+
+
+def summarize_session_context(context: dict[str, Any]) -> dict[str, Any]:
+    """Convert subjective check-in data into coaching-friendly flags."""
+
+    pre = context.get("pre_check_in") or {}
+    post = context.get("post_check_out") or {}
+    sleep_hours = pre.get("sleep_hours")
+
+    poor_sleep = (
+        pre.get("sleep_quality") == "poor"
+        or (
+            isinstance(sleep_hours, (int, float))
+            and sleep_hours < 6
+        )
+    )
+    high_training_load = pre.get("training_load_24h") == "hard"
+    high_stress_or_fatigue = (
+        pre.get("stress_level") == "high"
+        or pre.get("fatigue_level") == "high"
+    )
+
+    positive_subjective_response = (
+        post.get("energy_level") == "higher"
+        or post.get("relaxation_level") == "high"
+        or post.get("fatigue_level") == "lower"
+    )
+
+    discomfort_reported = post.get("discomfort") in {
+        "mild",
+        "moderate",
+    }
+
+    return {
+        "has_daily_context": bool(
+            any(value not in (None, "") for value in pre.values())
+            or any(value not in (None, "") for value in post.values())
+        ),
+        "poor_sleep": poor_sleep,
+        "high_training_load": high_training_load,
+        "high_stress_or_fatigue": high_stress_or_fatigue,
+        "positive_subjective_response": positive_subjective_response,
+        "discomfort_reported": discomfort_reported,
+    }
+
+
+def decode_json(value: Any) -> dict[str, Any]:
+    """Return dict JSON payloads regardless of database adapter decoding."""
+
+    if isinstance(value, dict):
+        return value
+
+    if not value:
+        return {}
+
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        return {}
+
+    return decoded if isinstance(decoded, dict) else {}
 
 
 def serialize_timeline_row(row: dict[str, Any]) -> dict[str, Any]:

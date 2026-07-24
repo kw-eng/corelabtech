@@ -16,8 +16,8 @@
             <span class="technology-eyebrow">Integrated research architecture</span>
             <h1>Technology</h1>
             <p>
-                CoreLabTech combines chamber telemetry, wearable FIT signals,
-                pulse oximeter CSV data, AI analysis and QA automation in one
+                CoreLabTech combines chamber telemetry, HR/HRV timelines,
+                SpO2/pulse timelines, AI analysis and QA automation in one
                 controlled HBOT research workflow.
             </p>
 
@@ -42,11 +42,11 @@
     <section class="technology-status-grid">
         <div>
             <span>Wearable input</span>
-            <strong>FIT HR / HRV</strong>
+            <strong>HR & HRV Timeline</strong>
         </div>
         <div>
             <span>Pulse oximeter</span>
-            <strong>CSV SpO2 / Pulse</strong>
+            <strong>SpO2 & Pulse Timeline</strong>
         </div>
         <div>
             <span>Synchronization</span>
@@ -86,7 +86,7 @@
                         <img src="{{ url_for('static', filename='img/garm_puls.svg') }}" alt="">
                         <span>STEP 3</span>
                         <h3>During Session</h3>
-                        <p>Record HR/HRV from FIT and SpO2/pulse from CSV.</p>
+                        <p>Record HR/HRV and SpO2/pulse timelines during the session.</p>
                     </article>
 
                     <article>
@@ -100,7 +100,7 @@
                         <img src="{{ url_for('static', filename='img/files.svg') }}" alt="">
                         <span>STEP 5</span>
                         <h3>Upload Data</h3>
-                        <p>Import FIT and CSV files into the same session.</p>
+                        <p>Import HR/HRV and SpO2/pulse files into the same session.</p>
                     </article>
 
                     <article>
@@ -116,20 +116,20 @@
         <section class="technology-accordion-item">
             <button class="technology-accordion-header" type="button">
                 <span>Data Flow & Integration</span>
-                <strong>FIT + CSV to synchronized timeline</strong>
+                <strong>HR/HRV + SpO2/pulse to synchronized timeline</strong>
             </button>
 
             <div class="technology-accordion-content">
                 <div class="technology-flow-grid">
                     <article>
                         <img src="{{ url_for('static', filename='img/fit.svg') }}" alt="">
-                        <h3>Wearable FIT</h3>
+                        <h3>HR & HRV Timeline</h3>
                         <p>Heart rate, RR intervals and HRV-derived signals.</p>
                     </article>
 
                     <article>
                         <img src="{{ url_for('static', filename='img/csv.svg') }}" alt="">
-                        <h3>Pulse Oximeter CSV</h3>
+                        <h3>SpO2 & Pulse Timeline</h3>
                         <p>SpO2 and pulse sampled during the chamber session.</p>
                     </article>
 
@@ -166,8 +166,8 @@
                         <img src="{{ url_for('static', filename='img/device.svg') }}" alt="">
                         <h3>Devices</h3>
                         <ul>
-                            <li>FIT-compatible wearable / HR strap for HR and HRV</li>
-                            <li>Pulse oximeter CSV for SpO2 and pulse</li>
+                            <li>Compatible wearable / HR strap for HR and HRV timeline data</li>
+                            <li>Pulse oximeter export for SpO2 and pulse timeline data</li>
                             <li>Chamber telemetry for pressure and environment</li>
                         </ul>
                     </article>
@@ -186,7 +186,7 @@
                         <img src="{{ url_for('static', filename='img/ai.svg') }}" alt="">
                         <h3>AI Scoring</h3>
                         <ul>
-                            <li>SpO2 stability and hypoxia warnings</li>
+                            <li>SpO2 stability and oxygenation quality warnings</li>
                             <li>HRV and cardiovascular response review</li>
                             <li>HR / pulse discrepancy and signal-quality checks</li>
                         </ul>
@@ -207,7 +207,7 @@
                         <h3>AI QA Lab</h3>
                         <ul>
                             <li>AI contract validation</li>
-                            <li>Score, risk, anomaly and timeline checks</li>
+                            <li>Score, wellness status, session flag and timeline checks</li>
                             <li>Scenario preview for research workflows</li>
                         </ul>
                     </article>

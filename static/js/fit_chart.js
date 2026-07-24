@@ -299,7 +299,7 @@ async function loadFitChart(session_id, importId = null) {
             data.time || [],
             [
                 {
-                    label: "Heart Rate from FIT",
+                    label: "Heart Rate from HR/HRV timeline",
                     data: (data.pulse || []).map(toNumberOrNull),
                     borderColor: CHART_COLORS.heartRate,
                     backgroundColor: CHART_COLORS.heartRate,
@@ -408,7 +408,7 @@ async function uploadFIT() {
 
         if (!input || !input.files.length) {
 
-            alert("Select FIT file")
+            alert("Select HR/HRV timeline file")
             return
         }
 
@@ -488,7 +488,7 @@ function getHRVColor(value) {
 
 function getColor(status) {
 
-    if (status === "hypoxia") {
+    if (status === "hypoxia" || status === "oxygenation_drop") {
         return "red"
     }
 
@@ -522,7 +522,7 @@ function renderMergedChart(rows) {
         labels,
         [
             {
-                label: "HR from FIT",
+                label: "HR from HR/HRV timeline",
                 data: buildTimelineDataset(rows, ["hr", "heart_rate"]),
                 borderColor: CHART_COLORS.heartRate,
                 backgroundColor: CHART_COLORS.heartRate,
@@ -530,7 +530,7 @@ function renderMergedChart(rows) {
                 spanGaps: true
             },
             {
-                label: "Pulse from CSV",
+                label: "Pulse from SpO2/pulse timeline",
                 data: buildTimelineDataset(rows, ["pulse"]),
                 borderColor: CHART_COLORS.pulse,
                 backgroundColor: CHART_COLORS.pulse,
@@ -538,7 +538,7 @@ function renderMergedChart(rows) {
                 spanGaps: true
             },
             {
-                label: "SpO2 from CSV",
+                label: "SpO2 from SpO2/pulse timeline",
                 data: buildTimelineDataset(
                     rows,
                     ["spo2", "SpO2", "SO2", "so2", "s02", "S02", "sp02"]
@@ -549,7 +549,7 @@ function renderMergedChart(rows) {
                 spanGaps: true
             },
             {
-                label: "HRV RMSSD from FIT",
+                label: "HRV RMSSD from HR/HRV timeline",
                 data: buildTimelineDataset(rows, ["hrv"]),
                 borderColor: CHART_COLORS.hrv,
                 backgroundColor: CHART_COLORS.hrv,

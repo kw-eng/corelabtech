@@ -5,15 +5,19 @@ It is imported by Docker/Gunicorn and can also be run directly for local dev.
 """
 
 import os
-from flask import render_template, redirect, url_for
+import time
+
+from flask import g, redirect, render_template, request, url_for
 from flask_login import LoginManager
 from auth.auth_routes import auth_bp
 from auth.user_model import get_user_by_id
-from flask import Flask, render_template
+from flask import Flask
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from security.limiter import limiter
 from security.headers import configure_security_headers
 from security.csrf import csrf
+from services.logger_service import access_logger, app_logger, error_logger
 
 # =========================
 # BLUEPRINTS
@@ -53,7 +57,30 @@ def ensure_runtime_directories():
 # =========================
 ensure_runtime_directories()
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,
+    x_proto=1,
+    x_host=1,
+    x_port=1,
+)
+
+APP_ENV = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development")).lower()
+IS_PRODUCTION = APP_ENV == "production"
+
+secret_key = os.getenv("SECRET_KEY")
+if IS_PRODUCTION and (
+    not secret_key
+    or secret_key in {"dev-secret-change-me", "change-me", "corelabtech"}
+):
+    raise RuntimeError(
+        "SECRET_KEY must be set to a strong, non-default value in production."
+    )
+
+app.secret_key = secret_key or "dev-secret-change-me"
+app.config["DEBUG_ROUTES_ENABLED"] = (
+    os.getenv("DISABLE_DEBUG_ROUTES", "true").lower() != "true"
+)
 # =========================================================
 # CSRF
 # =========================================================
@@ -73,7 +100,20 @@ configure_security_headers(app)
 
 
 
-CORS(app)
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+if cors_origins:
+    CORS(
+        app,
+        origins=cors_origins,
+        supports_credentials=True,
+    )
+elif not IS_PRODUCTION:
+    CORS(app)
 
 # =========================
 # REGISTER BLUEPRINTS
@@ -90,9 +130,39 @@ app.register_blueprint(performance_bp)
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "False") == "True"
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.getenv("SESSION_COOKIE_SECURE", "True" if IS_PRODUCTION else "False") == "True"
+)
 app.register_blueprint(auth_bp)
 app.register_blueprint(health_bp)
+
+
+@app.before_request
+def start_request_timer():
+    """Capture request start time for access logging."""
+
+    g.request_started_at = time.time()
+
+
+@app.after_request
+def log_request(response):
+    """Write compact access logs for operational monitoring."""
+
+    duration_ms = round(
+        (time.time() - getattr(g, "request_started_at", time.time())) * 1000,
+        2,
+    )
+
+    access_logger.info(
+        "%s %s %s %s %.2fms",
+        request.remote_addr or "-",
+        request.method,
+        request.path,
+        response.status_code,
+        duration_ms,
+    )
+
+    return response
 # =========================
 # LOGIN MANAGER
 # =========================
@@ -120,11 +190,6 @@ def ai_monitoring():
     return render_template("physiology_monitoring.html")
 
 
-# =========================
-# DEBUG
-# =========================
-print(app.url_map)
-
 @app.errorhandler(403)
 def forbidden(e):
     """Render the role/permission error page."""
@@ -137,6 +202,33 @@ def unauthorized(e):
     """Redirect anonymous users to login instead of returning raw 401 HTML."""
 
     return redirect(url_for("auth.login"))
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    """Log unexpected errors and avoid exposing stack traces to users."""
+
+    error_logger.exception(
+        "Unhandled server error on %s %s",
+        request.method,
+        request.path,
+    )
+
+    if request.path.startswith("/api/"):
+        return {
+            "status": "error",
+            "error": "internal_server_error",
+        }, 500
+
+    return render_template("unauthorized.html"), 500
+
+
+app_logger.info(
+    "CoreLabTech app configured env=%s debug_routes=%s cors_origins=%s",
+    APP_ENV,
+    app.config["DEBUG_ROUTES_ENABLED"],
+    bool(cors_origins),
+)
 
 
 # =========================

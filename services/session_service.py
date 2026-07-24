@@ -445,6 +445,37 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
         cursor.execute(
             """
             SELECT
+                fs.user_id,
+                u.email,
+                u.sex,
+                u.age,
+                u.weight,
+                u.notes
+            FROM full_sessions fs
+            LEFT JOIN users u
+                ON u.user_id = fs.user_id
+            WHERE fs.session_id = %s
+            LIMIT 1
+            """,
+            (session_id,),
+        )
+
+        subject_row = cursor.fetchone()
+        subject = None
+
+        if subject_row:
+            subject = {
+                "user_id": subject_row[0],
+                "email": subject_row[1],
+                "sex": subject_row[2],
+                "age": subject_row[3],
+                "weight": subject_row[4],
+                "notes": subject_row[5],
+            }
+
+        cursor.execute(
+            """
+            SELECT
                 ai_result_id,
                 merge_id,
                 model_name,
@@ -461,6 +492,7 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                 summary,
                 recommendations,
                 features_json,
+                result_json,
                 created_at
             FROM ai_results
             WHERE session_id = %s
@@ -492,11 +524,13 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                 "summary": row[13],
                 "recommendations": row[14],
                 "features": row[15] or {},
-                "created_at": row[16].isoformat() if row[16] else None,
+                "result": row[16] or {},
+                "created_at": row[17].isoformat() if row[17] else None,
             }
 
         return {
             **counts,
+            "subject": subject,
             "analysis": analysis,
         }
 
@@ -517,29 +551,59 @@ def build_pdf_report(
     doc = SimpleDocTemplate(
         str(path),
         pagesize=A4,
-        title=f"CoreLabTech report {session['session_id']}",
+        title=f"CoreLabTech wellness report {session['session_id']}",
     )
 
     story = [
-        Paragraph("CoreLabTech Research Report", styles["Title"]),
+        Paragraph("CoreLabTech Wellness Session Report", styles["Title"]),
         Spacer(1, 12),
         Paragraph("Session Summary", styles["Heading2"]),
         make_table(
             [
                 ("Session ID", session.get("session_id")),
-                ("User ID", session.get("user_id")),
+                ("Subject ID", session.get("user_id")),
                 ("Status", session.get("status")),
                 ("Completed", session.get("completed")),
                 ("Created at", session.get("created_at")),
             ]
         ),
         Spacer(1, 12),
-        Paragraph("Data Pipeline", styles["Heading2"]),
+        Paragraph("Subject", styles["Heading2"]),
         make_table(
             [
-                ("FIT samples", report_data.get("fit_samples")),
-                ("CSV samples", report_data.get("csv_samples")),
-                ("Merged samples", report_data.get("merged_samples")),
+                ("Subject ID", (report_data.get("subject") or {}).get("user_id")),
+                ("Email", (report_data.get("subject") or {}).get("email")),
+                ("Sex", (report_data.get("subject") or {}).get("sex")),
+                ("Age", (report_data.get("subject") or {}).get("age")),
+                ("Weight", (report_data.get("subject") or {}).get("weight")),
+                ("Notes", (report_data.get("subject") or {}).get("notes")),
+            ]
+        ),
+        Spacer(1, 12),
+        Paragraph("Data Sources", styles["Heading2"]),
+        make_table(
+            [
+                ("HR/HRV Timeline samples", report_data.get("fit_samples")),
+                ("SpO2/Pulse Timeline samples", report_data.get("csv_samples")),
+                ("Synchronized samples", report_data.get("merged_samples")),
+            ]
+        ),
+        Spacer(1, 12),
+        Paragraph("PRE / DURING / POST", styles["Heading2"]),
+        make_table(
+            [
+                ("PRE SpO2", phase_metric(session.get("pre"), "spo2", "avg_spo2")),
+                ("PRE pulse / HR", phase_metric(session.get("pre"), "pulse", "hr", "heart_rate")),
+                ("PRE HRV", phase_metric(session.get("pre"), "hrv", "rmssd", "avg_hrv")),
+                ("PRE check-in", format_context(phase_metric(session.get("pre"), "check_in"))),
+                ("DURING avg SpO2", phase_metric(session.get("during"), "avg_spo2", "spo2")),
+                ("DURING min SpO2", phase_metric(session.get("during"), "min_spo2")),
+                ("DURING avg pulse / HR", phase_metric(session.get("during"), "avg_pulse", "avg_hr", "pulse", "hr")),
+                ("DURING avg HRV", phase_metric(session.get("during"), "avg_hrv", "rmssd", "hrv")),
+                ("POST SpO2", phase_metric(session.get("post"), "spo2", "avg_spo2")),
+                ("POST pulse / HR", phase_metric(session.get("post"), "pulse", "hr", "heart_rate")),
+                ("POST HRV", phase_metric(session.get("post"), "hrv", "rmssd", "avg_hrv")),
+                ("POST check-out", format_context(phase_metric(session.get("post"), "check_out"))),
             ]
         ),
     ]
@@ -549,32 +613,60 @@ def build_pdf_report(
     story.extend(
         [
             Spacer(1, 12),
-            Paragraph("AI Analysis", styles["Heading2"]),
+            Paragraph("Wellness Analysis", styles["Heading2"]),
         ]
     )
 
     if analysis:
+        analysis_result = analysis.get("result") or {}
+        wellness_flags = analysis_result.get("wellness_flags") or {}
+        quality_warnings = analysis_result.get("quality_warnings") or []
+
         story.append(
             make_table(
                 [
-                    ("AI result ID", analysis.get("ai_result_id")),
+                    ("Analysis result ID", analysis.get("ai_result_id")),
                     ("Merge ID", analysis.get("merge_id")),
                     ("Model", analysis.get("model_name")),
                     ("Model version", analysis.get("model_version")),
-                    ("Overall score", analysis.get("overall_score")),
-                    ("Stress score", analysis.get("stress_score")),
-                    ("Hypoxia score", analysis.get("hypoxia_score")),
+                    ("Product mode", analysis_result.get("product_mode", "wellness")),
+                    ("Wellness status", analysis_result.get("wellness_status")),
+                    ("Wellness score", analysis.get("overall_score")),
+                    ("Load score", analysis.get("stress_score")),
+                    ("Oxygenation minimum", analysis.get("hypoxia_score")),
                     (
-                        "Cardiovascular score",
+                        "Heart-rate peak",
                         analysis.get("cardiovascular_score"),
                     ),
                     ("Data quality score", analysis.get("data_quality_score")),
-                    ("Anomaly detected", analysis.get("anomaly_detected")),
-                    ("Stress detected", analysis.get("stress_detected")),
-                    ("Hypoxia detected", analysis.get("hypoxia_detected")),
+                    ("Data quality warnings", format_list(quality_warnings)),
                     (
-                        "Arrhythmia detected",
-                        analysis.get("arrhythmia_detected"),
+                        "Session flagged",
+                        analysis_result.get(
+                            "session_flagged",
+                            analysis.get("anomaly_detected"),
+                        ),
+                    ),
+                    (
+                        "Elevated load flag",
+                        wellness_flags.get(
+                            "elevated_load",
+                            analysis.get("stress_detected"),
+                        ),
+                    ),
+                    (
+                        "Low oxygenation trend flag",
+                        wellness_flags.get(
+                            "oxygenation_drop",
+                            analysis.get("hypoxia_detected"),
+                        ),
+                    ),
+                    (
+                        "Sensor alignment warning",
+                        wellness_flags.get(
+                            "sensor_alignment_warning",
+                            False,
+                        ),
                     ),
                     ("Created at", analysis.get("created_at")),
                 ]
@@ -597,7 +689,7 @@ def build_pdf_report(
     else:
         story.append(
             Paragraph(
-                "No AI analysis result is available for this session yet.",
+                "No wellness analysis result is available for this session yet.",
                 styles["BodyText"],
             )
         )
@@ -605,9 +697,12 @@ def build_pdf_report(
     story.extend(
         [
             Spacer(1, 12),
-            Paragraph("Research Notice", styles["Heading2"]),
+            Paragraph("Wellness Notice", styles["Heading2"]),
             Paragraph(
-                "This report is research-only and is not a medical diagnosis.",
+                "This report provides wellness and educational insights only. "
+                "It is not intended to diagnose, treat, cure, or prevent disease. "
+                "It should be interpreted together with session context, sensor quality "
+                "and professional judgement where appropriate.",
                 styles["BodyText"],
             ),
         ]
@@ -660,6 +755,69 @@ def escape_text(value: Any) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
     )
+
+
+def phase_metric(phase: Any, *keys: str) -> Any:
+    """Return a readable value from nested PRE/DURING/POST payloads."""
+
+    if not isinstance(phase, dict):
+        return None
+
+    for key in keys:
+        value = nested_get(phase, key)
+
+        if value not in (None, ""):
+            return value
+
+    return None
+
+
+def nested_get(payload: dict[str, Any], key: str) -> Any:
+    """Find a key inside common telemetry/feature nesting patterns."""
+
+    if key in payload:
+        return payload[key]
+
+    for nested_key in (
+        "telemetry",
+        "features",
+        "summary",
+        "data",
+        "metrics",
+    ):
+        nested = payload.get(nested_key)
+
+        if isinstance(nested, dict) and key in nested:
+            return nested[key]
+
+    return None
+
+
+def format_list(values: Any) -> str:
+    """Format warnings and flags for compact PDF output."""
+
+    if not values:
+        return "-"
+
+    if isinstance(values, (list, tuple, set)):
+        return ", ".join(str(value) for value in values) or "-"
+
+    return str(values)
+
+
+def format_context(value: Any) -> str:
+    """Format optional check-in/check-out context for the PDF."""
+
+    if not isinstance(value, dict):
+        return "-"
+
+    pairs = [
+        f"{key.replace('_', ' ')}: {item}"
+        for key, item in value.items()
+        if item not in (None, "")
+    ]
+
+    return "; ".join(pairs) if pairs else "-"
 
 
 def safe_filename(value: str) -> str:

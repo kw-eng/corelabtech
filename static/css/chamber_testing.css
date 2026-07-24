@@ -218,14 +218,17 @@ HBOT CHAMBER TESTING
 }
 
 input,
-select{
+select,
+textarea{
     background:#07111f;
     border:1px solid #24445f;
     border-radius:6px;
     color:#dbeafe;
+    font:inherit;
     min-height:40px;
     outline:none;
     padding:10px 12px;
+    resize:vertical;
     width:100%;
 }
 
@@ -240,7 +243,8 @@ input[type="checkbox"]{
 }
 
 input:focus,
-select:focus{
+select:focus,
+textarea:focus{
     border-color:#00ffcc;
     box-shadow:0 0 0 3px #00ffcc22;
 }
@@ -318,7 +322,14 @@ button:hover{
 }
 
 .data-source-card h4{
-    margin-bottom:14px;
+    margin-bottom:6px;
+}
+
+.source-format-hint{
+    color:#94a3b8;
+    font-size:0.9rem;
+    line-height:1.35;
+    margin:0 0 12px;
 }
 
 .data-source-card button{

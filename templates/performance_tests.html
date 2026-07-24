@@ -73,21 +73,21 @@
             <div class="perf-simulation-card">
                 <span>AI</span>
                 <h3>AI Analysis</h3>
-                <p>Measures scoring, feature extraction, anomaly checks and response contract time.</p>
+                <p>Measures scoring, feature extraction, wellness flags and response contract time.</p>
                 <button onclick="runPerf('analysis')">Run AI Analysis Load Test</button>
             </div>
 
             <div class="perf-simulation-card">
                 <span>CSV</span>
                 <h3>CSV Upload</h3>
-                <p>Measures pulse oximeter CSV ingestion, SpO2 parsing and pipeline stability.</p>
+                <p>Measures SpO2/pulse timeline ingestion, CSV parsing and pipeline stability.</p>
                 <button onclick="runPerf('csv')">Run CSV Upload Load Test</button>
             </div>
 
             <div class="perf-simulation-card">
                 <span>FIT</span>
                 <h3>FIT Upload</h3>
-                <p>Measures wearable FIT ingestion, HR extraction, RR interval parsing and HRV readiness.</p>
+                <p>Measures HR/HRV timeline ingestion, FIT parsing, RR interval extraction and HRV readiness.</p>
                 <button onclick="runPerf('fit')">Run FIT Upload Load Test</button>
             </div>
         </div>
@@ -226,7 +226,7 @@
 
             <div class="perf-detail-card">
                 <h3>DuringMergeSimulation.scala</h3>
-                <p>Performance test for aligning wearable FIT and pulse oximeter CSV telemetry.</p>
+                <p>Performance test for aligning HR/HRV and SpO2/pulse timeline telemetry.</p>
                 <dl>
                     <dt>Endpoint</dt><dd><code>POST /api/during_merge</code></dd>
                     <dt>Gate</dt><dd>P95 below 1000 ms and failed requests below 10%</dd>
@@ -236,7 +236,7 @@
 
             <div class="perf-detail-card">
                 <h3>RunAnalysisSimulation.scala</h3>
-                <p>Benchmark for AI scoring, anomaly detection, features and timeline output.</p>
+                <p>Benchmark for AI scoring, wellness flags, features and timeline output.</p>
                 <dl>
                     <dt>Endpoint</dt><dd><code>POST /api/run_analysis</code></dd>
                     <dt>Gate</dt><dd>P95 below 1500 ms and success rate above 95%</dd>
@@ -246,7 +246,7 @@
 
             <div class="perf-detail-card">
                 <h3>UploadCsvSimulation.scala</h3>
-                <p>Upload and parser performance test for pulse oximeter CSV telemetry.</p>
+                <p>Upload and parser performance test for SpO2/pulse timeline telemetry.</p>
                 <dl>
                     <dt>Endpoint</dt><dd><code>POST /upload_csv</code></dd>
                     <dt>Gate</dt><dd>P95 below 2000 ms and controlled parser failures</dd>
@@ -256,7 +256,7 @@
 
             <div class="perf-detail-card">
                 <h3>UploadFitSimulation.scala</h3>
-                <p>Upload and parser performance test for wearable FIT telemetry.</p>
+                <p>Upload and parser performance test for HR/HRV timeline telemetry.</p>
                 <dl>
                     <dt>Endpoint</dt><dd><code>POST /upload_fit</code></dd>
                     <dt>Gate</dt><dd>P95 below 2500 ms and controlled parser failures</dd>
@@ -287,7 +287,7 @@
                 <tbody>
                     <tr><td>Sessions API</td><td>&lt; 300 ms preferred / &lt; 500 ms gate</td><td>PASS / FAIL</td><td>Dashboard and selector loading should stay fast.</td></tr>
                     <tr><td>Merge Engine</td><td>&lt; 1000 ms</td><td>PASS / FAIL</td><td>Telemetry alignment should not block workflow.</td></tr>
-                    <tr><td>AI Analysis</td><td>&lt; 1500 ms</td><td>PASS / FAIL</td><td>AI score and anomaly response should remain interactive.</td></tr>
+                    <tr><td>AI Analysis</td><td>&lt; 1500 ms</td><td>PASS / FAIL</td><td>AI score and wellness response should remain interactive.</td></tr>
                     <tr><td>CSV Upload</td><td>&lt; 2000 ms</td><td>PASS / FAIL</td><td>Telemetry ingestion should remain stable.</td></tr>
                     <tr><td>FIT Upload</td><td>&lt; 2500 ms</td><td>PASS / FAIL</td><td>Wearable telemetry ingestion should remain stable.</td></tr>
                 </tbody>

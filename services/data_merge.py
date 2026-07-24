@@ -183,14 +183,6 @@ def merge_session_data(
             rows=merged_rows,
         )
 
-        complete_merge_job(
-            cursor,
-            merge_id=merge_id,
-            merged_records=saved,
-        )
-
-        connection.commit()
-
         matched = sum(
             1
             for row in merged_rows
@@ -204,6 +196,21 @@ def merge_session_data(
             if merged_rows
             else 0.0
         )
+
+        complete_merge_job(
+            cursor,
+            merge_id=merge_id,
+            merged_records=saved,
+            notes=(
+                f"mode={mode}; "
+                f"fit_time_offset_hours={fit_time_offset_hours}; "
+                f"tolerance_ms={tolerance_ms}; "
+                f"matched_records={matched}; "
+                f"match_rate={match_rate}"
+            ),
+        )
+
+        connection.commit()
 
         return MergeResult(
             merge_id=merge_id,

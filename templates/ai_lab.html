@@ -4,26 +4,28 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/ai_lab.css') }}?v=ai-lab-polish-20260721"
+    href="{{ url_for('static', filename='css/ai_lab.css') }}?v=recovery-coach-20260724"
 >
 
 <div class="ai-lab-page">
 
     <section class="ai-lab-hero">
         <div>
-            <h1>AI Lab</h1>
+            <span class="ai-lab-eyebrow">CoreLabTech Wellness Insights</span>
+            <h1>Session Physiology Review</h1>
             <p>
-                Analyze completed HBOT sessions and review synchronized physiology signals.
+                Review completed wellness sessions, synchronized physiology signals,
+                data quality and client-ready session interpretation.
             </p>
         </div>
 
         <div class="ai-lab-actions">
             <button onclick="runSelectedAnalysis()" class="action-btn">
-                Run Selected
+                Analyze Selected
             </button>
 
             <button onclick="runLatestSession()" class="action-btn">
-                Run Latest
+                Analyze Latest
             </button>
 
             <button onclick="loadSessions()" class="action-btn secondary">
@@ -33,7 +35,7 @@
     </section>
 
     <section class="ai-live-card">
-        <span>Realtime AI Score</span>
+        <span>Latest wellness snapshot</span>
         <div id="telemetryBox">
             Waiting for latest completed session...
         </div>
@@ -67,7 +69,7 @@
 
     <section class="ai-lab-section">
         <div class="section-heading">
-            <h3>AI Visualization</h3>
+            <h3>Session Insight Report</h3>
         </div>
 
         <div id="chartsContainer"></div>
@@ -75,7 +77,7 @@
 
     <section class="ai-lab-section compact-result">
         <div class="section-heading">
-            <h3>AI Result</h3>
+            <h3>Report Summary</h3>
         </div>
 
         <div id="ai-result">
@@ -88,6 +90,6 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/ai_lab.js') }}?v=ai-lab-polish-20260721"></script>
+<script src="{{ url_for('static', filename='js/ai_lab.js') }}?v=recovery-coach-20260724"></script>
 
 {% endblock %}

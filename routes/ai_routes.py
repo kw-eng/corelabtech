@@ -241,50 +241,61 @@ def ai_latest():
     con = db()
     c = con.cursor()
 
-    c.execute("""
-        SELECT
-            spo2,
-            pulse,
-            hrv,
-            pressure_ata
-        FROM tests
-        ORDER BY timestamp DESC
-        LIMIT 20
-    """)
+    try:
+        c.execute("""
+            SELECT
+                ai_result_id,
+                session_id,
+                overall_score,
+                data_quality_score,
+                anomaly_detected,
+                summary,
+                recommendations,
+                features_json,
+                result_json,
+                created_at
+            FROM ai_results
+            WHERE session_id NOT LIKE 'PIPELINE_VALIDATION_%'
+            ORDER BY created_at DESC, ai_result_id DESC
+            LIMIT 1
+        """)
 
-    rows = c.fetchall()
+        row = c.fetchone()
 
-    con.close()
+        if not row:
+            return jsonify({
+                "error": "No AI result"
+            }), 404
 
-    if not rows:
+        features = row[7] or {}
+        result = row[8] or {}
 
         return jsonify({
-            "error": "No data"
-        }), 404
+            "status": "ok",
+            "ai_result_id": row[0],
+            "session_id": row[1],
+            "score": row[2],
+            "overall_score": row[2],
+            "data_quality_score": row[3],
+            "anomaly": bool(row[4]),
+            "anomaly_detected": bool(row[4]),
+            "summary": row[5],
+            "recommendations": row[6],
+            "features": features,
+            "result": result,
+            "product_mode": result.get("product_mode"),
+            "wellness_status": result.get("wellness_status"),
+            "session_flagged": result.get("session_flagged"),
+            "elevated_load": result.get("elevated_load"),
+            "oxygenation_drop": result.get("oxygenation_drop"),
+            "sensor_alignment_warning": result.get("sensor_alignment_warning"),
+            "quality_warnings": result.get("quality_warnings", []),
+            "created_at": row[9].isoformat() if row[9] else None,
+        })
 
-    spo2 = [r[0] for r in rows if r[0] is not None]
-    hrv = [r[2] for r in rows if r[2] is not None]
-
-    score = 50
-
-    if spo2 and min(spo2) > 94:
-        score += 20
-
-    if hrv and (sum(hrv) / len(hrv)) > 50:
-        score += 20
-
-    anomaly = False
-
-    if spo2 and min(spo2) < 90:
-        anomaly = True
-
-    return jsonify({
-
-        "score": score,
-        "anomaly": anomaly,
-        "summary": "Latest session analysis"
-
-    })
+    finally:
+        c.close()
+        con.close()
 
 
 # =====================================================

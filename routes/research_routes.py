@@ -12,6 +12,7 @@ from pathlib import Path
 
 from psycopg2 import IntegrityError
 from flask import (
+    abort,
     Blueprint,
     jsonify,
     render_template,
@@ -37,6 +38,9 @@ from repositories.data_repository import (
 from repositories.merge_repository import (
     get_latest_completed_merge_job,
     load_merged_measurements,
+)
+from repositories.wellness_repository import (
+    get_wellness_summary,
 )
 
 from security.csrf import csrf
@@ -282,6 +286,7 @@ def subjects():
                 is_active,
                 created_at
             FROM users
+            WHERE is_active = TRUE
             ORDER BY id DESC
         """)
 
@@ -1266,9 +1271,11 @@ def user_trends(user_id: str):
                 anomaly_detected,
                 summary,
                 features_json,
+                result_json,
                 created_at
             FROM ai_results
             WHERE user_id = %s
+              AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
             ORDER BY created_at ASC, ai_result_id ASC
             """,
             (subject_id,),
@@ -1284,6 +1291,8 @@ def user_trends(user_id: str):
 
         for row in analysis_rows:
             features = row[5] or {}
+            result_json = row[6] or {}
+            wellness_flags = result_json.get("wellness_flags") or {}
 
             score = row[1]
             avg_hrv = pick_feature(
@@ -1311,13 +1320,29 @@ def user_trends(user_id: str):
                 "overall_score": score,
                 "data_quality_score": row[2],
                 "anomaly_detected": bool(row[3]),
+                "session_flagged": bool(
+                    result_json.get(
+                        "session_flagged",
+                        row[3],
+                    )
+                ),
+                "wellness_status": result_json.get("wellness_status"),
+                "elevated_load": bool(
+                    wellness_flags.get("elevated_load", False)
+                ),
+                "oxygenation_drop": bool(
+                    wellness_flags.get("oxygenation_drop", False)
+                ),
+                "sensor_alignment_warning": bool(
+                    wellness_flags.get("sensor_alignment_warning", False)
+                ),
                 "summary": row[4],
                 "avg_spo2": avg_spo2,
                 "avg_pulse": avg_pulse,
                 "avg_hrv": avg_hrv,
                 "created_at": (
-                    row[6].isoformat()
-                    if row[6]
+                    row[7].isoformat()
+                    if row[7]
                     else None
                 ),
             })
@@ -1348,9 +1373,60 @@ def user_trends(user_id: str):
                 for row in analyses
                 if row["anomaly_detected"]
             ),
+            "flagged_session_count": sum(
+                1
+                for row in analyses
+                if row["session_flagged"]
+            ),
             "trend_direction": calculate_trend_direction(scores),
             "analyses": analyses,
             "timeline": analyses,
+        })
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route(
+    "/api/wellness/summary/<user_id>",
+)
+@login_required
+@limiter.limit(PERF_LIMIT)
+def wellness_summary(user_id: str):
+    """Return mobile-friendly wellness status, baseline and recent sessions."""
+
+    subject_id = clean_value(user_id)
+
+    if not subject_id:
+        return error_response(
+            "missing user_id",
+            400,
+        )
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        if (
+            current_user.role not in ("admin", "researcher")
+            and subject_id != get_current_user_id()
+        ):
+            return error_response(
+                "forbidden",
+                403,
+            )
+
+        return jsonify({
+            "status": "ok",
+            **get_wellness_summary(
+                cursor,
+                user_id=subject_id,
+            ),
         })
 
     except Exception as exc:
@@ -1714,6 +1790,9 @@ def admin_toggle_account_active():
 @role_required("admin")
 def debug_db():
     """Return lightweight row counts for admin database diagnostics."""
+
+    if os.getenv("DISABLE_DEBUG_ROUTES", "true").lower() == "true":
+        abort(404)
 
     connection = db()
     cursor = connection.cursor()
