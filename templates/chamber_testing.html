@@ -117,6 +117,80 @@
                     </label>
                 </div>
 
+                <div class="subsection-divider"></div>
+
+                <div class="chamber-section-header">
+                    <div>
+                        <h3>Session Check-in</h3>
+                        <p>Optional context helps the coach interpret today's response.</p>
+                    </div>
+                </div>
+
+                <div class="chamber-form-grid">
+                    <label>
+                        <span>Sleep hours</span>
+                        <input id="pre_sleep_hours" type="number" step="0.5" min="0" max="14" placeholder="e.g. 7.5">
+                    </label>
+
+                    <label>
+                        <span>Sleep quality</span>
+                        <select id="pre_sleep_quality">
+                            <option value="">Select</option>
+                            <option value="poor">Poor</option>
+                            <option value="fair">Fair</option>
+                            <option value="good">Good</option>
+                            <option value="excellent">Excellent</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Stress today</span>
+                        <select id="pre_stress_level">
+                            <option value="">Select</option>
+                            <option value="low">Low</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="high">High</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Training last 24h</span>
+                        <select id="pre_training_load">
+                            <option value="">Select</option>
+                            <option value="none">None</option>
+                            <option value="light">Light</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Fatigue</span>
+                        <select id="pre_fatigue_level">
+                            <option value="">Select</option>
+                            <option value="low">Low</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="high">High</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Session goal</span>
+                        <select id="pre_session_goal">
+                            <option value="">Select</option>
+                            <option value="recovery">Recovery</option>
+                            <option value="wellness">Wellness</option>
+                            <option value="sport">Sport support</option>
+                            <option value="fatigue">Fatigue management</option>
+                        </select>
+                    </label>
+
+                    <label class="wide">
+                        <span>Pre-session notes</span>
+                        <textarea id="pre_context_notes" rows="2" placeholder="Optional notes"></textarea>
+                    </label>
+                </div>
+
                 <div class="chamber-actions">
                     <button type="button" onclick="savePRE()">Save PRE</button>
                 </div>
@@ -189,17 +263,18 @@
                 <div class="chamber-section-header">
                     <div>
                         <h3>Data Sources</h3>
-                        <p>Upload FIT and CSV files into the same session before merging.</p>
+                        <p>Upload HR/HRV and SpO2/pulse timelines into the same session before synchronization.</p>
                     </div>
                 </div>
 
                 <div class="data-source-grid">
                     <article class="data-source-card">
-                        <h4>FIT / Wearable HR Stream</h4>
-                        <input type="file" id="fitFile">
+                        <h4>HR & HRV Timeline</h4>
+                        <p class="source-format-hint">Supported format: FIT from a compatible wearable or HR strap.</p>
+                        <input type="file" id="fitFile" accept=".fit">
 
                         <button id="uploadFitButton" type="button" onclick="uploadFIT()">
-                            Upload FIT
+                            Upload HR & HRV
                         </button>
 
                         <div id="fitStatus"></div>
@@ -209,9 +284,9 @@
                             <table id="fitDataTable">
                                 <thead>
                                     <tr>
-                                        <th title="Timestamp from FIT file">Time</th>
-                                        <th title="Heart rate from FIT-compatible wearable data">HR</th>
-                                        <th title="RR interval from FIT">RR</th>
+                                        <th title="Timestamp from HR/HRV timeline file">Time</th>
+                                        <th title="Heart rate from compatible wearable data">HR</th>
+                                        <th title="RR interval from HR/HRV source">RR</th>
                                         <th title="HRV calculated from RR interval">HRV</th>
                                     </tr>
                                 </thead>
@@ -221,10 +296,11 @@
                     </article>
 
                     <article class="data-source-card">
-                        <h4>CSV / SpO2 External Sensor</h4>
-                        <input type="file" id="csvFile">
+                        <h4>SpO2 & Pulse Timeline</h4>
+                        <p class="source-format-hint">Supported format: CSV from a pulse oximeter.</p>
+                        <input type="file" id="csvFile" accept=".csv">
 
-                        <button type="button" onclick="uploadCSV()">Upload CSV</button>
+                        <button type="button" onclick="uploadCSV()">Upload SpO2 & Pulse</button>
 
                         <div id="csvStatus"></div>
                         <div id="csvTableStatus" class="table-status"></div>
@@ -233,8 +309,8 @@
                             <table id="csvDataTable">
                                 <thead>
                                     <tr>
-                                        <th title="Timestamp from CSV">Time</th>
-                                        <th title="Pulse from pulseox / external sensor">Pulse</th>
+                                        <th title="Timestamp from SpO2/pulse timeline file">Time</th>
+                                        <th title="Pulse from pulse oximeter or external sensor">Pulse</th>
                                         <th title="Blood oxygen saturation">SpO2</th>
                                     </tr>
                                 </thead>
@@ -247,7 +323,7 @@
                 <div class="subsection-divider"></div>
 
                 <div class="chamber-actions">
-                    <button type="button" onclick="mergeDuring()">Merge FIT + CSV</button>
+                    <button type="button" onclick="mergeDuring()">Synchronize Timelines</button>
                 </div>
 
                 <div id="mergeStatus"></div>
@@ -258,12 +334,12 @@
                     <table id="mergedDataTable">
                         <thead>
                             <tr>
-                                <th title="Timestamp used to align FIT and CSV rows">Time</th>
-                                <th title="Heart rate from FIT-compatible wearable data">HR</th>
-                                <th title="Pulse from CSV / pulseox / external sensor">Pulse</th>
-                                <th title="RR interval from FIT, beat-to-beat interval">RR</th>
+                                <th title="Timestamp used to align HR/HRV and SpO2/pulse rows">Time</th>
+                                <th title="Heart rate from compatible wearable data">HR</th>
+                                <th title="Pulse from SpO2/pulse timeline">Pulse</th>
+                                <th title="RR interval from HR/HRV source, beat-to-beat interval">RR</th>
                                 <th title="HRV calculated from RR intervals, usually RMSSD">HRV</th>
-                                <th title="Blood oxygen saturation from CSV / pulseox">SpO2</th>
+                                <th title="Blood oxygen saturation from SpO2/pulse timeline">SpO2</th>
                                 <th title="Data source after merge">Source</th>
                             </tr>
                         </thead>
@@ -299,6 +375,62 @@
                     <label>
                         <span>Pulse</span>
                         <input id="post_pulse" type="number" placeholder="Pulse">
+                    </label>
+                </div>
+
+                <div class="subsection-divider"></div>
+
+                <div class="chamber-section-header">
+                    <div>
+                        <h3>Recovery Check-out</h3>
+                        <p>Optional feedback helps connect physiology with perceived recovery.</p>
+                    </div>
+                </div>
+
+                <div class="chamber-form-grid">
+                    <label>
+                        <span>Energy after</span>
+                        <select id="post_energy_level">
+                            <option value="">Select</option>
+                            <option value="lower">Lower</option>
+                            <option value="same">Same</option>
+                            <option value="higher">Higher</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Relaxation</span>
+                        <select id="post_relaxation_level">
+                            <option value="">Select</option>
+                            <option value="low">Low</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="high">High</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Fatigue after</span>
+                        <select id="post_fatigue_level">
+                            <option value="">Select</option>
+                            <option value="lower">Lower</option>
+                            <option value="same">Same</option>
+                            <option value="higher">Higher</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Discomfort</span>
+                        <select id="post_discomfort">
+                            <option value="">Select</option>
+                            <option value="none">None</option>
+                            <option value="mild">Mild</option>
+                            <option value="moderate">Moderate</option>
+                        </select>
+                    </label>
+
+                    <label class="wide">
+                        <span>Post-session notes</span>
+                        <textarea id="post_context_notes" rows="2" placeholder="Optional notes"></textarea>
                     </label>
                 </div>
 
@@ -391,7 +523,7 @@
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/fit_chart.js') }}?v=chamber-polish-20260721"></script>
-<script src="{{ url_for('static', filename='js/chamber_form.js') }}?v=chamber-polish-20260721"></script>
+<script src="{{ url_for('static', filename='js/chamber_form.js') }}?v=session-checkin-20260724"></script>
 <script src="{{ url_for('static', filename='js/realtime_monitor.js') }}"></script>
 
 {% endblock %}

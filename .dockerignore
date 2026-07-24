@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.log
+*.db
 
 venv/
 .venv/
@@ -14,7 +16,26 @@ test-results/
 
 tests/performance/gatling/target/
 
+data/
+files/
+backups/
+backup_before_postgres/
+reports/
+QA/
+
+*.docx
+*.xlsx
+*.pptx
+*.pdf
+WIEDZA_PROJEKT_QA.txt
+build_wiedza_docx.py
+
+.agents/
+.codex/
+.github/
+
 .git
 .gitignore
 
 .env
+.env.*

@@ -26,7 +26,7 @@
             </div>
             <div>
                 <span>Primary checks</span>
-                <strong>Score, anomaly, features, timeline</strong>
+                <strong>Score, session flag, features, timeline</strong>
             </div>
             <div>
                 <span>Execution mode</span>
@@ -103,7 +103,7 @@
                 </div>
                 <div>
                     <strong>AI Contract Test</strong>
-                    <span>Validates score, anomaly, features and timeline structure.</span>
+                    <span>Validates score, session flag, features and timeline structure.</span>
                 </div>
                 <div>
                     <strong>Run Playwright QA</strong>
@@ -167,7 +167,7 @@
         <div class="ai-qa-generator">
             <textarea
                 id="aiPrompt"
-                placeholder="Example: Validate AI score, risk_level, anomaly, features and timeline"
+                placeholder="Example: Validate AI score, wellness_status, session flag, features and timeline"
             ></textarea>
 
             <button class="action-btn" onclick="generateTests()">

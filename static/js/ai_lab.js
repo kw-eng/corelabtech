@@ -1,6 +1,7 @@
 // static/js/ai_lab.js
 
 let aiTimelineChart = null
+let aiLabSessionIndex = new Map()
 const AI_LAB_COLORS = {
     heartRate: "#2F9EED",
     pulse: "#F05A7E",
@@ -99,6 +100,375 @@ function riskClass(label){
     return "status-low"
 }
 
+function wellnessStatus(data){
+    const features = data.features || {}
+    const warnings = qualityWarnings(data, features)
+    const quality = Number(data.data_quality_score ?? features.data_quality_score)
+
+    if(warnings.length || (Number.isFinite(quality) && quality < 75)){
+        return "data_quality_warning"
+    }
+
+    return (
+        data.wellness_status ??
+        data.result?.wellness_status ??
+        (
+            data.elevated_load
+                ? "elevated_load"
+                : data.data_quality_score < 60
+                    ? "data_quality_warning"
+                    : "baseline"
+        )
+    )
+}
+
+function wellnessLabel(status){
+    const labels = {
+        baseline: "Baseline",
+        elevated_load: "Elevated load",
+        recovery_trend: "Recovery trend",
+        data_quality_warning: "Baseline, review data quality"
+    }
+
+    return labels[status] || status || "Not available"
+}
+
+function wellnessClass(status){
+    if(status === "elevated_load") return "status-high"
+    if(status === "data_quality_warning") return "status-moderate"
+    return "status-low"
+}
+
+function confidenceLevel(data, features = {}){
+    const warnings = qualityWarnings(data, features)
+    const quality = Number(data.data_quality_score ?? features.data_quality_score)
+
+    if(warnings.includes("missing_hrv_or_rr") || (Number.isFinite(quality) && quality < 70)){
+        return {
+            label: "Low confidence",
+            className: "status-moderate",
+            reason: "HRV/RR signal is incomplete or data quality requires review."
+        }
+    }
+
+    if(warnings.length || (Number.isFinite(quality) && quality < 85)){
+        return {
+            label: "Medium confidence",
+            className: "status-moderate",
+            reason: "The session is usable, but signal quality should be reviewed."
+        }
+    }
+
+    return {
+        label: "High confidence",
+        className: "status-low",
+        reason: "Signals are complete enough for a stronger session interpretation."
+    }
+}
+
+function qualityWarnings(data, features = {}){
+    const result = data.result || {}
+    const warnings =
+        data.quality_warnings ??
+        result.quality_warnings ??
+        features.quality_warnings ??
+        []
+
+    return Array.isArray(warnings)
+        ? warnings
+        : []
+}
+
+function readableWarning(value){
+    const labels = {
+        sensor_alignment_warning: "Heart-rate sensors were not fully aligned",
+        missing_hrv_or_rr: "HRV signal was not available for this session",
+        missing_spo2: "SpO2 signal was not available for this session",
+        low_match_rate: "Timeline synchronization quality was lower than expected",
+        too_few_total_samples: "Not enough samples for a strong interpretation",
+        too_few_synchronized_samples: "Too few synchronized samples for a strong interpretation"
+    }
+
+    return labels[value] || value
+}
+
+function clientInterpretation(data, features = {}){
+    const warnings = qualityWarnings(data, features)
+    const status = wellnessStatus(data)
+
+    if(status === "data_quality_warning"){
+        if(warnings.includes("missing_hrv_or_rr")){
+            return "SpO2 and pulse can be reviewed, but HRV-based interpretation has low confidence because HRV/RR data is incomplete."
+        }
+
+        return "The session can be reviewed, but the interpretation should be treated as provisional because signal quality requires attention."
+    }
+
+    if(status === "elevated_load"){
+        return "The session shows signs of elevated physiological load and should be reviewed in context."
+    }
+
+    if(status === "recovery_trend"){
+        return "The session shows a positive recovery-oriented pattern compared with available signals."
+    }
+
+    return "The session appears stable within the available wellness signals."
+}
+
+function priorityAction(data, features = {}){
+    const warnings = qualityWarnings(data, features)
+    const status = wellnessStatus(data)
+
+    if(warnings.includes("missing_hrv_or_rr")){
+        return "Use this report for SpO2/pulse review and repeat the next session with HRV/RR capture enabled."
+    }
+
+    if(warnings.includes("sensor_alignment_warning")){
+        return "Check sensor placement and timeline alignment before interpreting heart-rate differences."
+    }
+
+    if(status === "elevated_load"){
+        return "Review session load, recovery response and recent baseline before the next protocol decision."
+    }
+
+    return "Continue collecting repeat sessions to strengthen the personal baseline."
+}
+
+function conciseSummary(text){
+    const clean = String(text || "").trim()
+
+    if(!clean){
+        return "No session summary available yet."
+    }
+
+    const firstSentence = clean.match(/^.*?[.!?](\s|$)/)
+
+    return firstSentence
+        ? firstSentence[0].trim()
+        : clean
+}
+
+function getSubjectId(data){
+    const sessionId = data.session_id
+
+    if(sessionId && aiLabSessionIndex.has(sessionId)){
+        return aiLabSessionIndex.get(sessionId).user_id
+    }
+
+    return data.user_id || data.result?.user_id || null
+}
+
+function baselineReadiness(records){
+    const count = Number(records || 0)
+
+    if(count >= 14){
+        return {
+            label: "Trend baseline ready",
+            className: "status-low",
+            text: "There is enough history for a useful rolling wellness trend."
+        }
+    }
+
+    if(count >= 5){
+        return {
+            label: "Early trend forming",
+            className: "status-moderate",
+            text: "The system can start comparing sessions, but confidence will improve with more data."
+        }
+    }
+
+    return {
+        label: "Collect more sessions",
+        className: "status-moderate",
+        text: "Use this as a single-session review. At least 5 consistent sessions are recommended for trend coaching."
+    }
+}
+
+function coachTrendLabel(trend){
+    const direction = String(trend?.trend_direction || "").toLowerCase()
+    const records = Number(trend?.records || 0)
+
+    if(records < 5){
+        return "Insufficient history"
+    }
+
+    if(direction.includes("up") || direction.includes("improv")){
+        return "Recovery markers improving"
+    }
+
+    if(direction.includes("down") || direction.includes("declin")){
+        return "Recovery markers need review"
+    }
+
+    return "Stable trend"
+}
+
+function coachRecommendation(data, features = {}, trend = null){
+    const warnings = qualityWarnings(data, features)
+    const status = wellnessStatus(data)
+    const records = Number(trend?.records || 0)
+    const context = contextFeatures(data)
+
+    if(records < 5){
+        return "Continue collecting sessions before making strong protocol decisions. Keep measurement timing and sensor setup consistent."
+    }
+
+    if(warnings.includes("missing_hrv_or_rr")){
+        return "Repeat the next session with HRV/RR capture enabled before using HRV-based recovery coaching."
+    }
+
+    if(context.poor_sleep){
+        return "Sleep was limited or low quality. Treat today's session as recovery support and avoid over-interpreting HRV changes."
+    }
+
+    if(context.high_training_load){
+        return "Recent hard training can elevate load markers. Compare the next session after a lighter day."
+    }
+
+    if(context.high_stress_or_fatigue){
+        return "Reported stress or fatigue is high. Prioritize recovery and repeat baseline measurement tomorrow."
+    }
+
+    if(context.positive_subjective_response && status === "baseline"){
+        return "Subjective recovery feedback is positive and physiology is stable. Continue the current protocol and monitor trend consistency."
+    }
+
+    if(status === "elevated_load"){
+        return "Consider a lighter recovery day and compare the next session against baseline before increasing session frequency."
+    }
+
+    if(status === "data_quality_warning"){
+        return "Review sensor quality first. If the next session is clean and markers stay stable, continue the current protocol."
+    }
+
+    return "Continue the current wellness protocol and watch whether HR, HRV and SpO2 remain stable across the next sessions."
+}
+
+function dailyContextMessage(){
+    return "Sleep, training load, stress and rest-day context are not connected yet. Add a short daily check-in to unlock stronger coaching."
+}
+
+function sessionContext(data){
+    return (
+        data.session_context ||
+        data.result?.session_context ||
+        data.features?.session_context ||
+        {}
+    )
+}
+
+function contextFeatures(data){
+    return (
+        data.context_features ||
+        data.result?.context_features ||
+        data.features?.context_features ||
+        {}
+    )
+}
+
+function formatContextSummary(data){
+    const context = sessionContext(data)
+    const pre = context.pre_check_in || {}
+    const post = context.post_check_out || {}
+
+    if(!contextFeatures(data).has_daily_context){
+        return dailyContextMessage()
+    }
+
+    const parts = []
+
+    if(pre.sleep_hours || pre.sleep_quality){
+        parts.push(`Sleep: ${pre.sleep_hours || "-"}h, ${pre.sleep_quality || "quality not set"}`)
+    }
+
+    if(pre.training_load_24h){
+        parts.push(`Training: ${pre.training_load_24h}`)
+    }
+
+    if(pre.stress_level || pre.fatigue_level){
+        parts.push(`Stress/fatigue: ${pre.stress_level || "-"} / ${pre.fatigue_level || "-"}`)
+    }
+
+    if(pre.session_goal){
+        parts.push(`Goal: ${pre.session_goal}`)
+    }
+
+    if(post.energy_level || post.relaxation_level || post.discomfort){
+        parts.push(`After: energy ${post.energy_level || "-"}, relaxation ${post.relaxation_level || "-"}, discomfort ${post.discomfort || "-"}`)
+    }
+
+    return parts.join(". ") || "Daily context recorded."
+}
+
+function renderCoachPanel(data, trend = null){
+    const features = data.features || {}
+    const readiness = baselineReadiness(trend?.records)
+    const confidence = confidenceLevel(data, features)
+
+    return `
+        <div class="coach-card" id="coachPanel">
+            <div class="coach-header">
+                <div>
+                    <span>Recovery Coach Insight</span>
+                    <h3>${escapeHtml(coachTrendLabel(trend))}</h3>
+                    <p>${escapeHtml(readiness.text)}</p>
+                </div>
+                <span class="status-badge ${readiness.className}">
+                    ${escapeHtml(readiness.label)}
+                </span>
+            </div>
+
+            <div class="coach-grid">
+                <div>
+                    <span>Trend history</span>
+                    <strong>${escapeHtml(trend?.records ?? 0)} sessions</strong>
+                    <p>${escapeHtml(trend?.trend_direction || "More sessions needed for direction.")}</p>
+                </div>
+                <div>
+                    <span>Interpretation confidence</span>
+                    <strong>${escapeHtml(confidence.label)}</strong>
+                    <p>${escapeHtml(confidence.reason)}</p>
+                </div>
+                <div>
+                    <span>Daily context</span>
+                    <strong>${contextFeatures(data).has_daily_context ? "Check-in recorded" : "Not connected yet"}</strong>
+                    <p>${escapeHtml(formatContextSummary(data))}</p>
+                </div>
+                <div>
+                    <span>Coach recommendation</span>
+                    <strong>Next step</strong>
+                    <p>${escapeHtml(coachRecommendation(data, features, trend))}</p>
+                </div>
+            </div>
+        </div>
+    `
+}
+
+async function hydrateCoachPanel(data){
+    const subjectId = getSubjectId(data)
+    const panel = document.getElementById("coachPanel")
+
+    if(!panel || !subjectId){
+        return
+    }
+
+    try{
+        const res = await fetch(`/api/user_trends/${encodeURIComponent(subjectId)}`, {
+            credentials: "same-origin"
+        })
+
+        if(!res.ok){
+            return
+        }
+
+        const trend = await parseJsonResponse(res, "AI LAB USER TREND")
+
+        panel.outerHTML = renderCoachPanel(data, trend)
+    }catch(err){
+        console.error("hydrateCoachPanel error:", err)
+    }
+}
+
 function renderFindingList(items, fallback, className = ""){
     const cleanItems =
         Array.isArray(items)
@@ -179,7 +549,11 @@ async function loadSessions(){
             return
         }
 
+        aiLabSessionIndex = new Map()
+
         sessions.forEach(s => {
+            aiLabSessionIndex.set(s.session_id, s)
+
             const completedLabel =
                 s.completed
                     ? `<span class="status-pill status-low">Completed</span>`
@@ -202,7 +576,7 @@ async function loadSessions(){
 
                     <td>
                         <button class="tiny-action" onclick="runAnalysis('${escapeHtml(s.session_id)}')">
-                            AI
+                            Review
                         </button>
                     </td>
                 </tr>
@@ -232,10 +606,9 @@ async function loadLatestAI(){
             return
         }
 
-        const anomalyText =
-            data.anomaly
-                ? "YES - abnormal response detected"
-                : "NO critical anomaly detected"
+        const status = wellnessStatus(data)
+        const features = data.features || {}
+        const confidence = confidenceLevel(data, features)
 
         const box = document.getElementById("telemetryBox")
 
@@ -243,13 +616,18 @@ async function loadLatestAI(){
             box.innerHTML = `
                 <div class="live-score">
                     <strong>${formatScore(data)}</strong>
-                    <span class="status-badge ${riskClass(riskLabel(data))}">
-                        ${escapeHtml(riskLabel(data))} risk
+                    <span class="status-badge ${wellnessClass(status)}">
+                        ${escapeHtml(wellnessLabel(status))}
+                    </span>
+                    <span class="status-badge ${confidence.className}">
+                        ${escapeHtml(confidence.label)}
                     </span>
                 </div>
-                <p>${escapeHtml(data.summary || anomalyText)}</p>
+                <p>${escapeHtml(conciseSummary(data.summary || "Latest wellness analysis"))}</p>
             `
         }
+
+        hydrateCoachPanel(data)
 
     }catch(err){
         console.error("loadLatestAI error:", err)
@@ -328,19 +706,16 @@ async function runAnalysis(sessionId){
             return
         }
 
-        const anomalyText =
-            data.anomaly
-                ? "YES - abnormal response detected"
-                : "NO critical anomaly detected"
+        const status = wellnessStatus(data)
 
         document.getElementById("ai-summary").innerHTML =
-            `<b>Summary:</b> ${data.summary || "-"}`
+            `<b>Summary:</b> ${escapeHtml(conciseSummary(data.summary))}`
 
         document.getElementById("ai-score").innerHTML =
             `<b>Score:</b> ${data.score ?? "-"} / 100`
 
         document.getElementById("ai-anomaly").innerHTML =
-            `<b>Anomaly:</b> ${anomalyText}`
+            `<b>Wellness status:</b> ${wellnessLabel(status)}`
 
         renderAIVisualization(data)
 
@@ -402,55 +777,65 @@ function renderAIVisualization(data){
             ? data.timeline
             : []
 
-    const anomalyDetected =
-        data.anomaly ??
-        data.anomaly_detected
-
-    const anomalyText =
-        anomalyDetected
-            ? "YES - abnormal response detected"
-            : "NO critical anomaly detected"
-
     const warnings =
         Array.isArray(data.reasons)
             ? data.reasons
             : []
+    const signalWarnings = qualityWarnings(data, features)
+        .map(readableWarning)
 
     const positives =
         Array.isArray(data.positive_findings)
             ? data.positive_findings
             : []
 
-    const label = riskLabel(data)
+    const status = wellnessStatus(data)
+    const confidence = confidenceLevel(data, features)
     const keyFinding =
-        data.summary ||
+        conciseSummary(data.summary) ||
         warnings[0] ||
         positives[0] ||
-        "No critical rule-based finding was detected."
+        "No elevated load was detected."
     const dataQuality =
         data.data_quality_score ??
         features.data_quality_score
 
     container.innerHTML = `
         <section class="ai-report">
+            ${renderCoachPanel(data)}
+
+            <div class="client-verdict-card">
+                <div>
+                    <span>Client-ready status</span>
+                    <h3>${escapeHtml(wellnessLabel(status))}</h3>
+                    <p>${escapeHtml(clientInterpretation(data, features))}</p>
+                </div>
+                <div class="client-verdict-side">
+                    <span class="status-badge ${confidence.className}">
+                        ${escapeHtml(confidence.label)}
+                    </span>
+                    <p>${escapeHtml(confidence.reason)}</p>
+                </div>
+            </div>
+
             <div class="ai-report-header">
                 <div>
-                    <h3>AI Session Summary</h3>
-                    <p>${escapeHtml(data.score_type || "Research risk score")}</p>
+                    <h3>Session Wellness Summary</h3>
+                    <p>${escapeHtml(data.score_type || "Wellness session score")}</p>
                 </div>
-                <span class="status-badge ${riskClass(label)}">
-                    ${escapeHtml(label)} risk
+                <span class="status-badge ${wellnessClass(status)}">
+                    ${escapeHtml(wellnessLabel(status))}
                 </span>
             </div>
 
             <div class="ai-kpi-grid">
                 <div class="ai-kpi-card">
-                    <span>Risk score</span>
+                    <span>Wellness score</span>
                     <strong>${formatScore(data)}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Anomaly status</span>
-                    <strong>${escapeHtml(anomalyText)}</strong>
+                    <span>Wellness status</span>
+                    <strong>${escapeHtml(wellnessLabel(status))}</strong>
                 </div>
                 <div class="ai-kpi-card">
                     <span>Data quality</span>
@@ -464,29 +849,34 @@ function renderAIVisualization(data){
 
             <div class="ai-summary-grid">
                 <div class="ai-summary-card ai-summary-card-wide">
-                    <h4>Key Finding</h4>
+                    <h4>Plain-language interpretation</h4>
                     <p>${escapeHtml(keyFinding)}</p>
                 </div>
 
+                <div class="ai-summary-card ai-summary-card-wide action-card">
+                    <h4>Recommended next step</h4>
+                    <p>${escapeHtml(priorityAction(data, features))}</p>
+                </div>
+
                 <div class="ai-summary-card">
-                    <h4>Warnings</h4>
+                    <h4>Data quality notes</h4>
                     ${renderFindingList(
-                        warnings,
-                        "No rule-based warning detected.",
-                        warnings.length ? "warning-list" : ""
+                        signalWarnings,
+                        "No data quality issue detected.",
+                        signalWarnings.length ? "warning-list" : ""
                     )}
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Positive Findings</h4>
+                    <h4>Session findings</h4>
                     ${renderFindingList(
-                        positives,
-                        "No additional positive findings."
+                        [...positives, ...warnings],
+                        "No elevated load finding detected."
                     )}
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Signal Quality</h4>
+                    <h4>Signal quality</h4>
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
@@ -511,7 +901,7 @@ function renderAIVisualization(data){
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Physiology Metrics</h4>
+                    <h4>Physiology metrics</h4>
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
@@ -559,32 +949,32 @@ function renderAIVisualization(data){
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Rule Reference</h4>
+                    <h4>Status reference</h4>
                     <div class="metric-list">
                         ${renderMetricRows([
-                            { label: "Low risk", value: "90-100" },
-                            { label: "Moderate risk", value: "70-89" },
-                            { label: "High risk", value: "below 70" },
-                            { label: "SpO2 warning", value: "below 94%" },
-                            { label: "HRV warning", value: "below 30 ms" }
+                            { label: "Baseline", value: "stable session response" },
+                            { label: "Elevated load", value: "SpO2 drop, high HR or low HRV" },
+                            { label: "Recovery trend", value: "positive post-session response" },
+                            { label: "Data quality warning", value: "missing signal or sensor mismatch" }
                         ])}
                     </div>
                 </div>
             </div>
 
             <p class="ai-disclaimer">
-                ${escapeHtml(data.medical_disclaimer || "Research-only score. Not a medical diagnosis.")}
+                ${escapeHtml(data.wellness_disclaimer || data.medical_disclaimer || "Wellness insight only. Not a medical diagnosis.")}
             </p>
         </section>
 
         <div class="ai-chart-panel">
-            <h3>AI Timeline</h3>
+            <h3>Session Timeline</h3>
             <canvas id="aiTimelineChart"></canvas>
             <div id="aiTimelineStatus"></div>
         </div>
     `
 
     renderTimelineChart(timeline)
+    hydrateCoachPanel(data)
 }
 
 function renderTimelineChart(timeline){
@@ -685,7 +1075,7 @@ function renderTimelineChart(timeline){
             labels: labels,
             datasets: [
                 {
-                    label: "SpO2 from CSV",
+                    label: "SpO2 from SpO2/pulse timeline",
                     data: spo2,
                     borderColor: AI_LAB_COLORS.spo2,
                     backgroundColor: AI_LAB_COLORS.spo2,
@@ -695,7 +1085,7 @@ function renderTimelineChart(timeline){
                     spanGaps: true
                 },
                 {
-                    label: "Pulse from CSV",
+                    label: "Pulse from SpO2/pulse timeline",
                     data: pulse,
                     borderColor: AI_LAB_COLORS.pulse,
                     backgroundColor: AI_LAB_COLORS.pulse,
@@ -705,7 +1095,7 @@ function renderTimelineChart(timeline){
                     spanGaps: true
                 },
                 {
-                    label: "HR from FIT",
+                    label: "HR from HR/HRV timeline",
                     data: hr,
                     borderColor: AI_LAB_COLORS.heartRate,
                     backgroundColor: AI_LAB_COLORS.heartRate,
@@ -715,7 +1105,7 @@ function renderTimelineChart(timeline){
                     spanGaps: true
                 },
                 {
-                    label: "HRV from FIT",
+                    label: "HRV from HR/HRV timeline",
                     data: hrv,
                     borderColor: AI_LAB_COLORS.hrv,
                     backgroundColor: AI_LAB_COLORS.hrv,
@@ -848,7 +1238,7 @@ function renderBatchVisualization(results){
                 <tbody>
                     <tr><td>Sessions analyzed</td><td>${results.length}</td></tr>
                     <tr><td>Average score</td><td>${avg(scores)} / 100</td></tr>
-                    <tr><td>Anomalies</td><td>${results.filter(r => r.anomaly ?? r.anomaly_detected).length}</td></tr>
+                    <tr><td>Flagged sessions</td><td>${results.filter(r => r.anomaly ?? r.anomaly_detected).length}</td></tr>
                 </tbody>
             </table>
         </div>

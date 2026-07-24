@@ -65,6 +65,7 @@ def complete_merge_job(
     *,
     merge_id: int,
     merged_records: int,
+    notes: str | None = None,
 ) -> None:
     """Mark a merge job as completed after rows are inserted."""
 
@@ -74,11 +75,13 @@ def complete_merge_job(
         SET
             merged_records = %s,
             status = 'COMPLETED',
-            finished_at = CURRENT_TIMESTAMP
+            finished_at = CURRENT_TIMESTAMP,
+            notes = COALESCE(%s, notes)
         WHERE merge_id = %s
         """,
         (
             merged_records,
+            notes,
             merge_id,
         ),
     )
@@ -197,6 +200,7 @@ def get_latest_completed_merge_job(
             merged_records,
             algorithm,
             tolerance_ms,
+            notes,
             started_at,
             finished_at
         FROM merge_jobs
@@ -224,8 +228,9 @@ def get_latest_completed_merge_job(
         "merged_records": row[7],
         "algorithm": row[8],
         "tolerance_ms": row[9],
-        "started_at": row[10],
-        "finished_at": row[11],
+        "notes": row[10],
+        "started_at": row[11],
+        "finished_at": row[12],
     }
 
 

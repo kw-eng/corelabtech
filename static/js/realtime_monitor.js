@@ -187,7 +187,7 @@ function updateTelemetryUI(data) {
         const anomalyLabel =
             data.anomaly
                 ? "YES - review required"
-                : "NO critical anomaly"
+                : "NO critical session flag"
 
         const riskLevel =
             data.score >= 90
@@ -211,7 +211,7 @@ function updateTelemetryUI(data) {
                 </div>
 
                 <div>
-                    <b>Anomaly:</b>
+                    <b>Session flag:</b>
                     ${anomalyLabel}
                 </div>
 

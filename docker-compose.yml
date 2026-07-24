@@ -19,9 +19,9 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       APP_ENV: production 
       FLASK_ENV: production
-      PERFORMANCE_TESTING: "true"
-      # Produkcja/VPS:
-      # PERFORMANCE_TESTING: "false"
+      PERFORMANCE_TESTING: "false"
+      DISABLE_DEBUG_ROUTES: "true"
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       PLAYWRIGHT_BASE_URL: ${PLAYWRIGHT_BASE_URL}
 
     depends_on:
@@ -31,6 +31,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
+      - ./files:/app/files:ro
       - ./playwright-report:/app/playwright-report
       - ./test-results:/app/test-results
       - ./tests/performance/gatling/target:/app/tests/performance/gatling/target

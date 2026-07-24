@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import hashlib
 import sys
 from pathlib import Path
 from types import ModuleType
+
+from database_postgres import db
 
 
 ROOT = Path(__file__).resolve().parent
@@ -19,6 +22,8 @@ MIGRATIONS = [
     ROOT / "migrations" / "008_create_merge_jobs.py",
     ROOT / "migrations" / "009_create_merged_data.py",
     ROOT / "migrations" / "010_create_ai_results.py",
+    ROOT / "migrations" / "011_create_hrv_tables.py",
+    ROOT / "migrations" / "012_create_session_features_baselines.py",
 ]
 
 
@@ -78,7 +83,16 @@ def run_migrations() -> None:
     print()
     print("[migrations]")
 
+    ensure_schema_migrations()
+
     for migration in MIGRATIONS:
+        version = migration.stem
+        checksum = file_checksum(migration)
+
+        if migration_already_applied(version):
+            print(f"- {migration.relative_to(ROOT)} [skip]")
+            continue
+
         print(f"- {migration.relative_to(ROOT)}")
         module = load_module(migration)
 
@@ -88,7 +102,103 @@ def run_migrations() -> None:
             )
 
         module.upgrade()
+        record_migration(
+            version=version,
+            filename=str(migration.relative_to(ROOT)),
+            checksum=checksum,
+        )
         print(f"  [ok] {migration.name}")
+
+
+def ensure_schema_migrations() -> None:
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version VARCHAR(255) PRIMARY KEY,
+                filename TEXT NOT NULL,
+                checksum VARCHAR(64) NOT NULL,
+                applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def migration_already_applied(version: str) -> bool:
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT 1
+            FROM schema_migrations
+            WHERE version = %s
+            LIMIT 1
+            """,
+            (version,),
+        )
+        return cursor.fetchone() is not None
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def record_migration(
+    *,
+    version: str,
+    filename: str,
+    checksum: str,
+) -> None:
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            INSERT INTO schema_migrations (
+                version,
+                filename,
+                checksum
+            )
+            VALUES (%s, %s, %s)
+            ON CONFLICT (version)
+            DO UPDATE SET
+                filename = EXCLUDED.filename,
+                checksum = EXCLUDED.checksum
+            """,
+            (
+                version,
+                filename,
+                checksum,
+            ),
+        )
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def file_checksum(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def load_module(path: Path) -> ModuleType:

@@ -123,6 +123,63 @@ function getSelectedSubjectId() {
     )
 }
 
+function inputValue(id) {
+    const element = document.getElementById(id)
+
+    return element ? element.value.trim() : ""
+}
+
+function numericInputValue(id) {
+    const value = inputValue(id)
+
+    if (value === "") {
+        return null
+    }
+
+    const number = Number(value)
+
+    return Number.isFinite(number) ? number : null
+}
+
+function collectPreCheckIn() {
+    return {
+        sleep_hours: numericInputValue("pre_sleep_hours"),
+        sleep_quality: inputValue("pre_sleep_quality") || null,
+        stress_level: inputValue("pre_stress_level") || null,
+        training_load_24h: inputValue("pre_training_load") || null,
+        fatigue_level: inputValue("pre_fatigue_level") || null,
+        session_goal: inputValue("pre_session_goal") || null,
+        notes: inputValue("pre_context_notes") || null
+    }
+}
+
+function collectPostCheckOut() {
+    return {
+        energy_level: inputValue("post_energy_level") || null,
+        relaxation_level: inputValue("post_relaxation_level") || null,
+        fatigue_level: inputValue("post_fatigue_level") || null,
+        discomfort: inputValue("post_discomfort") || null,
+        notes: inputValue("post_context_notes") || null
+    }
+}
+
+function hasContextValues(context) {
+    return Object.values(context || {}).some(
+        value => value !== null && value !== ""
+    )
+}
+
+function contextPreview(context) {
+    if (!hasContextValues(context)) {
+        return "No check-in context added"
+    }
+
+    return Object.entries(context)
+        .filter(([, value]) => value !== null && value !== "")
+        .map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`)
+        .join("<br>")
+}
+
 function clearMergedPreview() {
     const tbody =
         document.querySelector("#mergedDataTable tbody")
@@ -547,6 +604,7 @@ async function loadSubjects() {
 
     const onlySubjects = subjects.filter(s =>
         s &&
+        s.is_active !== false &&
         s.subject_id &&
         !looksLikeGeneratedSessionId(s.subject_id) &&
         !looksLikeGeneratedSessionId(s.user_id) &&
@@ -655,6 +713,8 @@ async function savePRE() {
         return
     }
 
+    const checkIn = collectPreCheckIn()
+
     try {
 
         state.pre = {
@@ -665,7 +725,9 @@ async function savePRE() {
 
             spo2: spo2,
 
-            pulse: pulse
+            pulse: pulse,
+
+            check_in: checkIn
         }
 
     const res = await fetch(
@@ -694,7 +756,9 @@ async function savePRE() {
 
                     spo2: spo2,
 
-                    pulse: pulse
+                    pulse: pulse,
+
+                    check_in: checkIn
                 })
             }
         )
@@ -742,6 +806,11 @@ async function savePRE() {
                 Pulse:
                 ${pulse} bpm
 
+                <br><br>
+
+                <b>Check-in context</b><br>
+                ${contextPreview(checkIn)}
+
             </div>
         `
 
@@ -768,7 +837,7 @@ async function savePRE() {
 }
 
 // ========================================
-// FIT
+// HR / HRV timeline upload (FIT parser under the hood)
 // ========================================
 
 async function uploadFIT() {
@@ -784,7 +853,7 @@ async function uploadFIT() {
 
     if (!input.files.length) {
 
-        alert("Select FIT file")
+        alert("Select HR/HRV timeline file")
         return
     }
 
@@ -816,7 +885,7 @@ async function uploadFIT() {
         if (status) {
             status.innerHTML = `
                 <div class="success-box">
-                    Uploading and parsing FIT...
+                    Uploading and parsing HR/HRV timeline...
                 </div>
             `
         }
@@ -843,7 +912,7 @@ async function uploadFIT() {
             clearTimeout(timeoutId)
         }
 
-        let data = await parseJsonResponse(res, "UPLOAD FIT")
+        let data = await parseJsonResponse(res, "UPLOAD HR/HRV TIMELINE")
         const duplicateImport =
             res.status === 409 &&
             data &&
@@ -856,13 +925,13 @@ async function uploadFIT() {
 
             alert(
                 data.error ||
-                "FIT upload failed"
+                "HR/HRV timeline upload failed"
             )
 
             if (status) {
                 status.innerHTML = `
                     <div class="error-box">
-                        ${data.error || "FIT upload failed"}
+                        ${data.error || "HR/HRV timeline upload failed"}
                     </div>
                 `
             }
@@ -873,14 +942,14 @@ async function uploadFIT() {
         if (status) {
             const fitStatusMessage =
                 duplicateImport
-                    ? "FIT already imported"
-                    : "FIT uploaded"
+                    ? "HR/HRV timeline already imported"
+                    : "HR/HRV timeline uploaded"
 
             status.innerHTML = `
 
             <div class="success-box">
 
-                ✔ FIT uploaded
+                HR/HRV timeline uploaded
 
                 <br>
 
@@ -913,8 +982,8 @@ async function uploadFIT() {
 
         const message =
             err.name === "AbortError"
-                ? "FIT upload timed out"
-                : "FIT upload server error"
+                ? "HR/HRV timeline upload timed out"
+                : "HR/HRV timeline upload server error"
 
         if (status) {
             status.innerHTML = `
@@ -951,7 +1020,7 @@ async function loadFITTable(session, importId = null) {
     tbody.innerHTML = `
         <tr>
             <td colspan="4">
-                Loading FIT preview...
+                Loading HR/HRV preview...
             </td>
         </tr>
     `
@@ -972,17 +1041,17 @@ let res = await fetch(
     }
 )
 
-let data = await parseJsonResponse(res, "LOAD FIT DATA")
+let data = await parseJsonResponse(res, "LOAD HR/HRV TIMELINE")
 
     if (!Array.isArray(data)) {
 
         console.error(data)
-        setText("fitTableStatus", "FIT table error: invalid API response")
+        setText("fitTableStatus", "HR/HRV table error: invalid API response")
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="4">
-                    Invalid FIT data
+                    Invalid HR/HRV data
                 </td>
             </tr>
         `
@@ -991,12 +1060,12 @@ let data = await parseJsonResponse(res, "LOAD FIT DATA")
     }
 
     if (data.length === 0) {
-        setText("fitTableStatus", "FIT table: 0 records")
+        setText("fitTableStatus", "HR/HRV table: 0 records")
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="4">
-                    No FIT records
+                    No HR/HRV records
                 </td>
             </tr>
         `
@@ -1006,7 +1075,7 @@ let data = await parseJsonResponse(res, "LOAD FIT DATA")
 
     setText(
         "fitTableStatus",
-        `FIT table: rendering ${data.length} records...`
+        `HR/HRV table: rendering ${data.length} records...`
     )
 
     await renderTableRowsChunked(
@@ -1023,21 +1092,21 @@ let data = await parseJsonResponse(res, "LOAD FIT DATA")
     setText(
         "fitTableStatus",
         data.length >= TABLE_PREVIEW_LIMIT
-            ? `FIT table: first ${data.length} records loaded`
-            : `FIT table: ${data.length} records loaded`
+            ? `HR/HRV table: first ${data.length} records loaded`
+            : `HR/HRV table: ${data.length} records loaded`
     )
 
     } catch (err) {
         console.error("loadFITTable failed", err)
         setText(
             "fitTableStatus",
-            `FIT table error: ${err.message || err}`
+            `HR/HRV table error: ${err.message || err}`
         )
     }
 }
 
 // ========================================
-// CSV
+// SpO2 / pulse timeline upload (CSV parser under the hood)
 // ========================================
 
 async function uploadCSV() {
@@ -1047,7 +1116,7 @@ async function uploadCSV() {
 
     if (!input.files.length) {
 
-        alert("Select CSV file")
+        alert("Select SpO2/pulse timeline file")
         return
     }
 
@@ -1075,7 +1144,7 @@ let res = await fetch(
     }
 )
 
-let data = await parseJsonResponse(res, "UPLOAD CSV")
+let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
         const duplicateImport =
             res.status === 409 &&
             data &&
@@ -1086,7 +1155,7 @@ let data = await parseJsonResponse(res, "UPLOAD CSV")
 
             alert(
                 data.error ||
-                "CSV upload failed"
+                "SpO2/pulse timeline upload failed"
             )
 
             return
@@ -1098,7 +1167,7 @@ let data = await parseJsonResponse(res, "UPLOAD CSV")
 
             <div class="success-box">
 
-                ✔ CSV uploaded
+                SpO2/pulse timeline uploaded
 
                 <br>
 
@@ -1120,7 +1189,7 @@ let data = await parseJsonResponse(res, "UPLOAD CSV")
 
         console.error(err)
 
-        alert("CSV upload server error")
+        alert("SpO2/pulse timeline upload server error")
     }
 }
 
@@ -1141,7 +1210,7 @@ async function loadCSVTable(session, importId = null) {
     tbody.innerHTML = `
         <tr>
             <td colspan="3">
-                Loading CSV preview...
+                Loading SpO2/pulse preview...
             </td>
         </tr>
     `
@@ -1162,15 +1231,15 @@ let res = await fetch(
     }
 )
 
-let data = await parseJsonResponse(res, "LOAD CSV DATA")
+let data = await parseJsonResponse(res, "LOAD SPO2/PULSE TIMELINE")
 
     if (!Array.isArray(data)) {
-        setText("csvTableStatus", "CSV table error: invalid API response")
+        setText("csvTableStatus", "SpO2/pulse table error: invalid API response")
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="3">
-                    Invalid CSV data
+                    Invalid SpO2/pulse data
                 </td>
             </tr>
         `
@@ -1179,12 +1248,12 @@ let data = await parseJsonResponse(res, "LOAD CSV DATA")
     }
 
     if (data.length === 0) {
-        setText("csvTableStatus", "CSV table: 0 records")
+        setText("csvTableStatus", "SpO2/pulse table: 0 records")
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="3">
-                    No CSV records
+                    No SpO2/pulse records
                 </td>
             </tr>
         `
@@ -1194,7 +1263,7 @@ let data = await parseJsonResponse(res, "LOAD CSV DATA")
 
     setText(
         "csvTableStatus",
-        `CSV table: rendering ${data.length} records...`
+        `SpO2/pulse table: rendering ${data.length} records...`
     )
 
     await renderTableRowsChunked(
@@ -1209,14 +1278,14 @@ let data = await parseJsonResponse(res, "LOAD CSV DATA")
 
     setText(
         "csvTableStatus",
-        `CSV table: ${data.length} records loaded`
+        `SpO2/pulse table: ${data.length} records loaded`
     )
 
     } catch (err) {
         console.error("loadCSVTable failed", err)
         setText(
             "csvTableStatus",
-            `CSV table error: ${err.message || err}`
+            `SpO2/pulse table error: ${err.message || err}`
         )
     }
 }
@@ -1285,12 +1354,12 @@ async function mergeDuring() {
                 <div class="success-box">
                     ✔ Merge completed<br>
                     Mode: ${data.mode || "-"}<br>
-                    FIT samples: ${data.fit_samples ?? "-"}<br>
-                    CSV samples: ${data.csv_samples ?? "-"}<br>
+                    HR/HRV samples: ${data.fit_samples ?? "-"}<br>
+                    SpO2/pulse samples: ${data.csv_samples ?? "-"}<br>
                     Merged samples: ${merged.length}<br>
                     Matched: ${data.matched_records ?? "-"}
                     (${data.match_rate ?? "-"}%)<br>
-                    FIT time offset: ${data.fit_time_offset_hours ?? 0}h
+                    HR/HRV time offset: ${data.fit_time_offset_hours ?? 0}h
                 </div>
             `
         }
@@ -1430,7 +1499,7 @@ async function saveDURING() {
         csv && csv.length > 0
 
     if (!hasFIT && !hasCSV) {
-        alert("Upload FIT or CSV first")
+        alert("Upload HR/HRV or SpO2/pulse timeline first")
         return
     }
 
@@ -1504,8 +1573,8 @@ async function saveDURING() {
             Temp: ${temp}°C<br>
             O2: ${oxygenPercent || "-"}%<br><br>
 
-            FIT Samples: ${hasFIT ? fit.length : 0}<br>
-            CSV Samples: ${hasCSV ? csv.length : 0}<br>
+            HR/HRV Samples: ${hasFIT ? fit.length : 0}<br>
+            SpO2/pulse Samples: ${hasCSV ? csv.length : 0}<br>
             Merged Samples: ${merged.length}
         </div>
     `
@@ -1569,6 +1638,8 @@ async function savePOST() {
         return
     }
 
+    const checkOut = collectPostCheckOut()
+
     state.post = {
 
         saved: true,
@@ -1577,7 +1648,9 @@ async function savePOST() {
 
         spo2: spo2,
 
-        pulse: pulse
+        pulse: pulse,
+
+        check_out: checkOut
     }
 
     const res = await fetch(
@@ -1604,7 +1677,9 @@ async function savePOST() {
 
                 spo2: spo2,
 
-                pulse: pulse
+                pulse: pulse,
+
+                check_out: checkOut
             })
         }
     )
@@ -1635,6 +1710,11 @@ async function savePOST() {
 
             Pulse:
             ${pulse} bpm
+
+            <br><br>
+
+            <b>Check-out context</b><br>
+            ${contextPreview(checkOut)}
 
         </div>
     `
@@ -1896,8 +1976,8 @@ async function runAnalysis(sessionId) {
 
         const anomalyText =
             data.anomaly
-                ? "YES - abnormal response detected"
-                : "NO critical anomaly detected"
+                ? "YES - review session quality"
+                : "NO critical session flag detected"
 
         const aiSummary =
             document.getElementById("ai-summary")
@@ -1920,7 +2000,7 @@ async function runAnalysis(sessionId) {
 
         if (aiAnomaly) {
             aiAnomaly.innerHTML =
-                "<b>Anomaly:</b> " + escapeHtml(anomalyText)
+                "<b>Session flag:</b> " + escapeHtml(anomalyText)
         }
 
         renderAIVisualization(data)
@@ -2048,8 +2128,8 @@ function renderAIVisualization(data) {
 
     const anomalyLabel =
         data.anomaly
-            ? "YES - abnormal response detected"
-            : "NO critical anomaly detected"
+            ? "YES - review session quality"
+            : "NO critical session flag detected"
 
     const warnings =
         Array.isArray(data.reasons)
@@ -2063,7 +2143,7 @@ function renderAIVisualization(data) {
 
     const disclaimer =
         data.medical_disclaimer ||
-        "Research-only score. Not a medical diagnosis."
+        "Wellness-only score. Not a medical diagnosis."
 
     const keyFinding =
         data.summary ||
@@ -2077,12 +2157,12 @@ function renderAIVisualization(data) {
 
     const scoreReference = `
         90-100 = Low risk / stable session<br>
-        70-89 = Moderate warning / observe session<br>
-        below 70 = High risk / review required
+        70-89 = Moderate load / observe session<br>
+        below 70 = Elevated load / review required
     `
 
     const scoreMeaning = `
-        The score starts at 100 and is reduced when rule-based warnings are detected:
+        The score starts at 100 and is reduced when rule-based wellness flags are detected:
         low SpO2, large PRE to POST SpO2 drop, elevated HR/pulse, or low HRV.
     `
 
@@ -2096,7 +2176,7 @@ function renderAIVisualization(data) {
 
                     <tr>
                         <td><b>Score type</b></td>
-                        <td>${data.score_type || "AI Research Risk Score"}</td>
+                        <td>${data.score_type || "AI Wellness Score"}</td>
                     </tr>
 
                     <tr>
@@ -2120,12 +2200,12 @@ function renderAIVisualization(data) {
                     </tr>
 
                     <tr>
-                        <td><b>Anomaly</b></td>
+                        <td><b>Session flag</b></td>
                         <td>${anomalyLabel}</td>
                     </tr>
 
                     <tr>
-                        <td><b>AI warnings</b></td>
+                        <td><b>Wellness warnings</b></td>
                         <td>${warnings}</td>
                     </tr>
 
@@ -2156,15 +2236,15 @@ function renderAIVisualization(data) {
             <table border="1" style="width:100%;">
                 <tbody>
                     <tr>
-                        <td>FIT samples</td>
+                        <td>HR/HRV samples</td>
                         <td>${features.fit_samples ?? "-"}</td>
                     </tr>
                     <tr>
-                        <td>CSV samples</td>
+                        <td>SpO2/pulse samples</td>
                         <td>${features.csv_samples ?? "-"}</td>
                     </tr>
                     <tr>
-                        <td>CSV pulse artifacts ignored</td>
+                        <td>SpO2/pulse artifacts ignored</td>
                         <td>${features.csv_pulse_artifacts ?? 0}</td>
                     </tr>
                     <tr>
@@ -2183,43 +2263,43 @@ function renderAIVisualization(data) {
             <table border="1" style="width:100%;">
                 <tbody>
                     <tr>
-                        <td>Avg SpO2 from CSV</td>
+                        <td>Avg SpO2 from SpO2/pulse timeline</td>
                         <td>${features.avg_csv_spo2 ?? "-"} %</td>
                     </tr>
                     <tr>
-                        <td>Min SpO2 from CSV</td>
+                        <td>Min SpO2 from SpO2/pulse timeline</td>
                         <td>${features.min_spo2 ?? "-"} %</td>
                     </tr>
                     <tr>
-                        <td>Max SpO2 from CSV</td>
+                        <td>Max SpO2 from SpO2/pulse timeline</td>
                         <td>${features.max_spo2 ?? "-"} %</td>
                     </tr>
                     <tr>
-                        <td>Avg Pulse from CSV</td>
+                        <td>Avg Pulse from SpO2/pulse timeline</td>
                         <td>${features.avg_csv_pulse ?? "-"} bpm</td>
                     </tr>
                     <tr>
-                        <td>Min Pulse from CSV</td>
+                        <td>Min Pulse from SpO2/pulse timeline</td>
                         <td>${features.min_csv_pulse ?? "-"} bpm</td>
                     </tr>
                     <tr>
-                        <td>Max Pulse from CSV</td>
+                        <td>Max Pulse from SpO2/pulse timeline</td>
                         <td>${features.max_csv_pulse ?? "-"} bpm</td>
                     </tr>
                     <tr>
-                        <td>Avg HR from FIT</td>
+                        <td>Avg HR from HR/HRV timeline</td>
                         <td>${features.avg_fit_hr ?? "-"} bpm</td>
                     </tr>
                     <tr>
-                        <td>Min HR from FIT</td>
+                        <td>Min HR from HR/HRV timeline</td>
                         <td>${features.min_fit_hr ?? "-"} bpm</td>
                     </tr>
                     <tr>
-                        <td>Max HR from FIT</td>
+                        <td>Max HR from HR/HRV timeline</td>
                         <td>${features.max_fit_hr ?? "-"} bpm</td>
                     </tr>
                     <tr>
-                        <td>Avg HRV from FIT</td>
+                        <td>Avg HRV from HR/HRV timeline</td>
                         <td>${features.avg_hrv ?? "-"} ms</td>
                     </tr>
                 </tbody>
@@ -2250,11 +2330,11 @@ function renderAIVisualization(data) {
                         <td>≥ 3% warning, ≥ 5% stronger warning</td>
                     </tr>
                     <tr>
-                        <td>Pulse / HR anomaly threshold</td>
+                        <td>Pulse / HR load threshold</td>
                         <td>&gt; 160 bpm</td>
                     </tr>
                     <tr>
-                        <td>HRV anomaly threshold</td>
+                        <td>HRV low-readiness threshold</td>
                         <td>&lt; 30 ms</td>
                     </tr>
                 </tbody>
@@ -2281,20 +2361,20 @@ function renderAIVisualization(data) {
             <div class="ai-report-header">
                 <div>
                     <h3>AI Session Summary</h3>
-                    <p>${escapeHtml(data.score_type || "Research risk score")}</p>
+                    <p>${escapeHtml(data.score_type || "Wellness score")}</p>
                 </div>
                 <span class="status-badge ${riskClass(riskLabel)}">
-                    ${escapeHtml(riskLabel)} risk
+                    ${escapeHtml(riskLabel)} status
                 </span>
             </div>
 
             <div class="ai-kpi-grid">
                 <div class="ai-kpi-card">
-                    <span>Risk score</span>
+                    <span>Wellness score</span>
                     <strong>${formatScore(scoreValue)}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Anomaly status</span>
+                    <span>Session flag</span>
                     <strong>${escapeHtml(anomalyLabel)}</strong>
                 </div>
                 <div class="ai-kpi-card">
@@ -2335,7 +2415,7 @@ function renderAIVisualization(data) {
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
-                                label: "FIT samples",
+                                label: "HR/HRV samples",
                                 value: pickMetric(
                                     features,
                                     "fit_samples",
@@ -2343,7 +2423,7 @@ function renderAIVisualization(data) {
                                 ) ?? data.fit_samples
                             },
                             {
-                                label: "CSV samples",
+                                label: "SpO2/pulse samples",
                                 value: pickMetric(
                                     features,
                                     "csv_samples",
@@ -2359,7 +2439,7 @@ function renderAIVisualization(data) {
                                 ) ?? data.merged_samples
                             },
                             {
-                                label: "CSV pulse artifacts ignored",
+                                label: "SpO2/pulse artifacts ignored",
                                 value: features.csv_pulse_artifacts ?? 0
                             }
                         ])}
@@ -2641,7 +2721,7 @@ function renderAIVisualization(data) {
                 labels: labels,
                 datasets: [
                     {
-                        label: "SpO2 from CSV",
+                        label: "SpO2 from SpO2/pulse timeline",
                         data: spo2,
                         borderColor: "#F59F35",
                         backgroundColor: "#F59F35",
@@ -2651,7 +2731,7 @@ function renderAIVisualization(data) {
                         spanGaps: true
                     },
                     {
-                        label: "Pulse from CSV",
+                        label: "Pulse from SpO2/pulse timeline",
                         data: pulse,
                         borderColor: "#F05A7E",
                         backgroundColor: "#F05A7E",
@@ -2661,7 +2741,7 @@ function renderAIVisualization(data) {
                         spanGaps: true
                     },
                     {
-                        label: "HR from FIT",
+                        label: "HR from HR/HRV timeline",
                         data: heartRate,
                         borderColor: "#2F9EED",
                         backgroundColor: "#2F9EED",
@@ -2671,7 +2751,7 @@ function renderAIVisualization(data) {
                         spanGaps: true
                     },
                     {
-                        label: "HRV from FIT",
+                        label: "HRV from HR/HRV timeline",
                         data: hrv,
                         borderColor: "#FFD05A",
                         backgroundColor: "#FFD05A",
@@ -2844,7 +2924,7 @@ async function updateRealtimeAI() {
                 </h2>
 
                 <div>
-                    Anomaly:
+                    Session flag:
                     ${data.anomaly}
                 </div>
 

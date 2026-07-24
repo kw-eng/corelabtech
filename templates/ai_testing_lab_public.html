@@ -2,31 +2,200 @@
 
 {% block content %}
 
-<h1>AI Testing Lab</h1>
+<div class="ai-testing-page">
 
-<div class="panel">
+    <section class="ai-testing-hero">
+        <div>
+            <span class="ai-testing-eyebrow">Validation architecture</span>
+            <h1>AI Testing Lab</h1>
+            <p>
+                Public overview of the CoreLabTech validation layer for HBOT
+                research workflows, AI output contracts, telemetry processing,
+                UI automation and performance checks.
+            </p>
 
-    <p>
-        Public overview of the AI-powered QA system used in CoreLabTech.
-    </p>
+            <div class="ai-testing-actions">
+                <a class="ai-testing-primary" href="{{ url_for('auth.login') }}">
+                    Login
+                </a>
+                <a class="ai-testing-secondary" href="{{ url_for('main.technology') }}">
+                    Technology
+                </a>
+                <a class="ai-testing-secondary" href="{{ url_for('research.performance_tests') }}">
+                    Performance Testing
+                </a>
+            </div>
+        </div>
 
-    <ul>
-        <li>Playwright automation</li>
-        <li>AI contract validation</li>
-        <li>Telemetry verification</li>
-        <li>HBOT AI analysis validation</li>
-        <li>Gatling performance testing</li>
-    </ul>
+        <aside class="ai-testing-status-panel">
+            <div>
+                <span>Validation scope</span>
+                <strong>UI + API + AI + telemetry</strong>
+            </div>
+            <div>
+                <span>Automation runtime</span>
+                <strong>Playwright + Gatling</strong>
+            </div>
+            <div>
+                <span>Operational access</span>
+                <strong>Researcher / Admin</strong>
+            </div>
+        </aside>
+    </section>
 
-</div>
+    <section class="ai-testing-summary-grid">
+        <div>
+            <span>Primary workflow</span>
+            <strong>PRE / DURING / POST</strong>
+        </div>
+        <div>
+            <span>Data sources</span>
+            <strong>HR/HRV + SpO2/pulse telemetry</strong>
+        </div>
+        <div>
+            <span>AI contract</span>
+            <strong>Score, session flag, features, timeline</strong>
+        </div>
+        <div>
+            <span>Performance gate</span>
+            <strong>API, merge, upload, analysis</strong>
+        </div>
+    </section>
 
-<div class="panel">
+    <section class="ai-testing-section">
+        <div class="ai-testing-section-header">
+            <div>
+                <h2>What The Lab Validates</h2>
+                <p>
+                    The testing layer protects the most important parts of the
+                    research workflow: clean input, stable synchronization,
+                    predictable AI responses and reliable operator screens.
+                </p>
+            </div>
+        </div>
 
-    <h3>Restricted access</h3>
+        <div class="ai-testing-module-grid">
+            <article class="ai-testing-module-card">
+                <span>01</span>
+                <h3>Telemetry Ingestion</h3>
+                <p>
+                    Validates CSV pulse oximeter uploads, FIT wearable imports,
+                    parser behavior and session-level data availability.
+                </p>
+                <strong>Timeline import readiness</strong>
+            </article>
 
-    <p>
-        Operational AI QA tools are available only for researcher and admin roles.
-    </p>
+            <article class="ai-testing-module-card">
+                <span>02</span>
+                <h3>Timeline Synchronization</h3>
+                <p>
+                    Checks that DURING-session samples can be merged into one
+                    inspectable timeline for physiology review.
+                </p>
+                <strong>Timestamp merge quality</strong>
+            </article>
+
+            <article class="ai-testing-module-card">
+                <span>03</span>
+                <h3>AI Output Contract</h3>
+                <p>
+                    Confirms that analysis responses include score, risk state,
+                    session flags, feature summaries and timeline data.
+                </p>
+                <strong>Research-only AI validation</strong>
+            </article>
+
+            <article class="ai-testing-module-card">
+                <span>04</span>
+                <h3>Interface Automation</h3>
+                <p>
+                    Playwright checks core screens, session flows, upload paths,
+                    QA controls and API responses used by the browser UI.
+                </p>
+                <strong>End-to-end confidence</strong>
+            </article>
+        </div>
+    </section>
+
+    <section class="ai-testing-section ai-testing-two-column">
+        <div class="ai-testing-card">
+            <h2>Testing Methods</h2>
+
+            <div class="ai-testing-method-list">
+                <div>
+                    <span>Playwright</span>
+                    <strong>Browser and API automation for UI-critical flows.</strong>
+                </div>
+                <div>
+                    <span>AI contract checks</span>
+                    <strong>Validation of score, session flag, features and timeline shape.</strong>
+                </div>
+                <div>
+                    <span>Telemetry verification</span>
+                    <strong>FIT, CSV, merged data and session persistence checks.</strong>
+                </div>
+                <div>
+                    <span>Gatling</span>
+                    <strong>Load simulations for sessions, merge, upload and AI analysis.</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-testing-card">
+            <h2>Why It Matters</h2>
+            <p>
+                HBOT research workflows depend on repeatable data capture and
+                predictable analysis output. The AI Testing Lab helps detect
+                regressions before they affect session review, reports or
+                operational dashboards.
+            </p>
+
+            <div class="ai-testing-proof-grid">
+                <div>
+                    <span>Reliability</span>
+                    <strong>Regression detection</strong>
+                </div>
+                <div>
+                    <span>Data quality</span>
+                    <strong>Signal sanity checks</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-testing-section">
+        <div class="ai-testing-section-header">
+            <div>
+                <h2>Validated Workflow</h2>
+                <p>
+                    The public view shows the architecture. Running internal suites
+                    and viewing raw execution reports is restricted.
+                </p>
+            </div>
+        </div>
+
+        <div class="ai-testing-flow">
+            <span>Open session workflow</span>
+            <span>Upload telemetry</span>
+            <span>Merge timeline</span>
+            <span>Run AI analysis</span>
+            <span>Validate contract</span>
+            <strong>Review QA result</strong>
+        </div>
+    </section>
+
+    <section class="ai-testing-access-note">
+        <div>
+            <span>Restricted operational access</span>
+            <h2>Execution tools are available only for authorized roles.</h2>
+        </div>
+        <p>
+            Researcher and administrator accounts can access the operational AI QA
+            tools, Playwright execution controls, performance dashboards and internal
+            validation reports. Public visitors can review the validation architecture
+            without access to research data or test execution.
+        </p>
+    </section>
 
 </div>
 

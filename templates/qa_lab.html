@@ -48,7 +48,7 @@
         </div>
         <div>
             <span>Data pipeline</span>
-            <strong>FIT + CSV merge</strong>
+            <strong>HR/HRV + SpO2/Pulse merge</strong>
         </div>
         <div>
             <span>AI contract</span>
@@ -86,7 +86,7 @@
             <article class="software-qa-module-card">
                 <span class="software-qa-icon">AI</span>
                 <h3>AI Validation</h3>
-                <p>Risk score, anomaly state, summary text, features and timeline payload are validated after analysis.</p>
+                <p>Wellness score, session flag, summary text, features and timeline payload are validated after analysis.</p>
                 <strong>Research output checks</strong>
             </article>
 
@@ -109,8 +109,8 @@
 
         <div class="software-qa-flow">
             <span>Open chamber page</span>
-            <span>Upload CSV</span>
-            <span>Upload FIT</span>
+            <span>Upload SpO2/Pulse</span>
+            <span>Upload HR/HRV</span>
             <span>Merge timeline</span>
             <span>Save full session</span>
             <span>Run AI analysis</span>
@@ -159,13 +159,13 @@
                         <td>Timeline Merge</td>
                         <td><span class="software-qa-method post">POST</span></td>
                         <td><code>/api/during_merge</code></td>
-                        <td>Synchronize wearable FIT and pulse oximeter CSV samples.</td>
+                        <td>Synchronize HR/HRV and SpO2/pulse timeline samples.</td>
                     </tr>
                     <tr>
                         <td>AI Analysis</td>
                         <td><span class="software-qa-method post">POST</span></td>
                         <td><code>/api/run_analysis</code></td>
-                        <td>Calculate research risk score and anomaly logic.</td>
+                        <td>Calculate wellness score, data quality and session flag logic.</td>
                     </tr>
                     <tr>
                         <td>Latest AI</td>

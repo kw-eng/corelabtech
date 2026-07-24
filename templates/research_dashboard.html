@@ -11,11 +11,11 @@
 
     <section class="mission-hero">
         <div>
-            <span class="mission-eyebrow">Research operations dashboard</span>
+            <span class="mission-eyebrow">Wellness operations dashboard</span>
             <h1>Mission Control</h1>
             <p>
-                Review completed HBOT sessions, inspect synchronized telemetry,
-                run research-only AI analysis and generate session reports.
+                Review completed wellness sessions, inspect synchronized telemetry,
+                run AI wellness analysis and generate session reports.
             </p>
 
             <div class="mission-toolbar">
@@ -47,11 +47,11 @@
 
     <section class="mission-metric-grid">
         <article class="mission-metric-card">
-            <span>AI Score</span>
+            <span>Wellness Score</span>
             <strong id="aiScore">-</strong>
         </article>
         <article class="mission-metric-card">
-            <span>Risk</span>
+            <span>Status</span>
             <strong id="riskLevel">-</strong>
         </article>
         <article class="mission-metric-card">
@@ -76,8 +76,8 @@
         <article class="mission-card">
             <div class="mission-section-heading">
                 <div>
-                    <h2>AI Analysis</h2>
-                    <p>Research-only summary for the selected synchronized session.</p>
+                    <h2>Wellness Analysis</h2>
+                    <p>Wellness summary for the selected synchronized session.</p>
                 </div>
             </div>
             <div id="ai" class="mission-analysis">
@@ -102,7 +102,7 @@
         <div class="mission-section-heading">
             <div>
                 <h2>Telemetry Timeline</h2>
-                <p>SpO2, pulse, wearable heart rate and HRV after FIT/CSV synchronization.</p>
+                <p>SpO2, pulse, wearable heart rate and HRV after timeline synchronization.</p>
             </div>
             <span id="chartSampleCount" class="mission-pill">0 samples</span>
         </div>
@@ -118,11 +118,11 @@
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
-                <h2>Raw Output / Research Report</h2>
+                <h2>Output / Wellness Report</h2>
                 <p>Detailed JSON response or generated report text.</p>
             </div>
         </div>
-        <pre id="rawOutput" class="mission-raw">Select a session, then load analysis or generate a research report.</pre>
+        <pre id="rawOutput" class="mission-raw">Select a session, then load analysis or generate a wellness report.</pre>
     </section>
 
 </div>
@@ -478,10 +478,10 @@ function renderAIMetrics(data){
 
     if(anomaly){
         alarm.className = "mission-alert mission-alert-warning"
-        alarm.innerText = "AI anomaly detected. Review synchronized telemetry and sensor quality."
+        alarm.innerText = "Session flag detected. Review synchronized telemetry and sensor quality."
     }else{
         alarm.className = "mission-alert mission-alert-ok"
-        alarm.innerText = "No critical anomaly detected."
+        alarm.innerText = "No critical session flag detected."
     }
 }
 
@@ -540,7 +540,7 @@ function renderAIText(data){
         </div>
 
         <p class="mission-disclaimer">
-            ${escapeHtml(data.medical_disclaimer || "Research-only result. Not a medical diagnosis.")}
+            ${escapeHtml(data.wellness_disclaimer || data.medical_disclaimer || "Wellness insight only. Not a medical diagnosis.")}
         </p>
     `
 }
@@ -785,7 +785,7 @@ async function loadUserTrend(){
                 </div>
             </div>
             <p class="mission-muted">
-                Avg HRV: ${avgHrv}. Anomalies across analyses: ${escapeHtml(data.anomaly_count ?? 0)}.
+                Avg HRV: ${avgHrv}. Flagged analyses: ${escapeHtml(data.flagged_session_count ?? data.anomaly_count ?? 0)}.
             </p>
         `
 

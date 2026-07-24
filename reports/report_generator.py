@@ -1,46 +1,27 @@
-import sqlite3
-import matplotlib.pyplot as plt # type: ignore
-from reportlab.platypus import SimpleDocTemplate,Paragraph,Image
-from reportlab.lib.styles import getSampleStyleSheet
+"""Compatibility wrapper for PostgreSQL-backed session PDF reports.
 
-def generate_report():
+The old implementation read from the legacy SQLite ``tests`` table. Reports are
+now generated through ``services.session_service`` so they use PostgreSQL,
+``full_sessions``, telemetry counts and the latest ``ai_results`` row.
+"""
 
- con=sqlite3.connect("data/database.db")
+from __future__ import annotations
 
- c=con.cursor()
+from pathlib import Path
 
- c.execute("""
-SELECT timestamp, spo2, pulse, hrv, pressure_ata
-FROM tests
-ORDER BY timestamp DESC
-""")
+from services.session_service import generate_session_report
 
- rows=c.fetchall()
 
- dates=[r[0] for r in rows]
+def generate_report(
+    session_id: str,
+    *,
+    requesting_user_id: str | None = None,
+    requesting_role: str = "admin",
+) -> Path:
+    """Generate a PDF report for one session using the current data model."""
 
- spo2=[r[1] for r in rows]
-
- plt.plot(dates,spo2)
-
- plt.title("SpO2 over time")
-
- chart="static/chart.png"
-
- plt.savefig(chart)
-
- styles=getSampleStyleSheet()
-
- story=[]
-
- story.append(Paragraph("CoreLabTech Research Report",styles["Title"]))
-
- story.append(Image(chart))
-
- pdf="research/report.pdf"
-
- doc=SimpleDocTemplate(pdf)
-
- doc.build(story)
-
- return pdf
+    return generate_session_report(
+        session_id=session_id,
+        requesting_user_id=requesting_user_id,
+        requesting_role=requesting_role,
+    )
