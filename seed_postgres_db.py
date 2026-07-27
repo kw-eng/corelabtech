@@ -202,17 +202,23 @@ def seed_contract_session(cursor):
         INSERT INTO full_sessions (
             session_id,
             user_id,
+            protocol_id,
+            target_ata,
+            actual_ata,
             session_status,
             pre_json,
             during_json,
             post_json,
             summary,
             completed
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (session_id)
         DO UPDATE SET
             user_id = EXCLUDED.user_id,
+            protocol_id = EXCLUDED.protocol_id,
+            target_ata = EXCLUDED.target_ata,
+            actual_ata = EXCLUDED.actual_ata,
             session_status = EXCLUDED.session_status,
             pre_json = EXCLUDED.pre_json,
             during_json = EXCLUDED.during_json,
@@ -223,13 +229,16 @@ def seed_contract_session(cursor):
         (
             session_id,
             user_id,
+            2,
+            1.5,
+            1.5,
             "completed",
             json.dumps(pre),
             json.dumps(during),
             json.dumps(post),
             json.dumps({
-                "source": "seed_postgres_db",
-                "purpose": "E2E AI contract fixture",
+            "source": "seed_postgres_db",
+            "purpose": "E2E AI contract fixture",
             }),
             1,
         ),

@@ -783,7 +783,8 @@ async function loadSessionConfiguration() {
             protocol => protocol.code === "WELLNESS_1_5"
         )
         if (preferredProtocol) {
-            protocolSelect.value = preferredProtocol.protocol_id
+        protocolSelect.value = preferredProtocol.protocol_id
+        applyProtocolTimingDefaults()
         }
 
         const selectedChamber = getSelectedChamber()
