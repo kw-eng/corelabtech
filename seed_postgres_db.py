@@ -2,6 +2,7 @@ from database_postgres import db
 from datetime import datetime, timedelta
 import os
 import json
+
 from werkzeug.security import generate_password_hash
 
 
@@ -9,142 +10,243 @@ def seed_postgres_db():
 
     admin_password = os.getenv(
         "E2E_ADMIN_PASSWORD",
-        "CHANGE_ME_ADMIN_PASSWORD"
+        "CHANGE_ME_ADMIN_PASSWORD",
     )
 
     researcher_password = os.getenv(
         "E2E_RESEARCHER_PASSWORD",
-        "CHANGE_ME_RESEARCHER_PASSWORD"
+        "CHANGE_ME_RESEARCHER_PASSWORD",
     )
 
     con = db()
     c = con.cursor()
 
-    users = [
+    try:
+        # =====================================================
+        # DEFAULT ORGANIZATION / LOCATION
+        # =====================================================
 
-        {
-            "user_id": "admin",
-            "email": "admin@corelabtech.local",
-            "subject_id": "ADMIN",
-            "sex": None,
-            "age": None,
-            "weight": None,
-            "password": admin_password,
-            "role": "admin",
-            "notes": "Default admin account"
-        },
+        c.execute(
+            """
+            SELECT
+                o.organization_id,
+                l.location_id
+            FROM organizations o
+            JOIN organization_locations l
+                ON l.organization_id = o.organization_id
+            WHERE o.code = %s
+              AND l.code = %s
+            LIMIT 1
+            """,
+            (
+                "CORELABTECH_DEFAULT",
+                "MAIN",
+            ),
+        )
 
-        {
-            "user_id": "researcher_demo",
-            "email": "researcher@corelabtech.local",
-            "subject_id": "RESEARCHER",
-            "sex": None,
-            "age": None,
-            "weight": None,
-            "password": researcher_password,
-            "role": "researcher",
-            "notes": "Demo researcher account"
-        },
+        organization_row = c.fetchone()
 
-        # Enable only for local testing if needed.
-        # {
-        #     "user_id": "operator_demo",
-        #     "email": "operator@corelabtech.local",
-        #     "subject_id": "HBOT_DEMO_001",
-        #     "sex": "M",
-        #     "age": 46,
-        #     "weight": 83,
-        #     "password": "CHANGE_ME_OPERATOR_PASSWORD",
-        #     "role": "operator",
-        #     "notes": "Demo operator account"
-        # },
-
-        # Enable only for local testing if needed.
-        # {
-        #     "user_id": "viewer_demo",
-        #     "email": "viewer@corelabtech.local",
-        #     "subject_id": "VIEWER",
-        #     "sex": None,
-        #     "age": None,
-        #     "weight": None,
-        #     "password": "CHANGE_ME_VIEWER_PASSWORD",
-        #     "role": "viewer",
-        #     "notes": "Demo viewer account"
-        # }
-
-    ]
-
-    for u in users:
-
-        c.execute("""
-            INSERT INTO users (
-                user_id,
-                email,
-                subject_id,
-                sex,
-                age,
-                weight,
-                password_hash,
-                role,
-                is_active,
-                notes
-            )
-            VALUES (
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s
+        if not organization_row:
+            raise RuntimeError(
+                "Default organization/location not found. "
+                "Run database migrations before seed_postgres_db.py."
             )
 
-            ON CONFLICT (user_id)
+        default_organization_id = organization_row[0]
+        default_location_id = organization_row[1]
 
-            DO UPDATE SET
-                email = EXCLUDED.email,
-                subject_id = EXCLUDED.subject_id,
-                sex = EXCLUDED.sex,
-                age = EXCLUDED.age,
-                weight = EXCLUDED.weight,
-                password_hash = EXCLUDED.password_hash,
-                role = EXCLUDED.role,
-                is_active = EXCLUDED.is_active,
-                notes = EXCLUDED.notes
+        # =====================================================
+        # DEFAULT WELLNESS PROTOCOL
+        # =====================================================
 
-        """, (
+        c.execute(
+            """
+            SELECT
+                protocol_id,
+                target_ata
+            FROM protocols
+            WHERE code = %s
+            LIMIT 1
+            """,
+            ("WELLNESS_1_5",),
+        )
 
-            u["user_id"],
-            u["email"],
-            u["subject_id"],
-            u["sex"],
-            u["age"],
-            u["weight"],
-            generate_password_hash(u["password"]),
-            u["role"],
-            True,
-            u["notes"]
+        protocol_row = c.fetchone()
 
-        ))
+        if not protocol_row:
+            raise RuntimeError(
+                "WELLNESS_1_5 protocol not found. "
+                "Run database migrations before seed_postgres_db.py."
+            )
 
-    seed_contract_session(c)
+        wellness_protocol_id = protocol_row[0]
+        wellness_target_ata = protocol_row[1]
 
-    con.commit()
+        # =====================================================
+        # DEFAULT USERS
+        # =====================================================
 
-    c.close()
-    con.close()
+        users = [
+            {
+                "user_id": "admin",
+                "email": "admin@corelabtech.local",
+                "subject_id": "ADMIN",
+                "sex": None,
+                "age": None,
+                "weight": None,
+                "password": admin_password,
+                "role": "admin",
+                "notes": "Default admin account",
+                "organization_id": default_organization_id,
+                "location_id": default_location_id,
+            },
+            {
+                "user_id": "researcher_demo",
+                "email": "researcher@corelabtech.local",
+                "subject_id": "RESEARCHER",
+                "sex": None,
+                "age": None,
+                "weight": None,
+                "password": researcher_password,
+                "role": "researcher",
+                "notes": "Demo researcher account",
+                "organization_id": default_organization_id,
+                "location_id": default_location_id,
+            },
+
+            # Enable only for local testing if needed.
+            # {
+            #     "user_id": "operator_demo",
+            #     "email": "operator@corelabtech.local",
+            #     "subject_id": "HBOT_DEMO_001",
+            #     "sex": "M",
+            #     "age": 46,
+            #     "weight": 83,
+            #     "password": "CHANGE_ME_OPERATOR_PASSWORD",
+            #     "role": "operator",
+            #     "notes": "Demo operator account",
+            #     "organization_id": default_organization_id,
+            #     "location_id": default_location_id,
+            # },
+
+            # Enable only for local testing if needed.
+            # {
+            #     "user_id": "viewer_demo",
+            #     "email": "viewer@corelabtech.local",
+            #     "subject_id": "VIEWER",
+            #     "sex": None,
+            #     "age": None,
+            #     "weight": None,
+            #     "password": "CHANGE_ME_VIEWER_PASSWORD",
+            #     "role": "viewer",
+            #     "notes": "Demo viewer account",
+            #     "organization_id": default_organization_id,
+            #     "location_id": default_location_id,
+            # },
+        ]
+
+        for u in users:
+            c.execute(
+                """
+                INSERT INTO users (
+                    user_id,
+                    email,
+                    subject_id,
+                    sex,
+                    age,
+                    weight,
+                    password_hash,
+                    role,
+                    is_active,
+                    notes,
+                    organization_id,
+                    location_id
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s
+                )
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    email = EXCLUDED.email,
+                    subject_id = EXCLUDED.subject_id,
+                    sex = EXCLUDED.sex,
+                    age = EXCLUDED.age,
+                    weight = EXCLUDED.weight,
+                    password_hash = EXCLUDED.password_hash,
+                    role = EXCLUDED.role,
+                    is_active = EXCLUDED.is_active,
+                    notes = EXCLUDED.notes,
+                    organization_id = EXCLUDED.organization_id,
+                    location_id = EXCLUDED.location_id
+                """,
+                (
+                    u["user_id"],
+                    u["email"],
+                    u["subject_id"],
+                    u["sex"],
+                    u["age"],
+                    u["weight"],
+                    generate_password_hash(u["password"]),
+                    u["role"],
+                    True,
+                    u["notes"],
+                    u["organization_id"],
+                    u["location_id"],
+                ),
+            )
+
+        seed_contract_session(
+            c,
+            organization_id=default_organization_id,
+            location_id=default_location_id,
+            protocol_id=wellness_protocol_id,
+            target_ata=wellness_target_ata,
+        )
+
+        con.commit()
+
+    except Exception:
+        con.rollback()
+        raise
+
+    finally:
+        c.close()
+        con.close()
 
     print("========================================")
     print("PostgreSQL seed completed")
     print("========================================")
 
     print("Active production/demo accounts:")
-    print("  admin@corelabtech.local / configured from E2E_ADMIN_PASSWORD")
-    print("  researcher@corelabtech.local / configured from E2E_RESEARCHER_PASSWORD")
+    print(
+        "  admin@corelabtech.local / "
+        "configured from E2E_ADMIN_PASSWORD"
+    )
+    print(
+        "  researcher@corelabtech.local / "
+        "configured from E2E_RESEARCHER_PASSWORD"
+    )
 
     print("")
-    print("Operator/viewer examples are commented out in seed_postgres_db.py")
+    print(
+        "Operator/viewer examples are commented out "
+        "in seed_postgres_db.py"
+    )
     print("Enable them only for local testing if needed.")
 
     print("========================================")
 
 
-def seed_contract_session(cursor):
+def seed_contract_session(
+    cursor,
+    *,
+    organization_id: int,
+    location_id: int,
+    protocol_id: int,
+    target_ata: float,
+):
     session_id = "E2E_CONTRACT_SESSION"
     user_id = "E2E_CONTRACT_USER"
     now = datetime.utcnow().replace(microsecond=0)
@@ -157,15 +259,19 @@ def seed_contract_session(cursor):
             subject_id,
             role,
             is_active,
-            notes
+            notes,
+            organization_id,
+            location_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (user_id)
         DO UPDATE SET
             subject_id = EXCLUDED.subject_id,
             role = EXCLUDED.role,
             is_active = EXCLUDED.is_active,
-            notes = EXCLUDED.notes
+            notes = EXCLUDED.notes,
+            organization_id = EXCLUDED.organization_id,
+            location_id = EXCLUDED.location_id
         """,
         (
             user_id,
@@ -174,6 +280,8 @@ def seed_contract_session(cursor):
             "operator",
             True,
             "E2E contract fixture subject",
+            organization_id,
+            location_id,
         ),
     )
 
@@ -205,20 +313,28 @@ def seed_contract_session(cursor):
             protocol_id,
             target_ata,
             actual_ata,
+            organization_id,
+            location_id,
             session_status,
             pre_json,
             during_json,
             post_json,
             summary,
             completed
-)
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        )
+        VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s,
+            %s, %s, %s
+        )
         ON CONFLICT (session_id)
         DO UPDATE SET
             user_id = EXCLUDED.user_id,
             protocol_id = EXCLUDED.protocol_id,
             target_ata = EXCLUDED.target_ata,
             actual_ata = EXCLUDED.actual_ata,
+            organization_id = EXCLUDED.organization_id,
+            location_id = EXCLUDED.location_id,
             session_status = EXCLUDED.session_status,
             pre_json = EXCLUDED.pre_json,
             during_json = EXCLUDED.during_json,
@@ -229,17 +345,21 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         (
             session_id,
             user_id,
-            2,
-            1.5,
-            1.5,
+            protocol_id,
+            target_ata,
+            target_ata,
+            organization_id,
+            location_id,
             "completed",
             json.dumps(pre),
             json.dumps(during),
             json.dumps(post),
-            json.dumps({
-            "source": "seed_postgres_db",
-            "purpose": "E2E AI contract fixture",
-            }),
+            json.dumps(
+                {
+                    "source": "seed_postgres_db",
+                    "purpose": "E2E AI contract fixture",
+                }
+            ),
             1,
         ),
     )
@@ -262,7 +382,10 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             status,
             finished_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+        VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, CURRENT_TIMESTAMP
+        )
         RETURNING merge_id
         """,
         (
