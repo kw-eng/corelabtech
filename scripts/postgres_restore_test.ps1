@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BackupPath,
 
-    [string]$TestDatabase = "corelabtech_restore_test"
+    [string]$TestDatabase = "corelabtech_restore_test",
+
+    [switch]$KeepTestDatabase
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,7 +23,12 @@ docker cp $BackupPath "corelabtech_postgres:$containerPath"
 docker compose exec -T db sh -lc "dropdb -U `"`$POSTGRES_USER`" --if-exists $TestDatabase"
 docker compose exec -T db sh -lc "createdb -U `"`$POSTGRES_USER`" $TestDatabase"
 docker compose exec -T db sh -lc "pg_restore -U `"`$POSTGRES_USER`" -d $TestDatabase --no-owner $containerPath"
-docker compose exec -T db sh -lc "psql -U `"`$POSTGRES_USER`" -d $TestDatabase -c `"SELECT COUNT(*) AS users_count FROM users;`""
+docker compose exec -T db sh -lc "psql -v ON_ERROR_STOP=1 -U `"`$POSTGRES_USER`" -d $TestDatabase -c `"SELECT COUNT(*) AS users_count FROM users; SELECT COUNT(*) AS sessions_count FROM full_sessions; SELECT COUNT(*) AS migrations_count FROM schema_migrations;`""
 docker compose exec -T db rm -f $containerPath
 
-Write-Host "Restore test completed in database: $TestDatabase"
+if (-not $KeepTestDatabase) {
+    docker compose exec -T db sh -lc "dropdb -U `"`$POSTGRES_USER`" $TestDatabase"
+    Write-Host "Restore test passed; temporary database removed: $TestDatabase"
+} else {
+    Write-Host "Restore test passed; database retained: $TestDatabase"
+}

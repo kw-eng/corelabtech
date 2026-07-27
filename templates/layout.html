@@ -21,7 +21,7 @@
     <div class="header">
 
         <img
-            src="{{ url_for('static', filename='img/logo.svg') }}"
+            src="{{ url_for('static', filename='img/logo.svg') }}?v=wellness-commercial-20260727"
             class="logo"
         >
 
@@ -38,30 +38,33 @@
             <a href="{{ url_for('main.home') }}">Home</a>
             <a href="{{ url_for('main.about') }}">About</a>
             <a href="{{ url_for('main.technology') }}">Technology</a>
+            <a href="{{ url_for('main.wellness_start') }}">Wellness Start</a>
             <a href="{{ url_for('pub.publications') }}">Research</a>
             <a href="{{ url_for('main.contact') }}">Contact</a>
         </div>
 
         {% if not current_user.is_authenticated %}
             <div class="nav-group nav-group-right">
+                {% if config.INTERNAL_TOOLS_ENABLED %}
                 <a href="{{ url_for('research.ai_testing_lab_public') }}">AI Testing Lab</a>
+                {% endif %}
                 <a class="nav-primary" href="{{ url_for('auth.login') }}">Login</a>
             </div>
         {% endif %}
 
         {% if current_user.is_authenticated %}
             <div class="nav-group nav-dropdown">
-                <button type="button">Research</button>
+                <button type="button">Wellness</button>
                 <div class="nav-menu">
-                    <a href="{{ url_for('research.research_platform') }}">Research Platform</a>
-                    <a href="{{ url_for('research.research_dashboard') }}">Mission Control</a>
                     {% if current_user.role in ["operator", "researcher", "admin"] %}
-                        <a href="{{ url_for('research.chamber_testing') }}">Chamber Testing</a>
+                        <a href="{{ url_for('research.chamber_testing') }}">New Session</a>
                     {% endif %}
+                    <a href="{{ url_for('research.research_dashboard') }}">Session Reports</a>
+                    <a href="{{ url_for('ai.ai_lab') }}">Physiology Insights</a>
                 </div>
             </div>
 
-            {% if current_user.role in ["researcher", "admin"] %}
+            {% if config.INTERNAL_TOOLS_ENABLED and current_user.role in ["researcher", "admin"] %}
                 <div class="nav-group nav-dropdown">
                     <button type="button">AI & QA</button>
                     <div class="nav-menu">
@@ -74,10 +77,12 @@
 
             {% if current_user.role == "admin" %}
                 <div class="nav-group nav-dropdown">
-                    <button type="button">Admin</button>
+                    <button type="button">Management</button>
                     <div class="nav-menu">
+                        {% if config.INTERNAL_TOOLS_ENABLED %}
                         <a href="{{ url_for('research.performance_tests') }}">Performance Tests</a>
                         <a href="{{ url_for('research.admin_panel') }}">Mission Logs</a>
+                        {% endif %}
                         {% if config.DEBUG_ROUTES_ENABLED %}
                         <a href="{{ url_for('research.debug_db') }}">DB Debug</a>
                         {% endif %}
@@ -108,7 +113,14 @@
 </main>
 
 <footer>
-    <p>&copy; CoreLabTech Laboratory 2026</p>
+    <p>&copy; CoreLabTech Wellness 2026</p>
+    <p>
+        <a href="{{ url_for('main.privacy') }}">Privacy Notice</a>
+        ·
+        <a href="{{ url_for('main.terms') }}">Wellness Terms</a>
+        ·
+        <a href="{{ url_for('main.wellness_start') }}">Operator Onboarding</a>
+    </p>
     <p class="brand-disclaimer">FIT/wearable compatibility does not imply affiliation, endorsement or sponsorship by any device manufacturer, including Garmin.</p>
 </footer>
 

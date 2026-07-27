@@ -41,13 +41,13 @@
 
     <section class="admin-toolbar">
         <div class="admin-field">
-            <label for="filter">Risk filter</label>
+            <label for="filter">Response filter</label>
             <select id="filter" onchange="renderSessions()">
                 <option value="all">All sessions</option>
-                <option value="low">Low risk</option>
-                <option value="moderate">Moderate risk</option>
-                <option value="high">High risk</option>
-                <option value="anomaly">Flagged only</option>
+                <option value="low">Stable response</option>
+                <option value="moderate">Review context</option>
+                <option value="high">Elevated load</option>
+                <option value="anomaly">Review recommended</option>
                 <option value="missing">Without AI result</option>
             </select>
         </div>
@@ -74,10 +74,10 @@
                     <tr>
                         <th>Date</th>
                         <th>Session</th>
-                        <th>User</th>
-                        <th>Score</th>
-                        <th>Risk</th>
-                        <th>Session flag</th>
+                        <th>Client</th>
+                        <th>Response</th>
+                        <th>Status</th>
+                        <th>Review</th>
                         <th>Avg SpO2</th>
                         <th>Avg Pulse</th>
                         <th>Timeline</th>
@@ -95,7 +95,7 @@
             <div class="admin-section-header">
                 <div>
                     <h2>Experiment Timeline</h2>
-                    <p>Recent session risk trend based on stored AI output.</p>
+                    <p>Recent wellness response trend based on stored analysis output.</p>
                 </div>
             </div>
 
@@ -229,7 +229,14 @@ function normalizeAnalysis(ai){
 }
 
 function anomalyText(value){
-    return value ? "YES" : "NO"
+    return value ? "Review" : "No flag"
+}
+
+function responseLabel(value){
+    if(value === "High") return "Elevated load"
+    if(value === "Moderate") return "Review context"
+    if(value === "Low") return "Stable response"
+    return value || "-"
 }
 
 function formatMetric(value, unit){
@@ -403,7 +410,7 @@ function renderSessions(){
                 <td><code>${row.session_id || "-"}</code></td>
                 <td>${row.user_id || "-"}</td>
                 <td>${row.score ?? "-"}</td>
-                <td><span class="admin-risk ${String(row.risk_level || "-").toLowerCase()}">${row.risk_level || "-"}</span></td>
+                <td><span class="admin-risk ${String(row.risk_level || "-").toLowerCase()}">${responseLabel(row.risk_level)}</span></td>
                 <td>${anomalyText(row.anomaly)}</td>
                 <td>${formatMetric(features.avg_spo2 ?? features.avg_csv_spo2, "%")}</td>
                 <td>${formatMetric(features.avg_pulse ?? features.avg_csv_pulse, "bpm")}</td>
@@ -449,8 +456,8 @@ function renderTimeline(){
             <div class="qa-step ${cls}">
                 <b>${s.created_at || s.date || "-"}</b>
                 <span>Session: ${s.session_id}</span>
-                <span>User: ${s.user_id || "-"}</span>
-                <span>Score: ${s.score ?? "-"} / 100 | Status: ${risk} | Session flag: ${anomalyText(s.anomaly)}</span>
+                <span>Client: ${s.user_id || "-"}</span>
+                <span>Wellness response: ${s.score ?? "-"} / 100 | Status: ${responseLabel(risk)} | Review: ${anomalyText(s.anomaly)}</span>
             </div>
         `
     })

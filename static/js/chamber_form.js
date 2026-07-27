@@ -3,9 +3,14 @@
 let state = {
     pre: null,
     during: null,
-    post: null
+    post: null,
+    chambers: [],
+    protocols: [],
+    programs: [],
+    enrollments: []
 }
 
+const STANDARD_ATMOSPHERE_KPA = 101.325
 const TABLE_PREVIEW_LIMIT = 5000
 const TABLE_RENDER_CHUNK_SIZE = 100
 const FIT_UPLOAD_TIMEOUT_MS = 120000
@@ -211,6 +216,15 @@ window.onload = () => {
 
     loadSessions()
 
+    loadSessionConfiguration()
+
+    loadCommercialContext()
+
+    document.getElementById("use_detailed_timeline")?.addEventListener(
+        "change",
+        toggleDetailedTimeline
+    )
+
     initPressurePreview()
 
     initOxygenPreview()
@@ -235,7 +249,6 @@ window.onload = () => {
 
     updateProgress()
 
-    // setInterval(updateRealtimeAI, 5000)
 }
 
 // ========================================
@@ -341,67 +354,504 @@ function initPressurePreview() {
 
     const pressure =
         document.getElementById("during_pressure")
+    const pressureUnit =
+        document.getElementById("during_pressure_unit")
+    const protocol =
+        document.getElementById("protocol_id")
 
     if (!pressure) return
 
-    pressure.addEventListener("input", () => {
+    pressure.addEventListener("input", updatePressurePreview)
+    pressureUnit?.addEventListener("change", updatePressurePreview)
+    protocol?.addEventListener("change", updatePressurePreview)
+}
 
-        const kpa = Number(pressure.value)
+function pressureToAta(value, unit) {
+    const numericValue = Number(value)
 
-        if (!kpa) {
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+        return null
+    }
 
-            document.getElementById(
-                "ata_preview"
-            ).innerText = ""
+    if (unit === "ata") {
+        return numericValue
+    }
 
-            return
+    if (unit === "kpa_absolute") {
+        return numericValue / STANDARD_ATMOSPHERE_KPA
+    }
+
+    if (unit === "kpa_gauge") {
+        return 1 + (numericValue / STANDARD_ATMOSPHERE_KPA)
+    }
+
+    return null
+}
+
+function getSelectedProtocol() {
+    const protocolId =
+        Number(document.getElementById("protocol_id")?.value)
+
+    return state.protocols.find(
+        protocol => Number(protocol.protocol_id) === protocolId
+    ) || null
+}
+
+function protocolPhaseValue(protocol, field, fallback = 0) {
+    const value = Number(protocol?.[field])
+    return Number.isFinite(value) ? value : fallback
+}
+
+function updateDurationPreview() {
+    const compression = Number(
+        document.getElementById("during_compression_min")?.value
+    )
+    const exposure = Number(
+        document.getElementById("during_exposure_min")?.value
+    )
+    const decompression = Number(
+        document.getElementById("during_decompression_min")?.value
+    )
+    const values = [compression, exposure, decompression]
+
+    if (values.some(value => !Number.isFinite(value) || value < 0)) {
+        setText("duration_preview", "Enter valid phase durations.")
+        return
+    }
+
+    const total = compression + exposure + decompression
+    setText(
+        "duration_preview",
+        `${compression} min compression · ${exposure} min at target pressure · ` +
+        `${decompression} min decompression · ${total} min total`
+    )
+
+    const protocol = getSelectedProtocol()
+    if (protocol) {
+        const differs =
+            compression !== Number(protocol.compression_time_min) ||
+            exposure !== Number(protocol.exposure_time_min) ||
+            decompression !== Number(protocol.decompression_time_min)
+        if (differs) {
+            document.getElementById("during_execution_status").value =
+                "modified"
+        }
+    }
+}
+
+async function loadCommercialContext() {
+    try {
+        const [contextResponse, programsResponse] = await Promise.all([
+            fetch("/api/organization/context", {credentials: "same-origin"}),
+            fetch("/api/programs", {credentials: "same-origin"})
+        ])
+        const context = await parseJsonResponse(
+            contextResponse,
+            "LOAD ORGANIZATION"
+        )
+        const programs = await parseJsonResponse(
+            programsResponse,
+            "LOAD PROGRAMS"
+        )
+        if (contextResponse.ok) {
+            setText(
+                "organization_context",
+                `${context.organization_name} | ${context.location_name}`
+            )
+        }
+        if (programsResponse.ok && Array.isArray(programs)) {
+            state.programs = programs
+            const select = document.getElementById("program_catalog")
+            select.replaceChildren()
+            programs.forEach(program => {
+                const option = document.createElement("option")
+                option.value = program.program_id
+                option.textContent =
+                    `${program.name} | ${program.total_sessions} sessions`
+                select.appendChild(option)
+            })
+        }
+    } catch (error) {
+        console.error("Commercial context load failed:", error)
+    }
+}
+
+async function loadClientPrograms() {
+    const clientId = getSelectedSubjectId()
+    const select = document.getElementById("program_enrollment_id")
+    select.replaceChildren()
+    const empty = document.createElement("option")
+    empty.value = ""
+    empty.textContent = "Single session / no package"
+    select.appendChild(empty)
+    state.enrollments = []
+
+    if (!clientId) {
+        setText("program_progress", "No active program selected.")
+        return
+    }
+
+    const response = await fetch(
+        `/api/client-programs?client_id=${encodeURIComponent(clientId)}`,
+        {credentials: "same-origin"}
+    )
+    const enrollments = await parseJsonResponse(
+        response,
+        "LOAD CLIENT PROGRAMS"
+    )
+    if (!response.ok || !Array.isArray(enrollments)) return
+
+    state.enrollments = enrollments
+    enrollments
+        .filter(enrollment => enrollment.status === "active")
+        .forEach(enrollment => {
+            const option = document.createElement("option")
+            option.value = enrollment.enrollment_id
+            option.textContent =
+                `${enrollment.program_name} | ` +
+                `${enrollment.completed_sessions}/${enrollment.total_sessions}`
+            select.appendChild(option)
+        })
+
+    if (select.options.length > 1) {
+        select.selectedIndex = 1
+    }
+    renderProgramProgress()
+    select.onchange = renderProgramProgress
+}
+
+function renderProgramProgress() {
+    const enrollmentId = Number(
+        document.getElementById("program_enrollment_id")?.value
+    )
+    const enrollment = state.enrollments.find(
+        item => Number(item.enrollment_id) === enrollmentId
+    )
+    if (!enrollment) {
+        setText("program_progress", "Single session, outside a package.")
+        return
+    }
+    setText(
+        "program_progress",
+        `${enrollment.program_name}: ${enrollment.completed_sessions}/` +
+        `${enrollment.total_sessions} completed, ` +
+        `${enrollment.remaining_sessions} remaining`
+    )
+    if (enrollment.protocol_id) {
+        document.getElementById("protocol_id").value = enrollment.protocol_id
+        applyProtocolTimingDefaults()
+        updatePressurePreview()
+    }
+}
+
+async function enrollSelectedClient() {
+    const clientId = getSelectedSubjectId()
+    const programId = Number(
+        document.getElementById("program_catalog")?.value
+    )
+    if (!clientId || !programId) {
+        alert("Select a client and program")
+        return
+    }
+    const response = await fetch("/api/client-programs", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            client_id: clientId,
+            program_id: programId
+        })
+    })
+    const data = await parseJsonResponse(response, "ENROLL CLIENT")
+    if (!response.ok) {
+        alert(data.error || "Client enrollment failed")
+        return
+    }
+    await loadClientPrograms()
+}
+
+function toggleDetailedTimeline() {
+    const enabled = document.getElementById("use_detailed_timeline").checked
+    document.getElementById("session_segments_editor").hidden = !enabled
+    if (
+        enabled &&
+        document.getElementById("session_segments_rows").children.length === 0
+    ) {
+        const protocol = getSelectedProtocol()
+        addSessionSegment("compression", protocol?.compression_time_min)
+        addSessionSegment("exposure", protocol?.exposure_time_min)
+        addSessionSegment("decompression", protocol?.decompression_time_min)
+    }
+    updateSegmentsTotal()
+}
+
+function addSessionSegment(phase = "exposure", duration = "") {
+    const row = document.createElement("div")
+    row.className = "segment-row"
+    row.innerHTML = `
+        <select class="segment-phase">
+            <option value="compression">Compression</option>
+            <option value="exposure">Exposure</option>
+            <option value="air_break">Air break</option>
+            <option value="decompression">Decompression</option>
+            <option value="recovery">Recovery</option>
+            <option value="other">Other</option>
+        </select>
+        <input class="segment-duration" type="number" min="0" max="360"
+            step="1" value="${Number(duration) || 0}" aria-label="Duration min">
+        <input class="segment-target-ata" type="number" min="1" max="3"
+            step="0.01" value="${getSelectedProtocol()?.target_ata || ""}"
+            aria-label="Target ATA">
+        <input class="segment-actual-ata" type="number" min="1" max="3"
+            step="0.01" placeholder="Actual ATA" aria-label="Actual ATA">
+        <input class="segment-note" placeholder="Segment note"
+            aria-label="Segment note">
+        <button type="button" class="danger-btn" title="Remove segment">×</button>
+    `
+    row.querySelector(".segment-phase").value = phase
+    row.querySelector("button").onclick = () => {
+        row.remove()
+        updateSegmentsTotal()
+    }
+    row.querySelectorAll("input, select").forEach(element => {
+        element.addEventListener("input", updateSegmentsTotal)
+    })
+    document.getElementById("session_segments_rows").appendChild(row)
+    updateSegmentsTotal()
+}
+
+function collectSessionSegments() {
+    if (!document.getElementById("use_detailed_timeline").checked) return []
+    return [...document.querySelectorAll(".segment-row")].map(row => ({
+        phase: row.querySelector(".segment-phase").value,
+        actual_duration_min: Number(
+            row.querySelector(".segment-duration").value
+        ),
+        target_ata: Number(row.querySelector(".segment-target-ata").value),
+        actual_ata:
+            Number(row.querySelector(".segment-actual-ata").value) || null,
+        note: row.querySelector(".segment-note").value.trim() || null
+    }))
+}
+
+function updateSegmentsTotal() {
+    const total = collectSessionSegments().reduce(
+        (sum, segment) => sum + (segment.actual_duration_min || 0),
+        0
+    )
+    setText("segments_total", `${total} min total across detailed segments`)
+}
+
+function applyProtocolTimingDefaults() {
+    const protocol = getSelectedProtocol()
+    const preview = document.getElementById("protocol_plan_preview")
+
+    if (!protocol) {
+        if (preview) {
+            preview.textContent =
+                "Select a protocol to view its planned phase timing."
+        }
+        return
+    }
+
+    const compression = protocolPhaseValue(
+        protocol,
+        "compression_time_min"
+    )
+    const exposure = protocolPhaseValue(protocol, "exposure_time_min")
+    const decompression = protocolPhaseValue(
+        protocol,
+        "decompression_time_min"
+    )
+    const total = protocolPhaseValue(
+        protocol,
+        "planned_duration_min",
+        compression + exposure + decompression
+    )
+
+    document.getElementById("during_compression_min").value = compression
+    document.getElementById("during_exposure_min").value = exposure
+    document.getElementById("during_decompression_min").value = decompression
+
+    if (preview) {
+        preview.textContent =
+            `Planned: ${compression} min compression · ` +
+            `${exposure} min at target pressure · ` +
+            `${decompression} min decompression · ${total} min total`
+    }
+    updateDurationPreview()
+}
+
+function getSelectedChamber() {
+    const chamberId =
+        Number(document.getElementById("chamber_id")?.value)
+
+    return state.chambers.find(
+        chamber => Number(chamber.chamber_id) === chamberId
+    ) || null
+}
+
+function updatePressurePreview() {
+    const preview = document.getElementById("ata_preview")
+    const pressureValue =
+        document.getElementById("during_pressure")?.value
+    const pressureUnit =
+        document.getElementById("during_pressure_unit")?.value
+    const actualAta = pressureToAta(pressureValue, pressureUnit)
+    const selectedProtocol = getSelectedProtocol()
+
+    if (!preview) return
+
+    if (!selectedProtocol) {
+        preview.textContent = "Select a wellness protocol."
+        return
+    }
+
+    const targetAta = Number(selectedProtocol.target_ata)
+
+    if (actualAta === null) {
+        preview.textContent =
+            `Target: ${targetAta.toFixed(2)} ATA. Enter recorded pressure.`
+        return
+    }
+
+    const difference = actualAta - targetAta
+    const differenceLabel =
+        `${difference >= 0 ? "+" : ""}${difference.toFixed(3)} ATA`
+
+    preview.textContent =
+        `Target: ${targetAta.toFixed(2)} ATA · ` +
+        `Recorded: ${actualAta.toFixed(3)} ATA · ` +
+        `Difference: ${differenceLabel}`
+}
+
+async function loadSessionConfiguration() {
+    try {
+        const [chambersResponse, protocolsResponse] = await Promise.all([
+            fetch("/api/chambers", {credentials: "same-origin"}),
+            fetch("/api/protocols", {credentials: "same-origin"})
+        ])
+        const chambers = await parseJsonResponse(
+            chambersResponse,
+            "LOAD CHAMBERS"
+        )
+        const protocols = await parseJsonResponse(
+            protocolsResponse,
+            "LOAD PROTOCOLS"
+        )
+
+        if (!chambersResponse.ok || !Array.isArray(chambers)) {
+            throw new Error(chambers.error || "Cannot load chambers")
+        }
+        if (!protocolsResponse.ok || !Array.isArray(protocols)) {
+            throw new Error(protocols.error || "Cannot load protocols")
         }
 
-        const ata = (1 + (kpa / 100)).toFixed(2)
+        state.chambers = chambers
+        state.protocols = protocols
 
-        document.getElementById(
-            "ata_preview"
-        ).innerText = `ATA: ${ata}`
-    })
+        const chamberSelect = document.getElementById("chamber_id")
+        const protocolSelect = document.getElementById("protocol_id")
+
+        chamberSelect.replaceChildren()
+        chambers.forEach(chamber => {
+            const option = document.createElement("option")
+            option.value = chamber.chamber_id
+            option.textContent = chamber.location
+                ? `${chamber.name} · ${chamber.location}`
+                : chamber.name
+            chamberSelect.appendChild(option)
+        })
+
+        protocolSelect.replaceChildren()
+        const placeholder = document.createElement("option")
+        placeholder.value = ""
+        placeholder.textContent = "Select protocol"
+        protocolSelect.appendChild(placeholder)
+
+        protocols.forEach(protocol => {
+            const option = document.createElement("option")
+            option.value = protocol.protocol_id
+            option.textContent =
+                `${protocol.name} · ${protocol.planned_duration_min || "-"} min`
+            protocolSelect.appendChild(option)
+            option.textContent =
+                `${protocol.name} | ${protocol.planned_duration_min || "-"} min total`
+        })
+
+        const preferredProtocol = protocols.find(
+            protocol => protocol.code === "WELLNESS_1_5"
+        )
+        if (preferredProtocol) {
+        protocolSelect.value = preferredProtocol.protocol_id
+        applyProtocolTimingDefaults()
+        }
+
+        const selectedChamber = getSelectedChamber()
+        if (selectedChamber?.pressure_input_unit) {
+            document.getElementById("during_pressure_unit").value =
+                selectedChamber.pressure_input_unit
+        }
+
+        chamberSelect.addEventListener("change", () => {
+            const chamber = getSelectedChamber()
+            if (chamber?.pressure_input_unit) {
+                document.getElementById("during_pressure_unit").value =
+                    chamber.pressure_input_unit
+            }
+            updatePressurePreview()
+        })
+        protocolSelect.addEventListener("change", () => {
+            applyProtocolTimingDefaults()
+            updatePressurePreview()
+        })
+        ;[
+            "during_compression_min",
+            "during_exposure_min",
+            "during_decompression_min"
+        ].forEach(id => {
+            document.getElementById(id)?.addEventListener(
+                "input",
+                updateDurationPreview
+            )
+        })
+        applyProtocolTimingDefaults()
+        updatePressurePreview()
+    } catch (error) {
+        console.error("Session configuration load failed:", error)
+        setText("ata_preview", "Chamber/protocol configuration unavailable.")
+    }
 }
 
 function initOxygenPreview() {
 
     const oxygen =
         document.getElementById("during_oxygen_lpm")
+    const percent =
+        document.getElementById("during_oxygen_percent")
 
     if (!oxygen) return
 
-    oxygen.addEventListener("input", () => {
-
+    const renderRecordedOxygen = () => {
         const lpm = Number(oxygen.value)
+        const oxygenPercent = Number(percent?.value)
+        const values = []
 
-        if (!lpm) {
-
-            document.getElementById(
-                "oxygen_preview"
-            ).innerText = ""
-
-            return
+        if (Number.isFinite(lpm) && lpm > 0) {
+            values.push(`${lpm.toFixed(1)} L/min`)
+        }
+        if (Number.isFinite(oxygenPercent) && oxygenPercent > 0) {
+            values.push(`${oxygenPercent.toFixed(1)}% O2 setting`)
         }
 
-        const auto =
-            Math.min(96, 87 + (lpm * 1.2))
+        document.getElementById("oxygen_preview").innerText =
+            values.length
+                ? `Recorded: ${values.join(" · ")}`
+                : "Record configured device values; O2 percentage is not inferred from flow."
+    }
 
-        document.getElementById(
-            "oxygen_preview"
-        ).innerText =
-            `Auto O2: ${auto.toFixed(1)}%`
-
-        const percent =
-            document.getElementById(
-                "during_oxygen_percent"
-            )
-
-        if (percent) {
-            percent.value = auto.toFixed(1)
-        }
-    })
+    oxygen.addEventListener("input", renderRecordedOxygen)
+    percent?.addEventListener("input", renderRecordedOxygen)
 }
 
 // ========================================
@@ -414,7 +864,7 @@ function go(phase) {
         phase === "during" &&
         !state.pre?.saved
     ) {
-        alert("Save PRE first")
+        alert("Save Check-in first")
         return
     }
 
@@ -422,7 +872,7 @@ function go(phase) {
         phase === "post" &&
         !state.during?.saved
     ) {
-        alert("Save DURING first")
+        alert("Save Session first")
         return
     }
 
@@ -458,7 +908,7 @@ async function createSubject() {
         )
 
     if (!subjectId) {
-        alert("Enter Subject ID")
+        alert("Enter Client ID")
         return
     }
 
@@ -498,11 +948,11 @@ async function createSubject() {
 
     if (!res.ok || data.error) {
 
-        alert(data.error || "Create subject failed")
+        alert(data.error || "Create client failed")
         return
     }
 
-    alert("Subject created")
+    alert("Client created")
 
     await loadSubjects()
 }
@@ -519,11 +969,11 @@ async function deleteSubject() {
         subjectSelect.options[subjectSelect.selectedIndex]?.text || subjectId
 
     if (!subjectId) {
-        alert("No subject selected")
+        alert("No client selected")
         return
     }
 
-    if (!confirm(`Are you sure you want to delete this subject and all related sessions?\n\nSubject: ${subjectLabel}\nID: ${subjectId}`)) {
+    if (!confirm(`Are you sure you want to delete this client and all related sessions?\n\nClient: ${subjectLabel}\nID: ${subjectId}`)) {
         return
     }
 
@@ -559,11 +1009,11 @@ async function deleteSubject() {
         }
 
         if (!res.ok || data.error) {
-            alert(data.error || "Delete subject failed")
+            alert(data.error || "Delete client failed")
             return
         }
 
-        alert("Subject deleted")
+        alert("Client deleted")
 
         loadSubjects()
 
@@ -663,7 +1113,11 @@ function generateSession() {
     state = {
         pre: null,
         during: null,
-        post: null
+        post: null,
+        chambers: state.chambers || [],
+        protocols: state.protocols || [],
+        programs: state.programs || [],
+        enrollments: []
     }
 
     document.getElementById(
@@ -685,6 +1139,8 @@ function generateSession() {
     updateProgress()
 
     go("pre")
+
+    loadClientPrograms()
 }
 
 // ========================================
@@ -709,7 +1165,7 @@ async function savePRE() {
 
     if (!spo2 || !pulse) {
 
-        alert("Fill PRE data")
+        alert("Fill Check-in data")
         return
     }
 
@@ -771,7 +1227,7 @@ async function savePRE() {
 
             alert(
                 data.error ||
-                "PRE save failed"
+                "Check-in save failed"
             )
 
             return
@@ -789,7 +1245,7 @@ async function savePRE() {
 
             <div class="success-box">
 
-                <b>✔ PRE SAVED</b>
+                <b>Check-in saved</b>
 
                 <br><br>
 
@@ -824,7 +1280,7 @@ async function savePRE() {
 
         })
 
-        alert("PRE saved successfully")
+        alert("Check-in saved successfully")
 
     } catch (err) {
 
@@ -832,7 +1288,7 @@ async function savePRE() {
 
         state.pre = null
 
-        alert("Server error during PRE save")
+        alert("Server error during Check-in save")
     }
 }
 
@@ -874,6 +1330,10 @@ async function uploadFIT() {
     fd.append(
         "session_id",
         sessionId
+    )
+    fd.append(
+        "client_id",
+        getSelectedSubjectId()
     )
 
     try {
@@ -1001,6 +1461,20 @@ async function uploadFIT() {
             uploadButton.disabled = false
         }
     }
+}
+
+function exportClient() {
+    const clientId = getSelectedSubjectId()
+
+    if (!clientId) {
+        alert("Select a client first")
+        return
+    }
+
+    window.location.href =
+        "/api/clients/" +
+        encodeURIComponent(clientId) +
+        "/export"
 }
 
 async function loadFITTable(session, importId = null) {
@@ -1131,6 +1605,10 @@ async function uploadCSV() {
         document.getElementById(
             "session_id"
         ).value
+    )
+    fd.append(
+        "client_id",
+        getSelectedSubjectId()
     )
 
     try {
@@ -1316,7 +1794,8 @@ async function mergeDuring() {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                session_id: sessionId
+                session_id: sessionId,
+                client_id: getSelectedSubjectId()
             })
         })
 
@@ -1446,6 +1925,33 @@ async function saveDURING() {
 
     const pressure =
         Number(document.getElementById("during_pressure").value)
+    const pressureUnit =
+        document.getElementById("during_pressure_unit").value
+    const selectedProtocol = getSelectedProtocol()
+    const selectedChamber = getSelectedChamber()
+    const compressionTimeMin =
+        Number(document.getElementById("during_compression_min").value)
+    const exposureTimeMin =
+        Number(document.getElementById("during_exposure_min").value)
+    const decompressionTimeMin =
+        Number(document.getElementById("during_decompression_min").value)
+    const totalDurationMin =
+        compressionTimeMin + exposureTimeMin + decompressionTimeMin
+    const sessionSegments = collectSessionSegments()
+    const detailedTotalDurationMin = sessionSegments.reduce(
+        (sum, segment) => sum + (segment.actual_duration_min || 0),
+        0
+    )
+    const effectiveTotalDurationMin =
+        sessionSegments.length > 0
+            ? detailedTotalDurationMin
+            : totalDurationMin
+    const executionStatus =
+        document.getElementById("during_execution_status").value
+    const deviationReason =
+        document.getElementById("during_deviation_reason").value.trim()
+    const programEnrollmentId =
+        Number(document.getElementById("program_enrollment_id").value) || null
 
     const temp =
         Number(document.getElementById("during_temp").value)
@@ -1462,13 +1968,50 @@ async function saveDURING() {
     const oxygenPercent =
         Number(document.getElementById("during_oxygen_percent").value)
 
+    if (!selectedChamber || !selectedProtocol) {
+        alert("Select chamber and protocol")
+        return
+    }
+
     if (!pressure || !temp) {
         alert("Fill chamber data")
         return
     }
 
-    const ata =
-        1 + (pressure / 100)
+    if (
+        !Number.isInteger(compressionTimeMin) ||
+        compressionTimeMin < 0 ||
+        !Number.isInteger(exposureTimeMin) ||
+        exposureTimeMin < 1 ||
+        !Number.isInteger(decompressionTimeMin) ||
+        decompressionTimeMin < 0 ||
+        effectiveTotalDurationMin > 360 ||
+        effectiveTotalDurationMin < 1
+    ) {
+        alert("Enter valid session phase durations")
+        return
+    }
+
+    if (
+        ["modified", "interrupted"].includes(executionStatus) &&
+        !deviationReason
+    ) {
+        alert("Enter the reason for a modified or interrupted session")
+        return
+    }
+
+    const ata = pressureToAta(pressure, pressureUnit)
+    const targetAta = Number(selectedProtocol.target_ata)
+
+    if (ata === null || ata < 1 || ata > 3) {
+        alert("Recorded pressure does not produce a valid ATA value")
+        return
+    }
+
+    if (ata > Number(selectedChamber.max_ata) + 0.02) {
+        alert("Recorded ATA exceeds the selected chamber maximum")
+        return
+    }
 
     const fitRes =
     await fetch(
@@ -1517,13 +2060,30 @@ async function saveDURING() {
     state.during = {
         saved: true,
         phase: "during",
-        pressure_kpa: pressure,
+        chamber_id: Number(selectedChamber.chamber_id),
+        chamber_name: selectedChamber.name,
+        protocol_id: Number(selectedProtocol.protocol_id),
+        protocol_code: selectedProtocol.code,
+        protocol_name: selectedProtocol.name,
+        target_ata: targetAta,
+        actual_ata: ata,
+        pressure_deviation: ata - targetAta,
+        pressure_input_value: pressure,
+        pressure_input_unit: pressureUnit,
         pressure_ata: ata,
         chamber_temperature: temp,
         body_temperature: bodyTemp,
         humidity: humidity,
         oxygen_flow_lpm: oxygenLpm,
         oxygen_mask_percent: oxygenPercent,
+        compression_time_min: compressionTimeMin,
+        exposure_time_min: exposureTimeMin,
+        decompression_time_min: decompressionTimeMin,
+        total_duration_min: effectiveTotalDurationMin,
+        execution_status: executionStatus,
+        deviation_reason: deviationReason || null,
+        program_enrollment_id: programEnrollmentId,
+        segments: sessionSegments,
         fit: fit,
         csv: csv,
         merged: merged
@@ -1539,13 +2099,27 @@ async function saveDURING() {
             session_id: sessionId,
             user_id: subjectId,
             phase: "during",
-            pressure_kpa: pressure,
+            chamber_id: Number(selectedChamber.chamber_id),
+            protocol_id: Number(selectedProtocol.protocol_id),
+            target_ata: targetAta,
+            actual_ata: ata,
+            pressure_deviation: ata - targetAta,
+            pressure_input_value: pressure,
+            pressure_input_unit: pressureUnit,
             pressure_ata: ata,
             chamber_temperature: temp,
             body_temperature: bodyTemp,
             humidity: humidity,
             oxygen_flow_lpm: oxygenLpm,
             oxygen_mask_percent: oxygenPercent,
+            compression_time_min: compressionTimeMin,
+            exposure_time_min: exposureTimeMin,
+            decompression_time_min: decompressionTimeMin,
+            total_duration_min: effectiveTotalDurationMin,
+            execution_status: executionStatus,
+            deviation_reason: deviationReason || null,
+            program_enrollment_id: programEnrollmentId,
+            segments: sessionSegments,
             spo2: latestMerged.spo2,
             pulse:
                 latestMerged.pulse ||
@@ -1561,15 +2135,23 @@ async function saveDURING() {
     await parseJsonResponse(saveRes, "SAVE DURING")
 
     if (!saveRes.ok || saveData.error) {
-        alert(saveData.error || "DURING save failed")
+        alert(saveData.error || "Session save failed")
         return
     }
 
     document.getElementById("preview_during").innerHTML = `
         <div class="warning-box">
-            <b>✔ DURING SAVED</b><br><br>
+            <b>Session saved</b><br><br>
 
-            ATA: ${ata.toFixed(2)}<br>
+            Chamber: ${escapeHtml(selectedChamber.name)}<br>
+            Protocol: ${escapeHtml(selectedProtocol.name)}<br>
+            Target ATA: ${targetAta.toFixed(2)}<br>
+            Recorded ATA: ${ata.toFixed(3)}<br>
+            Difference: ${(ata - targetAta).toFixed(3)} ATA<br>
+            Session time: ${effectiveTotalDurationMin} min total
+            (${compressionTimeMin} / ${exposureTimeMin} / ${decompressionTimeMin} min)<br>
+            Execution: ${escapeHtml(executionStatus)}<br>
+            Deviation reason: ${escapeHtml(deviationReason || "-")}<br>
             Temp: ${temp}°C<br>
             O2: ${oxygenPercent || "-"}%<br><br>
 
@@ -1609,7 +2191,7 @@ async function saveDURING() {
         go("post")
     })
 
-    alert("DURING saved")
+    alert("Session saved")
 }
 
 // ========================================
@@ -1634,7 +2216,7 @@ async function savePOST() {
 
     if (!spo2 || !pulse) {
 
-        alert("Fill POST data")
+        alert("Fill Recovery data")
         return
     }
 
@@ -1688,7 +2270,7 @@ async function savePOST() {
 
     if (!res.ok || data.error) {
         console.error("POST save error:", data)
-        alert(data.error || "POST save failed")
+        alert(data.error || "Recovery save failed")
         return []
     }
 
@@ -1699,7 +2281,7 @@ async function savePOST() {
 
         <div class="success-box">
 
-            ✔ POST SAVED
+            Recovery saved
 
             <br><br>
 
@@ -1727,7 +2309,7 @@ async function savePOST() {
 
     // await saveFullSession()
 
-    alert("POST saved")
+    alert("Recovery saved")
 }
 
 // ========================================
@@ -1745,6 +2327,14 @@ async function saveFullSession() {
         return
     }
 
+    const wellnessConsent =
+        document.getElementById("wellness_consent")
+
+    if (!wellnessConsent?.checked) {
+        alert("Confirm the wellness-only client acknowledgement before saving")
+        return
+    }
+
     const subjectSelect =
         document.getElementById("user_id")
 
@@ -1754,8 +2344,15 @@ async function saveFullSession() {
 
     const payload = {
         session_id: document.getElementById("session_id").value,
+        client_id: getSelectedSubjectId(),
         user_id: getSelectedSubjectId(),
-        pre: state.pre,
+        pre: {
+            ...state.pre,
+            wellness_consent: {
+                accepted: true,
+                recorded_at: new Date().toISOString()
+            }
+        },
         during: state.during,
         post: state.post
     }
@@ -1803,7 +2400,7 @@ async function saveFullSession() {
             <div class="success-box">
                 <b>✔ FULL SESSION SAVED</b><br><br>
                 Session: ${payload.session_id}<br>
-                Subject: ${selectedSubjectLabel}<br>
+                Client: ${selectedSubjectLabel}<br>
                 DB saved_count: ${data.saved_count}
             </div>
         `
@@ -1884,7 +2481,7 @@ async function loadSessions() {
 
                 <td>
                     <button onclick="runAnalysis('${s.session_id}')">
-                        AI
+                        Analyze
                     </button>
                 </td>
             </tr>
@@ -1974,10 +2571,10 @@ async function runAnalysis(sessionId) {
             return
         }
 
-        const anomalyText =
+        const sessionFlagText =
             data.anomaly
-                ? "YES - review session quality"
-                : "NO critical session flag detected"
+                ? "Review recommended"
+                : "No session quality flag"
 
         const aiSummary =
             document.getElementById("ai-summary")
@@ -1992,7 +2589,9 @@ async function runAnalysis(sessionId) {
 
         if (aiScore) {
             aiScore.innerHTML =
-                "<b>Score:</b> " + escapeHtml(data.score ?? "-") + " / 100"
+                "<b>Wellness response:</b> " +
+                escapeHtml(data.score ?? "-") +
+                " / 100"
         }
 
         const aiAnomaly =
@@ -2000,10 +2599,14 @@ async function runAnalysis(sessionId) {
 
         if (aiAnomaly) {
             aiAnomaly.innerHTML =
-                "<b>Session flag:</b> " + escapeHtml(anomalyText)
+                "<b>Data quality:</b> " +
+                escapeHtml(data.data_quality_score ?? "-") +
+                " / 100 · <b>Session review:</b> " +
+                escapeHtml(sessionFlagText)
         }
 
         renderAIVisualization(data)
+        await updateLatestSessionInsight(data)
 
     } catch (err) {
 
@@ -2023,6 +2626,70 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;")
+}
+
+async function updateLatestSessionInsight(data) {
+    const container = document.getElementById("liveScore")
+
+    if (!container) {
+        return
+    }
+
+    let baseline = null
+    const clientId = getSelectedSubjectId()
+
+    if (clientId) {
+        try {
+            const response = await fetch(
+                `/api/wellness/summary/${encodeURIComponent(clientId)}`,
+                { credentials: "same-origin" }
+            )
+
+            if (response.ok) {
+                const summary = await parseJsonResponse(
+                    response,
+                    "LATEST SESSION BASELINE"
+                )
+                baseline = summary.baseline || null
+            }
+        } catch (error) {
+            console.error("Baseline summary unavailable", error)
+        }
+    }
+
+    const baselineSessions =
+        Number(baseline?.sessions_count_30d || 0)
+    const baselineConfidence =
+        baselineSessions >= 14
+            ? "Baseline ready"
+            : baselineSessions >= 5
+                ? "Early trend"
+                : "Collecting data"
+
+    container.innerHTML = `
+        <div class="metric-list">
+            ${renderMetricRows([
+                {
+                    label: "Wellness response",
+                    value: data.score ?? data.overall_score,
+                    unit: "/100"
+                },
+                {
+                    label: "Data quality",
+                    value: data.data_quality_score,
+                    unit: "/100"
+                },
+                {
+                    label: "Baseline confidence",
+                    value: baselineConfidence
+                },
+                {
+                    label: "Unique sessions (30d)",
+                    value: baselineSessions
+                }
+            ])}
+        </div>
+    `
 }
 
 function formatMetric(value, unit = "") {
@@ -2046,8 +2713,15 @@ function formatScore(value) {
 function riskClass(label) {
     const normalized = String(label || "").toLowerCase()
 
-    if (normalized.includes("high")) return "status-high"
-    if (normalized.includes("moderate")) return "status-moderate"
+    if (
+        normalized.includes("high") ||
+        normalized.includes("elevated")
+    ) return "status-high"
+    if (
+        normalized.includes("moderate") ||
+        normalized.includes("quality") ||
+        normalized.includes("review")
+    ) return "status-moderate"
 
     return "status-low"
 }
@@ -2117,19 +2791,18 @@ function renderAIVisualization(data) {
         features.overall_score
 
     const riskLabel =
-        data.risk_level ||
-        (
-            scoreValue >= 90
-                ? "Low"
-                : scoreValue >= 70
-                    ? "Moderate"
-                    : "High"
-        )
+        data.wellness_status === "elevated_load"
+            ? "Elevated load"
+            : data.wellness_status === "data_quality_warning"
+                ? "Review data quality"
+                : data.wellness_status === "recovery_trend"
+                    ? "Recovery trend"
+                    : "Stable response"
 
     const anomalyLabel =
         data.anomaly
-            ? "YES - review session quality"
-            : "NO critical session flag detected"
+            ? "Review recommended"
+            : "No session quality flag"
 
     const warnings =
         Array.isArray(data.reasons)
@@ -2156,27 +2829,27 @@ function renderAIVisualization(data) {
         data.data_quality_score
 
     const scoreReference = `
-        90-100 = Low risk / stable session<br>
-        70-89 = Moderate load / observe session<br>
-        below 70 = Elevated load / review required
+        90-100 = Stable wellness response<br>
+        70-89 = Review session context<br>
+        below 70 = Elevated load indicators
     `
 
     const scoreMeaning = `
         The score starts at 100 and is reduced when rule-based wellness flags are detected:
-        low SpO2, large PRE to POST SpO2 drop, elevated HR/pulse, or low HRV.
+        low SpO2, a large check-in to recovery SpO2 drop, elevated HR/pulse, or low HRV.
     `
 
     container.innerHTML = `
         <div class="panel">
 
-            <h3>AI Session Summary</h3>
+            <h3>Automated Wellness Summary</h3>
 
             <table border="1" style="width:100%;">
                 <tbody>
 
                     <tr>
                         <td><b>Score type</b></td>
-                        <td>${data.score_type || "AI Wellness Score"}</td>
+                        <td>${data.score_type || "Wellness Response"}</td>
                     </tr>
 
                     <tr>
@@ -2195,7 +2868,7 @@ function renderAIVisualization(data) {
                     </tr>
 
                     <tr>
-                        <td><b>Risk level</b></td>
+                        <td><b>Response status</b></td>
                         <td>${riskLabel}</td>
                     </tr>
 
@@ -2309,7 +2982,7 @@ function renderAIVisualization(data) {
 
         <div class="panel">
 
-            <h3>AI Rules</h3>
+            <h3>Interpretation Rules</h3>
 
             <table border="1" style="width:100%;">
                 <tbody>
@@ -2326,7 +2999,7 @@ function renderAIVisualization(data) {
                         <td>92-93%</td>
                     </tr>
                     <tr>
-                        <td>PRE → POST SpO2 drop</td>
+                        <td>Check-in to recovery SpO2 drop</td>
                         <td>≥ 3% warning, ≥ 5% stronger warning</td>
                     </tr>
                     <tr>
@@ -2360,21 +3033,21 @@ function renderAIVisualization(data) {
         <section class="ai-report">
             <div class="ai-report-header">
                 <div>
-                    <h3>AI Session Summary</h3>
-                    <p>${escapeHtml(data.score_type || "Wellness score")}</p>
+                    <h3>Wellness Session Summary</h3>
+                    <p>${escapeHtml(data.score_type || "Wellness response")}</p>
                 </div>
                 <span class="status-badge ${riskClass(riskLabel)}">
-                    ${escapeHtml(riskLabel)} status
+                    ${escapeHtml(riskLabel)}
                 </span>
             </div>
 
             <div class="ai-kpi-grid">
                 <div class="ai-kpi-card">
-                    <span>Wellness score</span>
+                    <span>Wellness response</span>
                     <strong>${formatScore(scoreValue)}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Session flag</span>
+                    <span>Session review</span>
                     <strong>${escapeHtml(anomalyLabel)}</strong>
                 </div>
                 <div class="ai-kpi-card">
@@ -2561,15 +3234,15 @@ function renderAIVisualization(data) {
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
-                                label: "Low risk",
+                                label: "Stable response",
                                 value: "90-100"
                             },
                             {
-                                label: "Moderate risk",
+                                label: "Review context",
                                 value: "70-89"
                             },
                             {
-                                label: "High risk",
+                                label: "Elevated load indicators",
                                 value: "below 70"
                             },
                             {
@@ -2892,58 +3565,13 @@ function renderAIVisualization(data) {
     }
 }
 
-// ========================================
-// REALTIME AI
-// ========================================
-
-async function updateRealtimeAI() {
-
-    try {
-
-    const res =
-    await fetch("/api/ai_latest", {
-        credentials: "same-origin"
-    })
-
-    const data =
-    await parseJsonResponse(res, "REALTIME AI")
-
-        if (data.error) {
-            return
-        }
-
-        document.getElementById(
-            "liveScore"
-        ).innerHTML = `
-
-            <div class="info-box">
-
-                <h2>
-                    AI Score:
-                    ${data.score}
-                </h2>
-
-                <div>
-                    Session flag:
-                    ${data.anomaly}
-                </div>
-
-                <div>
-                    ${data.summary || ""}
-                </div>
-
-            </div>
-        `
-
-    } catch (e) {
-
-        console.error(e)
-    }
-}
 window.createSubject = createSubject
 window.deleteSubject = deleteSubject
 window.loadSubjects = loadSubjects
 window.generateSession = generateSession
+window.exportClient = exportClient
+window.enrollSelectedClient = enrollSelectedClient
+window.addSessionSegment = addSessionSegment
 
 window.savePRE = savePRE
 window.uploadFIT = uploadFIT
@@ -2964,4 +3592,3 @@ window.toggleAll = toggleAll
 
 window.runAnalysis = runAnalysis
 window.renderAIVisualization = renderAIVisualization
-window.updateRealtimeAI = updateRealtimeAI

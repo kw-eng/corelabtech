@@ -3,33 +3,33 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/chamber_testing.css') }}?v=chamber-polish-20260721"
+    href="{{ url_for('static', filename='css/chamber_testing.css') }}?v=wellness-commercial-20260727"
 >
 
 <div class="chamber-page">
 
     <section class="chamber-hero">
         <div>
-            <span class="chamber-eyebrow">Operator workflow</span>
-            <h1>HBOT Testing Session</h1>
+            <span class="chamber-eyebrow">Wellness operator workflow</span>
+            <h1>Physiology Session</h1>
             <p>
-                Capture PRE, DURING and POST physiology, synchronize FIT and CSV data,
-                then save the full research session with AI analysis.
+                Capture check-in, session and recovery physiology, synchronize HR/HRV and
+                SpO2/pulse timelines, then generate a client-ready wellness insight.
             </p>
         </div>
 
         <div class="chamber-session-card">
             <span>Current session</span>
-            <strong id="sessionHeroLabel">Generated after subject selection</strong>
+            <strong id="sessionHeroLabel">Generated after client selection</strong>
             <div id="progressText">Progress: 0%</div>
         </div>
     </section>
 
     <section class="chamber-workflow-card">
         <div class="steps-wrapper">
-            <div id="step_pre" class="step active">PRE</div>
-            <div id="step_during" class="step locked">DURING</div>
-            <div id="step_post" class="step locked">POST</div>
+            <div id="step_pre" class="step active">Check-in</div>
+            <div id="step_during" class="step locked">Session</div>
+            <div id="step_post" class="step locked">Recovery</div>
         </div>
 
         <div class="progress-wrapper">
@@ -43,15 +43,15 @@
             <section class="chamber-card">
                 <div class="chamber-section-header">
                     <div>
-                        <h2>Subject Profile</h2>
-                        <p>Create or select a research subject before starting the session.</p>
+                        <h2>Client Profile</h2>
+                        <p>Create or select a wellness client before starting the session.</p>
                     </div>
                 </div>
 
                 <div class="chamber-form-grid">
                     <label>
-                        <span>Subject ID</span>
-                        <input id="subject_id" placeholder="Subject ID">
+                        <span>Client ID</span>
+                        <input id="subject_id" placeholder="Client ID">
                     </label>
 
                     <label>
@@ -80,27 +80,78 @@
                 </div>
 
                 <div class="chamber-actions">
-                    <button type="button" onclick="createSubject()">Create Subject</button>
-                    <button type="button" class="danger-btn" onclick="deleteSubject()">Delete Subject</button>
+                    <button type="button" onclick="createSubject()">Create Client</button>
+                    {% if current_user.role in ["admin", "researcher"] %}
+                    <button type="button" class="secondary-btn" onclick="exportClient()">Export Client</button>
+                    <button type="button" class="danger-btn" onclick="deleteSubject()">Delete Client</button>
+                    {% endif %}
                 </div>
             </section>
 
             <section class="chamber-card compact-session-controls">
+                <div id="organization_context" class="session-plan-preview">
+                    Loading organization and location...
+                </div>
+
                 <label>
-                    <span>Select Subject</span>
+                    <span>Select Client</span>
                     <select id="user_id" onchange="generateSession()"></select>
+                </label>
+
+                <label>
+                    <span>Chamber</span>
+                    <select id="chamber_id"></select>
+                </label>
+
+                <label>
+                    <span>Protocol</span>
+                    <select id="protocol_id"></select>
+                </label>
+
+                <label>
+                    <span>Client Program</span>
+                    <select id="program_enrollment_id">
+                        <option value="">Single session / no package</option>
+                    </select>
                 </label>
 
                 <label>
                     <span>Session ID</span>
                     <input id="session_id" readonly>
                 </label>
+
+                <div id="protocol_plan_preview" class="session-plan-preview">
+                    Select a protocol to view its planned phase timing.
+                </div>
+
+                <div class="program-actions">
+                    <select id="program_catalog"></select>
+                    <button type="button" class="secondary-btn" onclick="enrollSelectedClient()">
+                        Enroll Client
+                    </button>
+                    <div id="program_progress">No active program selected.</div>
+                </div>
+            </section>
+
+            <section class="chamber-card consent-card">
+                <label class="wellness-consent">
+                    <input id="wellness_consent" type="checkbox">
+                    <span>
+                        I confirm that the client has been informed that this session
+                        provides wellness and educational insights only and is not a
+                        medical diagnosis.
+                    </span>
+                </label>
+                <p>
+                    Review the <a href="{{ url_for('main.privacy') }}">Privacy Notice</a>
+                    and <a href="{{ url_for('main.terms') }}">Wellness Terms</a>.
+                </p>
             </section>
 
             <section id="panel_pre" class="panel phase-panel">
                 <div class="chamber-section-header">
                     <div>
-                        <h2>PRE</h2>
+                        <h2>Check-in</h2>
                         <p>Record baseline values before chamber exposure.</p>
                     </div>
                 </div>
@@ -192,7 +243,7 @@
                 </div>
 
                 <div class="chamber-actions">
-                    <button type="button" onclick="savePRE()">Save PRE</button>
+                    <button type="button" onclick="savePRE()">Save Check-in</button>
                 </div>
 
                 <div id="preview_pre"></div>
@@ -201,15 +252,30 @@
             <section id="panel_during" class="panel phase-panel" style="display:none;">
                 <div class="chamber-section-header">
                     <div>
-                        <h2>DURING</h2>
+                        <h2>Session</h2>
                         <p>Capture chamber environment and upload synchronized telemetry sources.</p>
                     </div>
                 </div>
 
                 <div class="chamber-form-grid">
                     <label>
-                        <span>Pressure</span>
-                        <input id="during_pressure" type="number" placeholder="Pressure kPa">
+                        <span>Recorded pressure</span>
+                        <input
+                            id="during_pressure"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Enter recorded pressure"
+                        >
+                    </label>
+
+                    <label>
+                        <span>Pressure unit</span>
+                        <select id="during_pressure_unit">
+                            <option value="kpa_gauge">kPa gauge (above ambient)</option>
+                            <option value="kpa_absolute">kPa absolute</option>
+                            <option value="ata">ATA</option>
+                        </select>
                     </label>
 
                     <label>
@@ -228,7 +294,77 @@
                     </label>
                 </div>
 
-                <div id="ata_preview" class="inline-preview"></div>
+                <div id="ata_preview" class="inline-preview">
+                    Select a protocol and enter recorded pressure.
+                </div>
+
+                <div class="subsection-divider"></div>
+
+                <div class="chamber-section-header">
+                    <div>
+                        <h3>Session Timing</h3>
+                        <p>Record actual phase durations. Defaults come from the selected protocol.</p>
+                    </div>
+                </div>
+
+                <div class="chamber-form-grid three">
+                    <label>
+                        <span>Compression (min)</span>
+                        <input id="during_compression_min" type="number" min="0" max="240" step="1">
+                    </label>
+
+                    <label>
+                        <span>At target pressure (min)</span>
+                        <input id="during_exposure_min" type="number" min="1" max="240" step="1">
+                    </label>
+
+                    <label>
+                        <span>Decompression (min)</span>
+                        <input id="during_decompression_min" type="number" min="0" max="240" step="1">
+                    </label>
+                </div>
+
+                <div id="duration_preview" class="inline-preview">
+                    Total session time will be calculated from the three phases.
+                </div>
+
+                <div class="chamber-form-grid two session-execution-grid">
+                    <label>
+                        <span>Execution status</span>
+                        <select id="during_execution_status">
+                            <option value="as_planned">Completed as planned</option>
+                            <option value="modified">Modified</option>
+                            <option value="interrupted">Interrupted</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Reason for deviation</span>
+                        <input
+                            id="during_deviation_reason"
+                            placeholder="Required when modified or interrupted"
+                        >
+                    </label>
+                </div>
+
+                <label class="detailed-timeline-toggle">
+                    <input id="use_detailed_timeline" type="checkbox">
+                    <span>Use detailed timeline for air breaks or non-standard sessions</span>
+                </label>
+
+                <div id="session_segments_editor" class="segments-editor" hidden>
+                    <div class="chamber-section-header">
+                        <div>
+                            <h4>Session Segments</h4>
+                            <p>Use for extended sessions, air breaks or pressure changes.</p>
+                        </div>
+                        <button type="button" class="secondary-btn" onclick="addSessionSegment()">
+                            Add Segment
+                        </button>
+                    </div>
+                    <div id="session_segments_rows"></div>
+                    <div id="segments_total" class="inline-preview">0 min total</div>
+                </div>
 
                 <div class="subsection-divider"></div>
 
@@ -256,7 +392,10 @@
                     </label>
                 </div>
 
-                <div id="oxygen_preview" class="inline-preview"></div>
+                <div id="oxygen_preview" class="inline-preview">
+                    Record the configured device values. Oxygen percentage is not
+                    inferred from flow alone.
+                </div>
 
                 <div class="subsection-divider"></div>
 
@@ -328,7 +467,7 @@
 
                 <div id="mergeStatus"></div>
 
-                <h3>Merged DURING Data</h3>
+                <h3>Synchronized Session Data</h3>
 
                 <div class="data-table-wrap merged-table-wrap">
                     <table id="mergedDataTable">
@@ -352,7 +491,7 @@
                 </div>
 
                 <div class="chamber-actions">
-                    <button type="button" onclick="saveDURING()">Save DURING</button>
+                    <button type="button" onclick="saveDURING()">Save Session</button>
                 </div>
 
                 <div id="preview_during"></div>
@@ -361,7 +500,7 @@
             <section id="panel_post" class="panel phase-panel" style="display:none;">
                 <div class="chamber-section-header">
                     <div>
-                        <h2>POST</h2>
+                        <h2>Recovery</h2>
                         <p>Record recovery values after chamber exposure.</p>
                     </div>
                 </div>
@@ -435,7 +574,7 @@
                 </div>
 
                 <div class="chamber-actions">
-                    <button type="button" onclick="savePOST()">Save POST</button>
+                    <button type="button" onclick="savePOST()">Save Recovery</button>
                 </div>
 
                 <div id="preview_post"></div>
@@ -444,7 +583,7 @@
             <section class="chamber-card save-card">
                 <div>
                     <h2>Complete Session</h2>
-                    <p>Save the full PRE / DURING / POST session and run AI analysis.</p>
+                    <p>Save the complete check-in, session and recovery record, then run the wellness analysis.</p>
                 </div>
 
                 <button type="button" class="primary-cta" onclick="saveFullSession()">
@@ -461,7 +600,7 @@
                 <div class="chamber-section-header">
                     <div>
                         <h2>Saved Sessions</h2>
-                        <p>Review previous sessions or run AI for a saved record.</p>
+                        <p>Review previous sessions or analyze a saved record.</p>
                     </div>
                 </div>
 
@@ -473,7 +612,7 @@
                                     <input type="checkbox" onclick="toggleAll(this)">
                                 </th>
                                 <th>Session</th>
-                                <th>Subject</th>
+                                <th>Client</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -487,8 +626,8 @@
             </section>
 
             <section class="chamber-card live-card">
-                <h2>Realtime AI Score</h2>
-                <div id="liveScore">Waiting for telemetry...</div>
+                <h2>Latest Session Insight</h2>
+                <div id="liveScore">Run a session analysis to display the latest result.</div>
             </section>
         </aside>
     </section>
@@ -496,8 +635,8 @@
     <section class="chamber-card ai-section">
         <div class="chamber-section-header">
             <div>
-                <h2>AI Visualization</h2>
-                <p>AI summary, signal quality and timeline appear after analysis.</p>
+                <h2>Wellness Insight</h2>
+                <p>Physiology summary, signal quality and timeline appear after analysis.</p>
             </div>
         </div>
 
@@ -507,8 +646,8 @@
     <section class="chamber-card ai-result-section">
         <div class="chamber-section-header">
             <div>
-                <h2>AI Result</h2>
-                <p>Compact analysis status for the latest session action.</p>
+                <h2>Analysis Summary</h2>
+                <p>Compact wellness status for the latest completed session.</p>
             </div>
         </div>
 
@@ -523,7 +662,6 @@
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/fit_chart.js') }}?v=chamber-polish-20260721"></script>
-<script src="{{ url_for('static', filename='js/chamber_form.js') }}?v=session-checkin-20260724"></script>
-<script src="{{ url_for('static', filename='js/realtime_monitor.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chamber_form.js') }}?v=wellness-commercial-20260727"></script>
 
 {% endblock %}

@@ -24,6 +24,11 @@ MIGRATIONS = [
     ROOT / "migrations" / "010_create_ai_results.py",
     ROOT / "migrations" / "011_create_hrv_tables.py",
     ROOT / "migrations" / "012_create_session_features_baselines.py",
+    ROOT / "migrations" / "014_create_chambers_protocols.py",
+    ROOT / "migrations" / "013_repair_client_ownership.py",
+    ROOT / "migrations" / "015_create_data_governance.py",
+    ROOT / "migrations" / "016_add_session_phase_timing.py",
+    ROOT / "migrations" / "017_add_commercial_wellness_model.py",
 ]
 
 

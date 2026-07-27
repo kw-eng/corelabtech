@@ -7,13 +7,25 @@ from database_postgres import db
 class User(UserMixin):
     """Minimal authenticated user object loaded from PostgreSQL."""
 
-    def __init__(self, id, user_id, email, password_hash, role, is_active=True):
+    def __init__(
+        self,
+        id,
+        user_id,
+        email,
+        password_hash,
+        role,
+        is_active=True,
+        organization_id=None,
+        location_id=None,
+    ):
         self.id = str(id)
         self.user_id = user_id
         self.email = email
         self.password_hash = password_hash
         self.role = role or "viewer"
         self._is_active = is_active
+        self.organization_id = organization_id
+        self.location_id = location_id
 
     @property
     def is_active(self):
@@ -34,7 +46,9 @@ def row_to_user(row):
         email=row[2],
         password_hash=row[3],
         role=row[4],
-        is_active=row[5]
+        is_active=row[5],
+        organization_id=row[6],
+        location_id=row[7],
     )
 
 
@@ -45,7 +59,15 @@ def get_user_by_id(id):
     c = con.cursor()
 
     c.execute("""
-        SELECT id, user_id, email, password_hash, role, is_active
+        SELECT
+            id,
+            user_id,
+            email,
+            password_hash,
+            role,
+            is_active,
+            organization_id,
+            location_id
         FROM users
         WHERE id=%s
         LIMIT 1
@@ -66,7 +88,15 @@ def get_user_by_email(email):
     c = con.cursor()
 
     c.execute("""
-        SELECT id, user_id, email, password_hash, role, is_active
+        SELECT
+            id,
+            user_id,
+            email,
+            password_hash,
+            role,
+            is_active,
+            organization_id,
+            location_id
         FROM users
         WHERE email=%s
         LIMIT 1

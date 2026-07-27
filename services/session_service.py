@@ -12,7 +12,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from auth.access_policy import (
+    CLIENT_STAFF_ROLES,
+    can_access_client_record,
+)
+from core.pressure import calculate_pressure_ata
 from database_postgres import db
+from repositories.wellness_repository import get_wellness_summary
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -24,7 +30,19 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-
+SESSION_CLIENT_TABLES = (
+    "tests",
+    "fit_imports",
+    "csv_imports",
+    "fit_data",
+    "csv_data",
+    "merge_jobs",
+    "merged_data",
+    "ai_results",
+    "session_features",
+    "hrv_imports",
+    "hrv_intervals",
+)
 @dataclass(frozen=True)
 class PhaseResult:
     """Database identity of one saved phase row."""
@@ -54,8 +72,13 @@ def save_session_phase(
 
     session_id = required_text(payload.get("session_id"), "session_id")
     phase = required_text(payload.get("phase"), "phase")
-    user_id = normalize_subject_id(
-        optional_text(payload.get("user_id")) or initiated_by or session_id
+    explicit_client_id = optional_text(
+        payload.get("client_id")
+        or payload.get("user_id")
+    )
+    user_id = (
+        explicit_client_id
+        or normalize_subject_id(initiated_by or session_id)
     )
     telemetry = payload.get("telemetry") or payload
 
@@ -102,12 +125,25 @@ def save_session_phase(
                 number_or_none(payload.get("spo2")),
                 number_or_none(payload.get("pulse")),
                 number_or_none(payload.get("hrv")),
-                number_or_none(payload.get("pressure")),
+                number_or_none(
+                    payload.get("pressure_input_value")
+                    or payload.get("pressure_kpa")
+                    or payload.get("pressure")
+                ),
                 number_or_none(payload.get("pressure_ata")),
-                number_or_none(payload.get("ata")),
+                number_or_none(
+                    payload.get("ata")
+                    or payload.get("pressure_ata")
+                ),
                 number_or_none(payload.get("oxygen_flow_lpm")),
-                number_or_none(payload.get("oxygen_percent")),
-                number_or_none(payload.get("temperature")),
+                number_or_none(
+                    payload.get("oxygen_percent")
+                    or payload.get("oxygen_mask_percent")
+                ),
+                number_or_none(
+                    payload.get("temperature")
+                    or payload.get("chamber_temperature")
+                ),
                 number_or_none(payload.get("body_temperature")),
                 number_or_none(payload.get("humidity")),
                 json.dumps(telemetry, default=str),
@@ -145,15 +181,18 @@ def complete_session(
     """Create or update the canonical completed session record."""
 
     session_id = required_text(session_id, "session_id")
-    user_id = normalize_subject_id(
-        required_text(user_id, "user_id")
-    )
+    user_id = required_text(user_id, "user_id")
 
     connection = db()
     cursor = connection.cursor()
 
     try:
         ensure_user(cursor, user_id=user_id)
+        session_config = resolve_session_configuration(
+            cursor,
+            during=during,
+            user_id=user_id,
+        )
 
         cursor.execute(
             """
@@ -165,9 +204,32 @@ def complete_session(
                 during_json,
                 post_json,
                 summary,
-                completed
+                completed,
+                chamber_id,
+                protocol_id,
+                target_ata,
+                actual_ata,
+                pressure_input_value,
+                pressure_input_unit,
+                pressure_deviation,
+                compression_time_min,
+                exposure_time_min,
+                decompression_time_min,
+                total_duration_min,
+                organization_id,
+                location_id,
+                program_enrollment_id,
+                protocol_version,
+                execution_status,
+                deviation_reason,
+                deviation_approved_by
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s
+            )
             ON CONFLICT (session_id)
             DO UPDATE SET
                 user_id = EXCLUDED.user_id,
@@ -176,7 +238,25 @@ def complete_session(
                 during_json = EXCLUDED.during_json,
                 post_json = EXCLUDED.post_json,
                 summary = EXCLUDED.summary,
-                completed = EXCLUDED.completed
+                completed = EXCLUDED.completed,
+                chamber_id = EXCLUDED.chamber_id,
+                protocol_id = EXCLUDED.protocol_id,
+                target_ata = EXCLUDED.target_ata,
+                actual_ata = EXCLUDED.actual_ata,
+                pressure_input_value = EXCLUDED.pressure_input_value,
+                pressure_input_unit = EXCLUDED.pressure_input_unit,
+                pressure_deviation = EXCLUDED.pressure_deviation,
+                compression_time_min = EXCLUDED.compression_time_min,
+                exposure_time_min = EXCLUDED.exposure_time_min,
+                decompression_time_min = EXCLUDED.decompression_time_min,
+                total_duration_min = EXCLUDED.total_duration_min,
+                organization_id = EXCLUDED.organization_id,
+                location_id = EXCLUDED.location_id,
+                program_enrollment_id = EXCLUDED.program_enrollment_id,
+                protocol_version = EXCLUDED.protocol_version,
+                execution_status = EXCLUDED.execution_status,
+                deviation_reason = EXCLUDED.deviation_reason,
+                deviation_approved_by = EXCLUDED.deviation_approved_by
             """,
             (
                 session_id,
@@ -193,7 +273,37 @@ def complete_session(
                     default=str,
                 ),
                 1,
+                session_config["chamber_id"],
+                session_config["protocol_id"],
+                session_config["target_ata"],
+                session_config["actual_ata"],
+                session_config["pressure_input_value"],
+                session_config["pressure_input_unit"],
+                session_config["pressure_deviation"],
+                session_config["compression_time_min"],
+                session_config["exposure_time_min"],
+                session_config["decompression_time_min"],
+                session_config["total_duration_min"],
+                session_config["organization_id"],
+                session_config["location_id"],
+                session_config["program_enrollment_id"],
+                session_config["protocol_version"],
+                session_config["execution_status"],
+                session_config["deviation_reason"],
+                initiated_by if session_config["requires_approval"] else None,
             ),
+        )
+
+        save_session_segments(
+            cursor,
+            session_id=session_id,
+            segments=session_config["segments"],
+        )
+
+        align_session_client_ownership(
+            cursor,
+            session_id=session_id,
+            client_id=user_id,
         )
 
         features = {
@@ -234,10 +344,35 @@ def complete_session(
         connection.close()
 
 
+def align_session_client_ownership(
+    cursor,
+    *,
+    session_id: str,
+    client_id: str,
+) -> None:
+    """Keep every persisted stage of a session assigned to one client."""
+
+    for table in SESSION_CLIENT_TABLES:
+        cursor.execute(
+            f"""
+            UPDATE {table}
+            SET user_id = %s
+            WHERE session_id = %s
+              AND user_id IS DISTINCT FROM %s
+            """,
+            (
+                client_id,
+                session_id,
+                client_id,
+            ),
+        )
+
+
 def list_research_sessions(
     *,
     requesting_user_id: str | None,
     requesting_role: str,
+    requesting_organization_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """List sessions visible to the current user role."""
 
@@ -249,27 +384,57 @@ def list_research_sessions(
             cursor.execute(
                 """
                 SELECT
-                    session_id,
-                    user_id,
-                    session_status,
-                    completed,
-                    created_at
-                FROM full_sessions
-                ORDER BY created_at DESC
+                    fs.session_id,
+                    fs.user_id,
+                    fs.session_status,
+                    fs.completed,
+                    fs.created_at,
+                    p.name,
+                    fs.actual_ata
+                FROM full_sessions fs
+                LEFT JOIN protocols p
+                    ON p.protocol_id = fs.protocol_id
+                WHERE fs.session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+                ORDER BY fs.created_at DESC
                 """
+            )
+        elif requesting_role in CLIENT_STAFF_ROLES:
+            cursor.execute(
+                """
+                SELECT
+                    fs.session_id,
+                    fs.user_id,
+                    fs.session_status,
+                    fs.completed,
+                    fs.created_at,
+                    p.name
+                    ,fs.actual_ata
+                FROM full_sessions fs
+                LEFT JOIN protocols p
+                    ON p.protocol_id = fs.protocol_id
+                WHERE fs.organization_id = %s
+                  AND fs.session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+                ORDER BY fs.created_at DESC
+                """,
+                (requesting_organization_id,),
             )
         else:
             cursor.execute(
                 """
                 SELECT
-                    session_id,
-                    user_id,
-                    session_status,
-                    completed,
-                    created_at
-                FROM full_sessions
-                WHERE user_id = %s
-                ORDER BY created_at DESC
+                    fs.session_id,
+                    fs.user_id,
+                    fs.session_status,
+                    fs.completed,
+                    fs.created_at,
+                    p.name,
+                    fs.actual_ata
+                FROM full_sessions fs
+                LEFT JOIN protocols p
+                    ON p.protocol_id = fs.protocol_id
+                WHERE fs.user_id = %s
+                  AND fs.session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+                ORDER BY fs.created_at DESC
                 """,
                 (requesting_user_id,),
             )
@@ -278,9 +443,12 @@ def list_research_sessions(
             {
                 "session_id": row[0],
                 "user_id": row[1],
+                "client_id": row[1],
                 "status": row[2],
                 "completed": bool(row[3]),
                 "created_at": row[4].isoformat() if row[4] else None,
+                "protocol_name": row[5],
+                "actual_ata": row[6],
             }
             for row in cursor.fetchall()
         ]
@@ -295,6 +463,7 @@ def get_research_session(
     session_id: str,
     requesting_user_id: str | None,
     requesting_role: str,
+    requesting_organization_id: int | None = None,
 ) -> dict[str, Any] | None:
     """Load one session and enforce owner access for non-admin users."""
 
@@ -313,9 +482,32 @@ def get_research_session(
                 post_json,
                 summary,
                 completed,
-                created_at
-            FROM full_sessions
-            WHERE session_id = %s
+                fs.created_at,
+                fs.chamber_id,
+                fs.protocol_id,
+                fs.target_ata,
+                fs.actual_ata,
+                fs.pressure_input_value,
+                fs.pressure_input_unit,
+                fs.pressure_deviation,
+                p.name,
+                c.name,
+                fs.compression_time_min,
+                fs.exposure_time_min,
+                fs.decompression_time_min,
+                fs.total_duration_min,
+                fs.execution_status,
+                fs.deviation_reason,
+                fs.program_enrollment_id,
+                fs.protocol_version,
+                fs.organization_id,
+                fs.location_id
+            FROM full_sessions fs
+            LEFT JOIN protocols p
+                ON p.protocol_id = fs.protocol_id
+            LEFT JOIN chambers c
+                ON c.chamber_id = fs.chamber_id
+            WHERE fs.session_id = %s
             LIMIT 1
             """,
             (session_id,),
@@ -326,12 +518,18 @@ def get_research_session(
         if not row:
             return None
 
-        if requesting_role != "admin" and row[1] != requesting_user_id:
+        if not can_access_client_record(
+            requesting_role=requesting_role,
+            requesting_user_id=requesting_user_id,
+            client_id=row[1],
+            requesting_organization_id=requesting_organization_id,
+        ):
             return None
 
-        return {
+        result = {
             "session_id": row[0],
             "user_id": row[1],
+            "client_id": row[1],
             "status": row[2],
             "pre": json_loads(row[3]),
             "during": json_loads(row[4]),
@@ -339,7 +537,57 @@ def get_research_session(
             "summary": json_loads(row[6]),
             "completed": bool(row[7]),
             "created_at": row[8].isoformat() if row[8] else None,
+            "chamber_id": row[9],
+            "protocol_id": row[10],
+            "target_ata": row[11],
+            "actual_ata": row[12],
+            "pressure_input_value": row[13],
+            "pressure_input_unit": row[14],
+            "pressure_deviation": row[15],
+            "protocol_name": row[16],
+            "chamber_name": row[17],
+            "compression_time_min": row[18],
+            "exposure_time_min": row[19],
+            "decompression_time_min": row[20],
+            "total_duration_min": row[21],
+            "execution_status": row[22],
+            "deviation_reason": row[23],
+            "program_enrollment_id": row[24],
+            "protocol_version": row[25],
+            "organization_id": row[26],
+            "location_id": row[27],
         }
+        cursor.execute(
+            """
+            SELECT
+                sequence_no,
+                phase,
+                planned_duration_min,
+                actual_duration_min,
+                target_ata,
+                actual_ata,
+                oxygen_mode,
+                note
+            FROM session_segments
+            WHERE session_id = %s
+            ORDER BY sequence_no
+            """,
+            (session_id,),
+        )
+        result["segments"] = [
+            {
+                "sequence_no": segment[0],
+                "phase": segment[1],
+                "planned_duration_min": segment[2],
+                "actual_duration_min": segment[3],
+                "target_ata": segment[4],
+                "actual_ata": segment[5],
+                "oxygen_mode": segment[6],
+                "note": segment[7],
+            }
+            for segment in cursor.fetchall()
+        ]
+        return result
 
     finally:
         cursor.close()
@@ -390,6 +638,7 @@ def generate_session_report(
     session_id: str,
     requesting_user_id: str | None,
     requesting_role: str,
+    requesting_organization_id: int | None = None,
 ) -> Path:
     """Build a PDF report for one authorized session."""
 
@@ -397,6 +646,7 @@ def generate_session_report(
         session_id=session_id,
         requesting_user_id=requesting_user_id,
         requesting_role=requesting_role,
+        requesting_organization_id=requesting_organization_id,
     )
 
     if not session:
@@ -450,10 +700,49 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                 u.sex,
                 u.age,
                 u.weight,
-                u.notes
+                u.notes,
+                fs.protocol_id,
+                fs.target_ata,
+                fs.actual_ata,
+                fs.pressure_deviation,
+                fs.pressure_input_value,
+                fs.pressure_input_unit,
+                p.code,
+                p.name,
+                p.planned_duration_min,
+                c.code,
+                c.name,
+                c.location,
+                fs.compression_time_min,
+                fs.exposure_time_min,
+                fs.decompression_time_min,
+                fs.total_duration_min,
+                o.name,
+                ol.name,
+                wp.name,
+                wp.total_sessions,
+                (
+                    SELECT COUNT(*)
+                    FROM full_sessions completed_fs
+                    WHERE completed_fs.program_enrollment_id =
+                        fs.program_enrollment_id
+                      AND completed_fs.completed = 1
+                )
             FROM full_sessions fs
             LEFT JOIN users u
                 ON u.user_id = fs.user_id
+            LEFT JOIN protocols p
+                ON p.protocol_id = fs.protocol_id
+            LEFT JOIN chambers c
+                ON c.chamber_id = fs.chamber_id
+            LEFT JOIN organizations o
+                ON o.organization_id = fs.organization_id
+            LEFT JOIN organization_locations ol
+                ON ol.location_id = fs.location_id
+            LEFT JOIN client_programs cp
+                ON cp.enrollment_id = fs.program_enrollment_id
+            LEFT JOIN wellness_programs wp
+                ON wp.program_id = cp.program_id
             WHERE fs.session_id = %s
             LIMIT 1
             """,
@@ -472,6 +761,31 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                 "weight": subject_row[4],
                 "notes": subject_row[5],
             }
+            session_config = {
+                "protocol_id": subject_row[6],
+                "target_ata": subject_row[7],
+                "actual_ata": subject_row[8],
+                "pressure_deviation": subject_row[9],
+                "pressure_input_value": subject_row[10],
+                "pressure_input_unit": subject_row[11],
+                "protocol_code": subject_row[12],
+                "protocol_name": subject_row[13],
+                "planned_duration_min": subject_row[14],
+                "chamber_code": subject_row[15],
+                "chamber_name": subject_row[16],
+                "location": subject_row[17],
+                "compression_time_min": subject_row[18],
+                "exposure_time_min": subject_row[19],
+                "decompression_time_min": subject_row[20],
+                "total_duration_min": subject_row[21],
+                "organization_name": subject_row[22],
+                "location_name": subject_row[23],
+                "program_name": subject_row[24],
+                "program_total_sessions": subject_row[25],
+                "program_completed_sessions": subject_row[26],
+            }
+        else:
+            session_config = None
 
         cursor.execute(
             """
@@ -528,10 +842,26 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                 "created_at": row[17].isoformat() if row[17] else None,
             }
 
+        wellness_history = (
+            get_wellness_summary(
+                cursor,
+                user_id=subject["user_id"],
+                protocol_id=(
+                    session_config.get("protocol_id")
+                    if session_config
+                    else None
+                ),
+            )
+            if subject
+            else None
+        )
+
         return {
             **counts,
             "subject": subject,
+            "session_config": session_config,
             "analysis": analysis,
+            "wellness_history": wellness_history,
         }
 
     finally:
@@ -561,17 +891,90 @@ def build_pdf_report(
         make_table(
             [
                 ("Session ID", session.get("session_id")),
-                ("Subject ID", session.get("user_id")),
+                ("Client ID", session.get("user_id")),
                 ("Status", session.get("status")),
                 ("Completed", session.get("completed")),
                 ("Created at", session.get("created_at")),
+                (
+                    "Organization",
+                    (report_data.get("session_config") or {}).get(
+                        "organization_name"
+                    ),
+                ),
+                (
+                    "Location",
+                    (report_data.get("session_config") or {}).get(
+                        "location_name"
+                    ),
+                ),
+                ("Chamber", session.get("chamber_name")),
+                ("Protocol", session.get("protocol_name")),
+                ("Protocol version", session.get("protocol_version")),
+                (
+                    "Program",
+                    (report_data.get("session_config") or {}).get(
+                        "program_name"
+                    ),
+                ),
+                (
+                    "Program progress",
+                    (
+                        f"{(report_data.get('session_config') or {}).get('program_completed_sessions')}/"
+                        f"{(report_data.get('session_config') or {}).get('program_total_sessions')}"
+                        if (report_data.get("session_config") or {}).get(
+                            "program_name"
+                        )
+                        else "-"
+                    ),
+                ),
+                ("Execution status", session.get("execution_status")),
+                ("Deviation reason", session.get("deviation_reason")),
+                ("Target ATA", session.get("target_ata")),
+                ("Recorded ATA", session.get("actual_ata")),
+                ("ATA difference", session.get("pressure_deviation")),
+                (
+                    "Planned total time (min)",
+                    (report_data.get("session_config") or {}).get(
+                        "planned_duration_min"
+                    ),
+                ),
+                (
+                    "Actual compression (min)",
+                    session.get("compression_time_min"),
+                ),
+                (
+                    "Actual time at target pressure (min)",
+                    session.get("exposure_time_min"),
+                ),
+                (
+                    "Actual decompression (min)",
+                    session.get("decompression_time_min"),
+                ),
+                ("Actual total time (min)", session.get("total_duration_min")),
             ]
         ),
         Spacer(1, 12),
-        Paragraph("Subject", styles["Heading2"]),
+        Paragraph("Session Timeline", styles["Heading2"]),
         make_table(
             [
-                ("Subject ID", (report_data.get("subject") or {}).get("user_id")),
+                (
+                    f"{segment.get('sequence_no')}. "
+                    f"{str(segment.get('phase') or '').replace('_', ' ').title()}",
+                    (
+                        f"{segment.get('actual_duration_min')} min; "
+                        f"ATA {segment.get('actual_ata') or '-'}; "
+                        f"{segment.get('note') or 'no note'}"
+                    ),
+                )
+                for segment in session.get("segments") or []
+            ]
+            or [("Timeline", "No segment data available")]
+        ),
+        Spacer(1, 12),
+        Paragraph("Client", styles["Heading2"]),
+        make_table(
+            [
+                ("Client ID", (report_data.get("subject") or {}).get("user_id")),
                 ("Email", (report_data.get("subject") or {}).get("email")),
                 ("Sex", (report_data.get("subject") or {}).get("sex")),
                 ("Age", (report_data.get("subject") or {}).get("age")),
@@ -589,24 +992,72 @@ def build_pdf_report(
             ]
         ),
         Spacer(1, 12),
-        Paragraph("PRE / DURING / POST", styles["Heading2"]),
+        Paragraph("Check-in / Session / Recovery", styles["Heading2"]),
         make_table(
             [
-                ("PRE SpO2", phase_metric(session.get("pre"), "spo2", "avg_spo2")),
-                ("PRE pulse / HR", phase_metric(session.get("pre"), "pulse", "hr", "heart_rate")),
-                ("PRE HRV", phase_metric(session.get("pre"), "hrv", "rmssd", "avg_hrv")),
-                ("PRE check-in", format_context(phase_metric(session.get("pre"), "check_in"))),
-                ("DURING avg SpO2", phase_metric(session.get("during"), "avg_spo2", "spo2")),
-                ("DURING min SpO2", phase_metric(session.get("during"), "min_spo2")),
-                ("DURING avg pulse / HR", phase_metric(session.get("during"), "avg_pulse", "avg_hr", "pulse", "hr")),
-                ("DURING avg HRV", phase_metric(session.get("during"), "avg_hrv", "rmssd", "hrv")),
-                ("POST SpO2", phase_metric(session.get("post"), "spo2", "avg_spo2")),
-                ("POST pulse / HR", phase_metric(session.get("post"), "pulse", "hr", "heart_rate")),
-                ("POST HRV", phase_metric(session.get("post"), "hrv", "rmssd", "avg_hrv")),
-                ("POST check-out", format_context(phase_metric(session.get("post"), "check_out"))),
+                ("Check-in SpO2", phase_metric(session.get("pre"), "spo2", "avg_spo2")),
+                ("Check-in pulse / HR", phase_metric(session.get("pre"), "pulse", "hr", "heart_rate")),
+                ("Check-in HRV", phase_metric(session.get("pre"), "hrv", "rmssd", "avg_hrv")),
+                ("Check-in context", format_context(phase_metric(session.get("pre"), "check_in"))),
+                (
+                    "Wellness acknowledgement",
+                    format_context(
+                        phase_metric(
+                            session.get("pre"),
+                            "wellness_consent",
+                        )
+                    ),
+                ),
+                ("Session avg SpO2", phase_metric(session.get("during"), "avg_spo2", "spo2")),
+                ("Session min SpO2", phase_metric(session.get("during"), "min_spo2")),
+                ("Session avg pulse / HR", phase_metric(session.get("during"), "avg_pulse", "avg_hr", "pulse", "hr")),
+                ("Session avg HRV", phase_metric(session.get("during"), "avg_hrv", "rmssd", "hrv")),
+                ("Session pressure", phase_metric(session.get("during"), "pressure_ata", "ata")),
+                ("Session temperature", phase_metric(session.get("during"), "chamber_temperature", "temperature")),
+                ("Session oxygen flow", phase_metric(session.get("during"), "oxygen_flow_lpm")),
+                ("Session oxygen setting", phase_metric(session.get("during"), "oxygen_mask_percent", "oxygen_percent")),
+                ("Recovery SpO2", phase_metric(session.get("post"), "spo2", "avg_spo2")),
+                ("Recovery pulse / HR", phase_metric(session.get("post"), "pulse", "hr", "heart_rate")),
+                ("Recovery HRV", phase_metric(session.get("post"), "hrv", "rmssd", "avg_hrv")),
+                ("Recovery context", format_context(phase_metric(session.get("post"), "check_out"))),
             ]
         ),
     ]
+
+    wellness_history = report_data.get("wellness_history") or {}
+    baseline = wellness_history.get("baseline") or {}
+
+    story.extend(
+        [
+            Spacer(1, 12),
+            Paragraph("Personal Baseline", styles["Heading2"]),
+            make_table(
+                [
+                    (
+                        "Baseline confidence",
+                        wellness_history.get("baseline_confidence"),
+                    ),
+                    (
+                        "Unique sessions (30 days)",
+                        wellness_history.get("unique_sessions_30d"),
+                    ),
+                    ("RMSSD 7 days", baseline.get("rmssd_7d")),
+                    ("RMSSD 14 days", baseline.get("rmssd_14d")),
+                    ("RMSSD 30 days", baseline.get("rmssd_30d")),
+                    (
+                        "Session HR reference (7 days)",
+                        baseline.get("resting_hr_7d"),
+                    ),
+                    ("SpO2 average", baseline.get("spo2_avg")),
+                    ("SpO2 minimum", baseline.get("spo2_min")),
+                    (
+                        "Baseline data quality",
+                        baseline.get("data_quality_score"),
+                    ),
+                ]
+            ),
+        ]
+    )
 
     analysis = report_data.get("analysis")
 
@@ -631,7 +1082,7 @@ def build_pdf_report(
                     ("Model version", analysis.get("model_version")),
                     ("Product mode", analysis_result.get("product_mode", "wellness")),
                     ("Wellness status", analysis_result.get("wellness_status")),
-                    ("Wellness score", analysis.get("overall_score")),
+                    ("Wellness response", analysis.get("overall_score")),
                     ("Load score", analysis.get("stress_score")),
                     ("Oxygenation minimum", analysis.get("hypoxia_score")),
                     (
@@ -641,7 +1092,7 @@ def build_pdf_report(
                     ("Data quality score", analysis.get("data_quality_score")),
                     ("Data quality warnings", format_list(quality_warnings)),
                     (
-                        "Session flagged",
+                        "Session review recommended",
                         analysis_result.get(
                             "session_flagged",
                             analysis.get("anomaly_detected"),
@@ -842,7 +1293,7 @@ def normalize_subject_id(value: Any) -> str:
 def ensure_user(cursor, *, user_id: str) -> None:
     """Create a placeholder subject row when telemetry arrives first."""
 
-    user_id = normalize_subject_id(user_id)
+    user_id = required_text(user_id, "user_id")
 
     cursor.execute(
         """
@@ -864,6 +1315,398 @@ def ensure_user(cursor, *, user_id: str) -> None:
             "Auto-created during research session workflow",
         ),
     )
+
+
+def resolve_session_configuration(
+    cursor,
+    *,
+    during: dict[str, Any],
+    user_id: str,
+) -> dict[str, Any]:
+    """Validate chamber/protocol selection and normalized pressure metadata."""
+
+    try:
+        chamber_id = int(during.get("chamber_id"))
+        protocol_id = int(during.get("protocol_id"))
+    except (TypeError, ValueError):
+        raise ValueError("chamber_id and protocol_id are required") from None
+
+    submitted_actual_ata = number_or_none(
+        during.get("actual_ata")
+        or during.get("pressure_ata")
+        or during.get("ata")
+    )
+    pressure_input_value = number_or_none(
+        during.get("pressure_input_value")
+        or during.get("pressure_kpa")
+        or during.get("pressure")
+    )
+    pressure_input_unit = optional_text(
+        during.get("pressure_input_unit")
+    )
+
+    if pressure_input_unit not in {
+        "ata",
+        "kpa_gauge",
+        "kpa_absolute",
+    }:
+        raise ValueError("invalid pressure_input_unit")
+
+    if pressure_input_value is None:
+        raise ValueError("pressure_input_value is required")
+
+    actual_ata = calculate_pressure_ata(
+        pressure_input_value,
+        pressure_input_unit,
+    )
+
+    if submitted_actual_ata is not None and abs(
+        submitted_actual_ata - actual_ata
+    ) > 0.01:
+        raise ValueError("submitted actual_ata does not match pressure input")
+
+    if not 1.0 <= actual_ata <= 3.0:
+        raise ValueError("actual_ata must be between 1.0 and 3.0")
+
+    cursor.execute(
+        """
+        SELECT
+            p.target_ata,
+            p.mode,
+            p.is_active,
+            p.compression_time_min,
+            p.exposure_time_min,
+            p.decompression_time_min,
+            c.max_ata,
+            c.is_active,
+            p.protocol_version,
+            p.organization_id,
+            c.organization_id,
+            c.location_id,
+            u.organization_id,
+            u.location_id
+        FROM protocols p
+        CROSS JOIN chambers c
+        CROSS JOIN users u
+        WHERE p.protocol_id = %s
+          AND c.chamber_id = %s
+          AND u.user_id = %s
+        LIMIT 1
+        """,
+        (
+            protocol_id,
+            chamber_id,
+            user_id,
+        ),
+    )
+    config_row = cursor.fetchone()
+
+    if not config_row:
+        raise ValueError("selected chamber or protocol does not exist")
+
+    target_ata = number_or_none(config_row[0])
+    protocol_mode = config_row[1]
+    protocol_active = bool(config_row[2])
+    planned_compression = int(config_row[3] or 0)
+    planned_exposure = int(config_row[4] or 0)
+    planned_decompression = int(config_row[5] or 0)
+    chamber_max_ata = float(config_row[6])
+    chamber_active = bool(config_row[7])
+    protocol_version = int(config_row[8] or 1)
+    protocol_organization_id = config_row[9]
+    chamber_organization_id = config_row[10]
+    chamber_location_id = config_row[11]
+    client_organization_id = config_row[12]
+    client_location_id = config_row[13]
+
+    if not protocol_active or not chamber_active:
+        raise ValueError("selected chamber or protocol is inactive")
+
+    if not (
+        protocol_organization_id
+        == chamber_organization_id
+        == client_organization_id
+    ):
+        raise ValueError("client, chamber and protocol must belong to one organization")
+
+    if protocol_mode != "wellness":
+        raise ValueError("only wellness protocols can be used in this workflow")
+
+    if target_ata is None:
+        raise ValueError("selected protocol has no target ATA")
+
+    if target_ata > chamber_max_ata:
+        raise ValueError("protocol target exceeds chamber maximum ATA")
+
+    if actual_ata > chamber_max_ata + 0.02:
+        raise ValueError("recorded ATA exceeds chamber maximum")
+
+    compression_time_min = positive_int_or_default(
+        during.get("compression_time_min"),
+        planned_compression,
+        allow_zero=True,
+    )
+    exposure_time_min = positive_int_or_default(
+        during.get("exposure_time_min"),
+        planned_exposure,
+    )
+    decompression_time_min = positive_int_or_default(
+        during.get("decompression_time_min"),
+        planned_decompression,
+        allow_zero=True,
+    )
+    phase_total_duration_min = (
+        compression_time_min
+        + exposure_time_min
+        + decompression_time_min
+    )
+
+    program_enrollment_id = optional_positive_int(
+        during.get("program_enrollment_id")
+    )
+    if program_enrollment_id is not None:
+        cursor.execute(
+            """
+            SELECT 1
+            FROM client_programs cp
+            JOIN wellness_programs wp ON wp.program_id = cp.program_id
+            WHERE cp.enrollment_id = %s
+              AND cp.client_id = %s
+              AND cp.status = 'active'
+              AND wp.organization_id = %s
+              AND wp.protocol_id = %s
+            LIMIT 1
+            """,
+            (
+                program_enrollment_id,
+                user_id,
+                client_organization_id,
+                protocol_id,
+            ),
+        )
+        if not cursor.fetchone():
+            raise ValueError("selected program is not active for this client and protocol")
+
+    segments = normalize_session_segments(
+        during.get("segments"),
+        compression_time_min=compression_time_min,
+        exposure_time_min=exposure_time_min,
+        decompression_time_min=decompression_time_min,
+        target_ata=target_ata,
+        actual_ata=actual_ata,
+    )
+    segmented_total = sum(segment["actual_duration_min"] for segment in segments)
+    total_duration_min = (
+        segmented_total
+        if isinstance(during.get("segments"), list) and during.get("segments")
+        else phase_total_duration_min
+    )
+    if total_duration_min <= 0 or total_duration_min > 360:
+        raise ValueError("total session duration must be between 1 and 360 minutes")
+
+    planned_total = (
+        planned_compression
+        + planned_exposure
+        + planned_decompression
+    )
+    has_deviation = any(
+        (
+            compression_time_min != planned_compression,
+            exposure_time_min != planned_exposure,
+            decompression_time_min != planned_decompression,
+            abs(actual_ata - target_ata) > 0.02,
+        )
+    )
+    execution_status = optional_text(
+        during.get("execution_status")
+    ) or ("modified" if has_deviation else "as_planned")
+    if execution_status not in {"as_planned", "modified", "interrupted"}:
+        raise ValueError("invalid execution_status")
+    if has_deviation and execution_status == "as_planned":
+        execution_status = "modified"
+
+    deviation_reason = optional_text(during.get("deviation_reason"))
+    if execution_status in {"modified", "interrupted"} and not deviation_reason:
+        raise ValueError("deviation_reason is required for a modified session")
+
+    return {
+        "chamber_id": chamber_id,
+        "protocol_id": protocol_id,
+        "target_ata": target_ata,
+        "actual_ata": actual_ata,
+        "pressure_input_value": pressure_input_value,
+        "pressure_input_unit": pressure_input_unit,
+        "pressure_deviation": round(actual_ata - target_ata, 3),
+        "compression_time_min": compression_time_min,
+        "exposure_time_min": exposure_time_min,
+        "decompression_time_min": decompression_time_min,
+        "total_duration_min": total_duration_min,
+        "planned_total_duration_min": planned_total,
+        "organization_id": client_organization_id,
+        "location_id": client_location_id or chamber_location_id,
+        "program_enrollment_id": program_enrollment_id,
+        "protocol_version": protocol_version,
+        "execution_status": execution_status,
+        "deviation_reason": deviation_reason,
+        "requires_approval": execution_status in {"modified", "interrupted"},
+        "segments": segments,
+    }
+
+
+def optional_positive_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("identifier must be an integer") from None
+    if parsed <= 0:
+        raise ValueError("identifier must be positive")
+    return parsed
+
+
+def normalize_session_segments(
+    value: Any,
+    *,
+    compression_time_min: int,
+    exposure_time_min: int,
+    decompression_time_min: int,
+    target_ata: float,
+    actual_ata: float,
+) -> list[dict[str, Any]]:
+    """Normalize optional long-session segments or build the standard phases."""
+
+    if not isinstance(value, list) or not value:
+        return [
+            {
+                "sequence_no": 1,
+                "phase": "compression",
+                "planned_duration_min": compression_time_min,
+                "actual_duration_min": compression_time_min,
+                "target_ata": target_ata,
+                "actual_ata": actual_ata,
+                "oxygen_mode": None,
+                "note": None,
+            },
+            {
+                "sequence_no": 2,
+                "phase": "exposure",
+                "planned_duration_min": exposure_time_min,
+                "actual_duration_min": exposure_time_min,
+                "target_ata": target_ata,
+                "actual_ata": actual_ata,
+                "oxygen_mode": None,
+                "note": None,
+            },
+            {
+                "sequence_no": 3,
+                "phase": "decompression",
+                "planned_duration_min": decompression_time_min,
+                "actual_duration_min": decompression_time_min,
+                "target_ata": target_ata,
+                "actual_ata": actual_ata,
+                "oxygen_mode": None,
+                "note": None,
+            },
+        ]
+
+    allowed_phases = {
+        "compression",
+        "exposure",
+        "air_break",
+        "decompression",
+        "recovery",
+        "other",
+    }
+    normalized = []
+    for index, segment in enumerate(value, start=1):
+        if not isinstance(segment, dict):
+            raise ValueError("each session segment must be an object")
+        phase = optional_text(segment.get("phase"))
+        if phase not in allowed_phases:
+            raise ValueError("invalid session segment phase")
+        duration = positive_int_or_default(
+            segment.get("actual_duration_min"),
+            0,
+            allow_zero=True,
+        )
+        normalized.append(
+            {
+                "sequence_no": index,
+                "phase": phase,
+                "planned_duration_min": optional_positive_int(
+                    segment.get("planned_duration_min")
+                ),
+                "actual_duration_min": duration,
+                "target_ata": number_or_none(segment.get("target_ata")) or target_ata,
+                "actual_ata": number_or_none(segment.get("actual_ata")) or actual_ata,
+                "oxygen_mode": optional_text(segment.get("oxygen_mode")),
+                "note": optional_text(segment.get("note")),
+            }
+        )
+    return normalized
+
+
+def save_session_segments(
+    cursor,
+    *,
+    session_id: str,
+    segments: list[dict[str, Any]],
+) -> None:
+    cursor.execute(
+        "DELETE FROM session_segments WHERE session_id = %s",
+        (session_id,),
+    )
+    for segment in segments:
+        cursor.execute(
+            """
+            INSERT INTO session_segments (
+                session_id,
+                sequence_no,
+                phase,
+                planned_duration_min,
+                actual_duration_min,
+                target_ata,
+                actual_ata,
+                oxygen_mode,
+                note
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                session_id,
+                segment["sequence_no"],
+                segment["phase"],
+                segment["planned_duration_min"],
+                segment["actual_duration_min"],
+                segment["target_ata"],
+                segment["actual_ata"],
+                segment["oxygen_mode"],
+                segment["note"],
+            ),
+        )
+
+
+def positive_int_or_default(
+    value: Any,
+    default: int,
+    *,
+    allow_zero: bool = False,
+) -> int:
+    """Normalize a phase duration while preserving protocol defaults."""
+
+    candidate = default if value in (None, "") else value
+
+    try:
+        parsed = int(candidate)
+    except (TypeError, ValueError):
+        raise ValueError("session phase durations must be whole minutes") from None
+
+    minimum = 0 if allow_zero else 1
+    if parsed < minimum or parsed > 240:
+        raise ValueError("session phase duration is outside the allowed range")
+
+    return parsed
 
 
 def count_rows(cursor, *, table: str, session_id: str) -> int:

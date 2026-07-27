@@ -5,15 +5,18 @@ This blueprint serves the chamber workflow, upload APIs, merge/analysis APIs,
 admin compatibility endpoints and public research pages.
 """
 
+import hashlib
 import os
 import traceback
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from psycopg2 import IntegrityError
 from flask import (
     abort,
     Blueprint,
+    current_app,
     jsonify,
     render_template,
     request,
@@ -23,6 +26,7 @@ from flask_login import current_user, login_required
 from werkzeug.security import generate_password_hash
 
 from auth.decorators import role_required
+from auth.access_policy import can_access_client_record
 from database_postgres import db
 
 from repositories.analysis_repository import (
@@ -55,6 +59,8 @@ from services.analysis_service import (
     AnalysisInputMissingError,
     run_session_analysis,
 )
+from services.audit_service import record_audit_event
+from services.client_data_service import build_client_export
 
 from services.data_ingestion import (
     DataIngestionError,
@@ -141,6 +147,112 @@ def current_user_id() -> str | None:
     )
 
 
+def audit_request_metadata() -> dict[str, str | None]:
+    """Return bounded request metadata for an audit event."""
+
+    return {
+        "ip_address": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "user_agent": clean_value(request.user_agent.string)[:500] or None,
+    }
+
+
+def write_audit_event(
+    *,
+    action: str,
+    entity_type: str,
+    entity_id: str | None = None,
+    client_id: str | None = None,
+    session_id: str | None = None,
+    details: dict | None = None,
+) -> None:
+    """Commit an audit event after a successful route-level operation."""
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=getattr(current_user, "role", None),
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            client_id=client_id,
+            session_id=session_id,
+            details=details,
+            **audit_request_metadata(),
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def record_session_consent_and_audit(
+    *,
+    session_id: str,
+    client_id: str,
+    consent: dict,
+) -> None:
+    """Persist the versioned wellness acknowledgement and session audit."""
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            INSERT INTO consent_records (
+                client_id,
+                session_id,
+                consent_type,
+                accepted,
+                terms_version,
+                recorded_by,
+                recorded_at,
+                metadata_json
+            )
+            VALUES (
+                %s, %s, 'wellness_session',
+                TRUE, %s, %s, %s, %s::jsonb
+            )
+            """,
+            (
+                client_id,
+                session_id,
+                consent.get("terms_version"),
+                consent.get("recorded_by"),
+                consent.get("recorded_at"),
+                '{"scope":"wellness_and_educational_insights"}',
+            ),
+        )
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=current_user.role,
+            action="session.complete",
+            entity_type="session",
+            entity_id=session_id,
+            client_id=client_id,
+            session_id=session_id,
+            details={
+                "consent_version": consent.get("terms_version"),
+            },
+            **audit_request_metadata(),
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def create_temp_path(filename: str) -> Path:
     TEMP_UPLOAD_DIRECTORY.mkdir(
         parents=True,
@@ -223,6 +335,8 @@ def ai_lab():
 
 @research_bp.route("/ai-testing-lab")
 def ai_testing_lab_public():
+    if not current_app.config["INTERNAL_TOOLS_ENABLED"]:
+        abort(404)
     return render_template(
         "ai_testing_lab_public.html"
     )
@@ -232,6 +346,8 @@ def ai_testing_lab_public():
 @login_required
 @role_required("admin")
 def performance_tests():
+    if not current_app.config["INTERNAL_TOOLS_ENABLED"]:
+        abort(404)
     return render_template(
         "performance_tests.html"
     )
@@ -253,6 +369,524 @@ def admin_accounts():
     return render_template(
         "admin_accounts.html"
     )
+
+
+# =========================================================
+# CHAMBERS / PROTOCOLS
+# =========================================================
+
+@research_bp.route("/api/chambers", methods=["GET"])
+@login_required
+@role_required("admin", "researcher", "operator")
+@limiter.limit(PERF_LIMIT)
+def chambers():
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                chamber_id,
+                code,
+                name,
+                location,
+                manufacturer,
+                model,
+                serial_number,
+                max_ata,
+                pressure_input_unit
+            FROM chambers
+            WHERE is_active = TRUE
+              AND organization_id = %s
+            ORDER BY name
+            """,
+            (current_user.organization_id,),
+        )
+        return jsonify(
+            [
+                {
+                    "chamber_id": row[0],
+                    "code": row[1],
+                    "name": row[2],
+                    "location": row[3],
+                    "manufacturer": row[4],
+                    "model": row[5],
+                    "serial_number": row[6],
+                    "max_ata": row[7],
+                    "pressure_input_unit": row[8],
+                }
+                for row in cursor.fetchall()
+            ]
+        )
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/chambers", methods=["POST"])
+@login_required
+@role_required("admin", "researcher")
+@limiter.limit("30 per minute")
+def create_chamber():
+    data = request.get_json(silent=True) or {}
+    code = clean_value(data.get("code")).upper()
+    name = clean_value(data.get("name"))
+    unit = clean_value(data.get("pressure_input_unit")) or "kpa_gauge"
+
+    if not code or not name:
+        return error_response("code and name are required", 400)
+    if unit not in {"ata", "kpa_gauge", "kpa_absolute"}:
+        return error_response("invalid pressure_input_unit", 400)
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            INSERT INTO chambers (
+                code,
+                name,
+                location,
+                manufacturer,
+                model,
+                serial_number,
+                max_ata,
+                pressure_input_unit,
+                organization_id,
+                location_id
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING chamber_id
+            """,
+            (
+                code,
+                name,
+                clean_value(data.get("location")) or None,
+                clean_value(data.get("manufacturer")) or None,
+                clean_value(data.get("model")) or None,
+                clean_value(data.get("serial_number")) or None,
+                data.get("max_ata") or 1.5,
+                unit,
+                current_user.organization_id,
+                current_user.location_id,
+            ),
+        )
+        chamber_id = cursor.fetchone()[0]
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=current_user.role,
+            action="chamber.create",
+            entity_type="chamber",
+            entity_id=str(chamber_id),
+            details={"code": code, "name": name},
+            **audit_request_metadata(),
+        )
+        connection.commit()
+        return jsonify({"status": "created", "chamber_id": chamber_id}), 201
+    except IntegrityError:
+        connection.rollback()
+        return error_response("chamber code already exists", 409)
+    except Exception as exc:
+        connection.rollback()
+        return error_response(str(exc), 400)
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route("/api/protocols", methods=["GET"])
+@login_required
+@role_required("admin", "researcher", "operator")
+@limiter.limit(PERF_LIMIT)
+def protocols():
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                protocol_id,
+                code,
+                name,
+                mode,
+                target_ata,
+                planned_duration_min,
+                compression_time_min,
+                exposure_time_min,
+                decompression_time_min,
+                oxygen_mode,
+                oxygen_flow_lpm,
+                oxygen_percent
+            FROM protocols
+            WHERE is_active = TRUE
+              AND mode = 'wellness'
+              AND organization_id = %s
+            ORDER BY target_ata, name
+            """,
+            (current_user.organization_id,),
+        )
+        return jsonify(
+            [
+                {
+                    "protocol_id": row[0],
+                    "code": row[1],
+                    "name": row[2],
+                    "mode": row[3],
+                    "target_ata": row[4],
+                    "planned_duration_min": row[5],
+                    "compression_time_min": row[6],
+                    "exposure_time_min": row[7],
+                    "decompression_time_min": row[8],
+                    "oxygen_mode": row[9],
+                    "oxygen_flow_lpm": row[10],
+                    "oxygen_percent": row[11],
+                }
+                for row in cursor.fetchall()
+            ]
+        )
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route("/api/organization/context", methods=["GET"])
+@login_required
+@role_required("admin", "researcher", "operator")
+def organization_context():
+    """Return the commercial tenant and location visible to this account."""
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                o.organization_id,
+                o.code,
+                o.name,
+                l.location_id,
+                l.code,
+                l.name,
+                l.timezone
+            FROM organizations o
+            LEFT JOIN organization_locations l
+                ON l.location_id = %s
+            WHERE o.organization_id = %s
+            LIMIT 1
+            """,
+            (
+                current_user.location_id,
+                current_user.organization_id,
+            ),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return error_response("organization context unavailable", 404)
+        return jsonify(
+            {
+                "organization_id": row[0],
+                "organization_code": row[1],
+                "organization_name": row[2],
+                "location_id": row[3],
+                "location_code": row[4],
+                "location_name": row[5],
+                "timezone": row[6],
+            }
+        )
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route("/api/programs", methods=["GET"])
+@login_required
+@role_required("admin", "researcher", "operator")
+def wellness_programs():
+    """List active wellness packages for the current organization."""
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                wp.program_id,
+                wp.code,
+                wp.name,
+                wp.total_sessions,
+                wp.frequency_per_week,
+                wp.description,
+                wp.protocol_id,
+                p.name,
+                p.target_ata,
+                p.planned_duration_min
+            FROM wellness_programs wp
+            JOIN protocols p ON p.protocol_id = wp.protocol_id
+            WHERE wp.organization_id = %s
+              AND wp.is_active = TRUE
+            ORDER BY wp.name
+            """,
+            (current_user.organization_id,),
+        )
+        return jsonify(
+            [
+                {
+                    "program_id": row[0],
+                    "code": row[1],
+                    "name": row[2],
+                    "total_sessions": row[3],
+                    "frequency_per_week": row[4],
+                    "description": row[5],
+                    "protocol_id": row[6],
+                    "protocol_name": row[7],
+                    "target_ata": row[8],
+                    "planned_duration_min": row[9],
+                }
+                for row in cursor.fetchall()
+            ]
+        )
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/client-programs", methods=["GET", "POST"])
+@login_required
+@role_required("admin", "researcher", "operator")
+def client_programs():
+    """List or create package enrollments within the current organization."""
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        if request.method == "POST":
+            data = request.get_json(silent=True) or {}
+            client_id = clean_value(data.get("client_id"))
+            program_id = parse_optional_int(data.get("program_id"))
+            if not client_id or program_id is None:
+                return error_response("client_id and program_id are required", 400)
+
+            cursor.execute(
+                """
+                SELECT 1
+                FROM users u
+                JOIN wellness_programs wp
+                    ON wp.organization_id = u.organization_id
+                WHERE u.user_id = %s
+                  AND u.organization_id = %s
+                  AND wp.program_id = %s
+                  AND wp.is_active = TRUE
+                LIMIT 1
+                """,
+                (
+                    client_id,
+                    current_user.organization_id,
+                    program_id,
+                ),
+            )
+            if not cursor.fetchone():
+                return error_response("client or program unavailable", 404)
+
+            cursor.execute(
+                """
+                SELECT enrollment_id
+                FROM client_programs
+                WHERE client_id = %s
+                  AND program_id = %s
+                  AND status = 'active'
+                LIMIT 1
+                """,
+                (client_id, program_id),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                enrollment_id = existing[0]
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO client_programs (
+                        program_id,
+                        client_id,
+                        created_by
+                    )
+                    VALUES (%s, %s, %s)
+                    RETURNING enrollment_id
+                    """,
+                    (
+                        program_id,
+                        client_id,
+                        current_user_id(),
+                    ),
+                )
+                enrollment_id = cursor.fetchone()[0]
+
+            record_audit_event(
+                cursor,
+                actor_user_id=current_user_id(),
+                actor_role=current_user.role,
+                action="program.enroll",
+                entity_type="client_program",
+                entity_id=str(enrollment_id),
+                client_id=client_id,
+                details={"program_id": program_id},
+                **audit_request_metadata(),
+            )
+            connection.commit()
+            return jsonify(
+                {
+                    "status": "active",
+                    "enrollment_id": enrollment_id,
+                    "client_id": client_id,
+                    "program_id": program_id,
+                }
+            ), 201
+
+        client_id = clean_value(request.args.get("client_id"))
+        if not client_id:
+            return error_response("client_id is required", 400)
+        cursor.execute(
+            """
+            SELECT
+                cp.enrollment_id,
+                cp.status,
+                cp.started_at,
+                cp.completed_at,
+                wp.program_id,
+                wp.code,
+                wp.name,
+                wp.total_sessions,
+                wp.frequency_per_week,
+                wp.protocol_id,
+                COUNT(fs.id) FILTER (WHERE fs.completed = 1) AS completed_sessions
+            FROM client_programs cp
+            JOIN wellness_programs wp
+                ON wp.program_id = cp.program_id
+            JOIN users u ON u.user_id = cp.client_id
+            LEFT JOIN full_sessions fs
+                ON fs.program_enrollment_id = cp.enrollment_id
+            WHERE cp.client_id = %s
+              AND u.organization_id = %s
+            GROUP BY
+                cp.enrollment_id,
+                cp.status,
+                cp.started_at,
+                cp.completed_at,
+                wp.program_id,
+                wp.code,
+                wp.name,
+                wp.total_sessions,
+                wp.frequency_per_week,
+                wp.protocol_id
+            ORDER BY cp.created_at DESC
+            """,
+            (
+                client_id,
+                current_user.organization_id,
+            ),
+        )
+        return jsonify(
+            [
+                {
+                    "enrollment_id": row[0],
+                    "status": row[1],
+                    "started_at": row[2].isoformat() if row[2] else None,
+                    "completed_at": row[3].isoformat() if row[3] else None,
+                    "program_id": row[4],
+                    "program_code": row[5],
+                    "program_name": row[6],
+                    "total_sessions": row[7],
+                    "frequency_per_week": row[8],
+                    "protocol_id": row[9],
+                    "completed_sessions": row[10],
+                    "remaining_sessions": max(0, row[7] - row[10]),
+                }
+                for row in cursor.fetchall()
+            ]
+        )
+    except Exception as exc:
+        connection.rollback()
+        return error_response(str(exc), 400)
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route("/api/admin/audit-log", methods=["GET"])
+@login_required
+@role_required("admin")
+@limiter.limit("60 per minute")
+def audit_log():
+    """Return a bounded, metadata-only operational audit feed."""
+
+    limit = parse_preview_limit(
+        request.args.get("limit"),
+        default=100,
+        maximum=500,
+    )
+    client_id = clean_value(request.args.get("client_id"))
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                audit_id,
+                actor_user_id,
+                actor_role,
+                action,
+                entity_type,
+                entity_id,
+                client_id,
+                session_id,
+                outcome,
+                details_json,
+                created_at
+            FROM audit_log
+            WHERE (%s = '' OR client_id = %s)
+            ORDER BY created_at DESC, audit_id DESC
+            LIMIT %s
+            """,
+            (
+                client_id,
+                client_id,
+                limit,
+            ),
+        )
+        return jsonify(
+            {
+                "status": "ok",
+                "events": [
+                    {
+                        "audit_id": row[0],
+                        "actor_user_id": row[1],
+                        "actor_role": row[2],
+                        "action": row[3],
+                        "entity_type": row[4],
+                        "entity_id": row[5],
+                        "client_id": row[6],
+                        "session_id": row[7],
+                        "outcome": row[8],
+                        "details": row[9] or {},
+                        "created_at": (
+                            row[10].isoformat()
+                            if row[10]
+                            else None
+                        ),
+                    }
+                    for row in cursor.fetchall()
+                ],
+            }
+        )
+    finally:
+        cursor.close()
+        connection.close()
 
 
 # =========================================================
@@ -287,8 +921,11 @@ def subjects():
                 created_at
             FROM users
             WHERE is_active = TRUE
+              AND role = 'viewer'
+              AND email IS NULL
+              AND organization_id = %s
             ORDER BY id DESC
-        """)
+        """, (current_user.organization_id,))
 
         return jsonify([
             {
@@ -340,9 +977,11 @@ def create_subject():
                 weight,
                 notes,
                 role,
-                is_active
+                is_active,
+                organization_id,
+                location_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             subject_id,
             subject_id,
@@ -352,8 +991,20 @@ def create_subject():
             clean_value(data.get("notes")) or None,
             "viewer",
             True,
+            current_user.organization_id,
+            current_user.location_id,
         ))
 
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=current_user.role,
+            action="client.create",
+            entity_type="client",
+            entity_id=subject_id,
+            client_id=subject_id,
+            **audit_request_metadata(),
+        )
         connection.commit()
 
         return jsonify({
@@ -380,7 +1031,7 @@ def create_subject():
 @research_bp.route("/api/delete_subject", methods=["POST"])
 @research_bp.route("/api/delete_user", methods=["POST"])
 @login_required
-@role_required("admin", "researcher", "operator")
+@role_required("admin", "researcher")
 @limiter.limit("30 per minute")
 def delete_subject():
     """Delete one subject and its related research data."""
@@ -395,6 +1046,10 @@ def delete_subject():
     cursor = connection.cursor()
 
     try:
+        deletion_token = (
+            "deleted:"
+            + hashlib.sha256(user_id.encode("utf-8")).hexdigest()[:16]
+        )
         session_ids = collect_subject_session_ids(
             cursor,
             user_id=user_id,
@@ -407,11 +1062,70 @@ def delete_subject():
         )
 
         cursor.execute(
-            "DELETE FROM users WHERE user_id = %s",
+            """
+            DELETE FROM users
+            WHERE user_id = %s
+              AND role = 'viewer'
+            """,
             (user_id,),
         )
 
         deleted_subjects = cursor.rowcount
+
+        cursor.execute(
+            """
+            INSERT INTO data_requests (
+                client_id,
+                request_type,
+                requested_by,
+                status,
+                details_json,
+                completed_at
+            )
+            VALUES (
+                %s, 'delete', %s, 'completed',
+                %s::jsonb, CURRENT_TIMESTAMP
+            )
+            """,
+            (
+                deletion_token,
+                current_user_id(),
+                '{"method":"hard_delete","identifier_pseudonymized":true}',
+            ),
+        )
+        cursor.execute(
+            """
+            UPDATE audit_log
+            SET
+                client_id = %s,
+                entity_id = CASE
+                    WHEN entity_type = 'client' THEN %s
+                    ELSE entity_id
+                END
+            WHERE client_id = %s
+               OR (entity_type = 'client' AND entity_id = %s)
+            """,
+            (
+                deletion_token,
+                deletion_token,
+                user_id,
+                user_id,
+            ),
+        )
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=current_user.role,
+            action="client.delete",
+            entity_type="client",
+            entity_id=deletion_token,
+            client_id=deletion_token,
+            details={
+                "deleted_sessions": len(session_ids),
+                "identifier_pseudonymized": True,
+            },
+            **audit_request_metadata(),
+        )
         connection.commit()
 
         return jsonify({
@@ -426,6 +1140,93 @@ def delete_subject():
         traceback.print_exc()
         return error_response(str(exc), 500)
 
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route("/api/clients/<client_id>/export", methods=["GET"])
+@login_required
+@role_required("admin", "researcher")
+@limiter.limit("10 per hour")
+def export_client(client_id: str):
+    """Export all client-owned records as a portable JSON ZIP."""
+
+    normalized_client_id = clean_value(client_id)
+
+    if not normalized_client_id:
+        return error_response("missing client_id", 400)
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT 1
+            FROM users
+            WHERE user_id = %s
+              AND role = 'viewer'
+            """,
+            (normalized_client_id,),
+        )
+        if not cursor.fetchone():
+            return error_response("client not found", 404)
+
+        archive = build_client_export(
+            cursor,
+            client_id=normalized_client_id,
+        )
+        cursor.execute(
+            """
+            INSERT INTO data_requests (
+                client_id,
+                request_type,
+                requested_by,
+                status,
+                details_json,
+                completed_at
+            )
+            VALUES (
+                %s, 'export', %s, 'completed',
+                '{"format":"zip_json"}'::jsonb,
+                CURRENT_TIMESTAMP
+            )
+            """,
+            (
+                normalized_client_id,
+                current_user_id(),
+            ),
+        )
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=current_user.role,
+            action="client.export",
+            entity_type="client",
+            entity_id=normalized_client_id,
+            client_id=normalized_client_id,
+            details={"format": "zip_json"},
+            **audit_request_metadata(),
+        )
+        connection.commit()
+
+        safe_client_id = "".join(
+            character
+            for character in normalized_client_id
+            if character.isalnum() or character in {"-", "_"}
+        ) or "client"
+
+        return send_file(
+            archive,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"corelabtech_{safe_client_id}_export.zip",
+        )
+    except Exception as exc:
+        connection.rollback()
+        traceback.print_exc()
+        return error_response(str(exc), 500)
     finally:
         cursor.close()
         connection.close()
@@ -457,7 +1258,8 @@ def upload_fit():
     )
 
     user_id = clean_value(
-        request.form.get("user_id")
+        request.form.get("client_id")
+        or request.form.get("user_id")
     ) or None
 
     if not file or not session_id:
@@ -505,6 +1307,7 @@ def upload_fit():
         return jsonify({
             "status": "fit_saved",
             "records": payload.get("records_saved", 0),
+            "client_id": payload.get("user_id"),
             **payload,
         }), 201
 
@@ -555,7 +1358,8 @@ def upload_csv():
     )
 
     user_id = clean_value(
-        request.form.get("user_id")
+        request.form.get("client_id")
+        or request.form.get("user_id")
     ) or None
 
     if not file or not session_id:
@@ -603,6 +1407,7 @@ def upload_csv():
         return jsonify({
             "status": "csv_saved",
             "records": payload.get("records_saved", 0),
+            "client_id": payload.get("user_id"),
             **payload,
         }), 201
 
@@ -808,7 +1613,8 @@ def during_merge():
         result = merge_session_data(
             session_id=session_id,
             user_id=clean_value(
-                data.get("user_id")
+                data.get("client_id")
+                or data.get("user_id")
             ) or None,
             tolerance_ms=int(
                 data.get("tolerance_ms", 2500)
@@ -835,6 +1641,7 @@ def during_merge():
         return jsonify({
             "status": "ok",
             "result_status": "merge_completed",
+            "client_id": result.user_id,
             "mode": result.mode,
             "fit_samples": result.fit_records,
             "csv_samples": result.csv_records,
@@ -917,6 +1724,8 @@ def save_phase():
     """Save one PRE, DURING or POST phase payload."""
 
     data = request.get_json(silent=True) or {}
+    if data.get("client_id") and not data.get("user_id"):
+        data["user_id"] = data["client_id"]
 
     try:
         result = save_session_phase(
@@ -929,6 +1738,7 @@ def save_phase():
             "phase_id": result.phase_id,
             "session_id": result.session_id,
             "phase": result.phase,
+            "client_id": data.get("user_id"),
         }), 201
 
     except ValueError as exc:
@@ -960,7 +1770,8 @@ def save_full_session():
         data.get("session_id")
     )
     user_id = clean_value(
-        data.get("user_id")
+        data.get("client_id")
+        or data.get("user_id")
     )
 
     if not session_id:
@@ -975,20 +1786,45 @@ def save_full_session():
             400,
         )
 
+    pre = data.get("pre") or {}
+    wellness_consent = pre.get("wellness_consent") or {}
+
+    if wellness_consent.get("accepted") is not True:
+        return error_response(
+            "wellness client acknowledgement is required",
+            400,
+        )
+
+    pre = {
+        **pre,
+        "wellness_consent": {
+            "accepted": True,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "recorded_by": get_current_user_id(),
+            "terms_version": "2026-07-26",
+        },
+    }
+
     try:
         result = complete_session(
             session_id=session_id,
             user_id=user_id,
-            pre=data.get("pre") or {},
+            pre=pre,
             during=data.get("during") or {},
             post=data.get("post") or {},
             initiated_by=get_current_user_id(),
+        )
+        record_session_consent_and_audit(
+            session_id=result.session_id,
+            client_id=result.user_id,
+            consent=pre["wellness_consent"],
         )
 
         return jsonify({
             "status": "ok",
             "session_id": result.session_id,
             "user_id": result.user_id,
+            "client_id": result.user_id,
             "saved_count": 1,
             "fit_samples": result.fit_samples,
             "csv_samples": result.csv_samples,
@@ -1019,6 +1855,7 @@ def sessions():
         rows = list_research_sessions(
             requesting_user_id=get_current_user_id(),
             requesting_role=current_user.role,
+            requesting_organization_id=current_user.organization_id,
         )
 
         return jsonify({
@@ -1049,6 +1886,7 @@ def get_session(session_id: str):
         session_id=session_id,
         requesting_user_id=get_current_user_id(),
         requesting_role=current_user.role,
+        requesting_organization_id=current_user.organization_id,
     )
 
     if not result:
@@ -1129,7 +1967,6 @@ def run_analysis():
     try:
         analysis = run_session_analysis(
             session_id=session_id,
-            user_id=get_current_user_id(),
         )
 
         result = {
@@ -1152,11 +1989,25 @@ def run_analysis():
             "risk_level",
             risk_level_from_score(score),
         )
+        write_audit_event(
+            action="session.analyze",
+            entity_type="session",
+            entity_id=analysis.session_id,
+            client_id=result.get("client_id"),
+            session_id=analysis.session_id,
+            details={
+                "analysis_id": analysis.ai_result_id,
+                "protocol_id": (
+                    result.get("protocol") or {}
+                ).get("protocol_id"),
+            },
+        )
 
         return jsonify({
             "status": "completed",
             "analysis_id": analysis.ai_result_id,
             "session_id": analysis.session_id,
+            "client_id": result.get("client_id"),
             "merge_id": analysis.merge_id,
             **result,
         }), 201
@@ -1253,14 +2104,35 @@ def user_trends(user_id: str):
     cursor = connection.cursor()
 
     try:
-        if (
-            current_user.role not in ("admin", "researcher")
-            and subject_id != get_current_user_id()
+        if not can_access_client_record(
+            requesting_role=current_user.role,
+            requesting_user_id=get_current_user_id(),
+            client_id=subject_id,
+            requesting_organization_id=current_user.organization_id,
         ):
             return error_response(
                 "forbidden",
                 403,
             )
+
+        protocol_id = parse_optional_int(
+            request.args.get("protocol_id")
+        )
+        if protocol_id is None:
+            cursor.execute(
+                """
+                SELECT protocol_id
+                FROM full_sessions
+                WHERE user_id = %s
+                  AND completed = 1
+                  AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (subject_id,),
+            )
+            protocol_row = cursor.fetchone()
+            protocol_id = protocol_row[0] if protocol_row else None
 
         cursor.execute(
             """
@@ -1273,12 +2145,31 @@ def user_trends(user_id: str):
                 features_json,
                 result_json,
                 created_at
-            FROM ai_results
-            WHERE user_id = %s
-              AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+            FROM (
+                SELECT DISTINCT ON (ar.session_id)
+                    ar.session_id,
+                    ar.overall_score,
+                    ar.data_quality_score,
+                    ar.anomaly_detected,
+                    ar.summary,
+                    ar.features_json,
+                    ar.result_json,
+                    ar.created_at,
+                    ar.ai_result_id
+                FROM ai_results ar
+                JOIN full_sessions fs
+                    ON fs.session_id = ar.session_id
+                WHERE fs.user_id = %s
+                  AND fs.protocol_id = %s
+                  AND ar.session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+                ORDER BY
+                    ar.session_id,
+                    ar.created_at DESC,
+                    ar.ai_result_id DESC
+            ) latest_per_session
             ORDER BY created_at ASC, ai_result_id ASC
             """,
-            (subject_id,),
+            (subject_id, protocol_id),
         )
 
         analysis_rows = cursor.fetchall()
@@ -1349,18 +2240,40 @@ def user_trends(user_id: str):
 
         cursor.execute(
             """
-            SELECT COUNT(*)
+            SELECT COUNT(DISTINCT session_id)
             FROM full_sessions
             WHERE user_id = %s
+              AND protocol_id = %s
+              AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
             """,
-            (subject_id,),
+            (subject_id, protocol_id),
         )
 
         session_count = cursor.fetchone()[0]
+        cursor.execute(
+            """
+            SELECT code, name, target_ata
+            FROM protocols
+            WHERE protocol_id = %s
+            """,
+            (protocol_id,),
+        )
+        selected_protocol_row = cursor.fetchone()
+        selected_protocol = (
+            {
+                "protocol_id": protocol_id,
+                "code": selected_protocol_row[0],
+                "name": selected_protocol_row[1],
+                "target_ata": selected_protocol_row[2],
+            }
+            if selected_protocol_row
+            else None
+        )
 
         return jsonify({
             "status": "ok",
             "user_id": subject_id,
+            "protocol": selected_protocol,
             "records": len(analyses),
             "session_count": session_count,
             "avg_score": average_or_none(scores),
@@ -1412,9 +2325,11 @@ def wellness_summary(user_id: str):
     cursor = connection.cursor()
 
     try:
-        if (
-            current_user.role not in ("admin", "researcher")
-            and subject_id != get_current_user_id()
+        if not can_access_client_record(
+            requesting_role=current_user.role,
+            requesting_user_id=get_current_user_id(),
+            client_id=subject_id,
+            requesting_organization_id=current_user.organization_id,
         ):
             return error_response(
                 "forbidden",
@@ -1426,6 +2341,9 @@ def wellness_summary(user_id: str):
             **get_wellness_summary(
                 cursor,
                 user_id=subject_id,
+                protocol_id=parse_optional_int(
+                    request.args.get("protocol_id")
+                ),
             ),
         })
 
@@ -1495,6 +2413,7 @@ def report(session_id: str):
             session_id=session_id,
             requesting_user_id=get_current_user_id(),
             requesting_role=current_user.role,
+            requesting_organization_id=current_user.organization_id,
         )
 
         return send_file(
@@ -2004,6 +2923,9 @@ def collect_subject_session_ids(
         "merge_jobs",
         "merged_data",
         "ai_results",
+        "session_features",
+        "hrv_imports",
+        "hrv_intervals",
     ):
         if not table_exists(cursor, table):
             continue
@@ -2035,6 +2957,11 @@ def delete_subject_related_rows(
     """Delete subject-owned data while tolerating absent optional tables."""
 
     tables = (
+        "consent_records",
+        "daily_baselines",
+        "session_features",
+        "hrv_intervals",
+        "hrv_imports",
         "ai_results",
         "merged_data",
         "merge_jobs",
@@ -2050,7 +2977,20 @@ def delete_subject_related_rows(
         if not table_exists(cursor, table):
             continue
 
-        if session_ids:
+        if table in {"daily_baselines", "consent_records"}:
+            owner_column = (
+                "client_id"
+                if table == "consent_records"
+                else "user_id"
+            )
+            cursor.execute(
+                f"""
+                DELETE FROM {table}
+                WHERE {owner_column} = %s
+                """,
+                (user_id,),
+            )
+        elif session_ids:
             cursor.execute(
                 f"""
                 DELETE FROM {table}

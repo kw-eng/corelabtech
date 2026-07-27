@@ -81,6 +81,9 @@ app.secret_key = secret_key or "dev-secret-change-me"
 app.config["DEBUG_ROUTES_ENABLED"] = (
     os.getenv("DISABLE_DEBUG_ROUTES", "true").lower() != "true"
 )
+app.config["INTERNAL_TOOLS_ENABLED"] = (
+    os.getenv("INTERNAL_TOOLS_ENABLED", "false").lower() == "true"
+)
 # =========================================================
 # CSRF
 # =========================================================
@@ -121,12 +124,13 @@ elif not IS_PRODUCTION:
 app.register_blueprint(main_bp)
 app.register_blueprint(research_bp)
 app.register_blueprint(ai_bp)
-app.register_blueprint(ai_qa_bp)
-app.register_blueprint(qa_bp)
 app.register_blueprint(pub_bp)
 # app.register_blueprint(user_bp)
 app.register_blueprint(telemetry_bp)
-app.register_blueprint(performance_bp)
+if app.config["INTERNAL_TOOLS_ENABLED"]:
+    app.register_blueprint(ai_qa_bp)
+    app.register_blueprint(qa_bp)
+    app.register_blueprint(performance_bp)
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_HTTPONLY"] = True
