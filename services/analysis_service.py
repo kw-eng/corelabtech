@@ -105,9 +105,14 @@ def run_session_analysis(
                 "Merged timeline contains no synchronized records"
             )
 
+        session_client_id = load_session_client_id(
+            cursor,
+            session_id=session_id,
+        )
         final_user_id = (
-            user_id
+            session_client_id
             or merge_job.get("user_id")
+            or user_id
             or session_id
         )
 
@@ -121,6 +126,9 @@ def run_session_analysis(
             usable=usable,
             session_context=session_context,
         )
+        result["client_id"] = final_user_id
+        result["protocol"] = session_context.get("protocol") or {}
+        result["chamber"] = session_context.get("chamber") or {}
 
         ai_result_id = create_ai_result(
             cursor,
@@ -146,11 +154,15 @@ def run_session_analysis(
             window_end=result["features"].get("window_end"),
             features=result["features"],
             result=result,
+            protocol_id=session_context["protocol_id"],
+            target_ata=session_context.get("target_ata"),
+            actual_ata=session_context.get("actual_ata"),
         )
 
         refresh_daily_baseline(
             cursor,
             user_id=final_user_id,
+            protocol_id=session_context["protocol_id"],
             baseline_date=(
                 result["features"].get("window_start").date()
                 if result["features"].get("window_start")
@@ -394,6 +406,8 @@ def analyze_measurements(
 
     return {
         "overall_score": score,
+        "wellness_response_score": score,
+        "score_type": "Wellness Response",
         "recovery_score": None,
         "stress_score": (
             100 - min(100, max(0, 30 - avg_hrv) * 3)
@@ -418,6 +432,7 @@ def analyze_measurements(
         "arrhythmia_detected": False,
 
         "product_mode": "wellness",
+        "wellness_only": True,
         "wellness_status": wellness_status,
         "session_flagged": anomaly_detected,
         "elevated_load": elevated_load,
@@ -458,6 +473,26 @@ def analyze_measurements(
         "medical_disclaimer": WELLNESS_DISCLAIMER,
         "wellness_disclaimer": WELLNESS_DISCLAIMER,
     }
+
+
+def load_session_client_id(
+    cursor,
+    *,
+    session_id: str,
+) -> str | None:
+    """Resolve the canonical client from the completed session record."""
+
+    cursor.execute(
+        """
+        SELECT user_id
+        FROM full_sessions
+        WHERE session_id = %s
+        LIMIT 1
+        """,
+        (session_id,),
+    )
+    row = cursor.fetchone()
+    return row[0] if row and row[0] else None
 
 
 def numeric_values(
@@ -695,9 +730,38 @@ def load_session_context(
 
     cursor.execute(
         """
-        SELECT pre_json, post_json
-        FROM full_sessions
-        WHERE session_id = %s
+        SELECT
+            fs.pre_json,
+            fs.during_json,
+            fs.post_json,
+            fs.protocol_id,
+            fs.chamber_id,
+            fs.target_ata,
+            fs.actual_ata,
+            fs.pressure_input_value,
+            fs.pressure_input_unit,
+            fs.pressure_deviation,
+            p.code,
+            p.name,
+            p.mode,
+            p.planned_duration_min,
+            c.code,
+            c.name,
+            c.location,
+            fs.compression_time_min,
+            fs.exposure_time_min,
+            fs.decompression_time_min,
+            fs.total_duration_min,
+            fs.execution_status,
+            fs.deviation_reason,
+            fs.program_enrollment_id,
+            fs.protocol_version
+        FROM full_sessions fs
+        LEFT JOIN protocols p
+            ON p.protocol_id = fs.protocol_id
+        LEFT JOIN chambers c
+            ON c.chamber_id = fs.chamber_id
+        WHERE fs.session_id = %s
         LIMIT 1
         """,
         (session_id,),
@@ -709,12 +773,74 @@ def load_session_context(
         return {}
 
     pre = decode_json(row[0])
-    post = decode_json(row[1])
+    during = decode_json(row[1])
+    post = decode_json(row[2])
 
-    return {
+    context = {
         "pre_check_in": pre.get("check_in") or {},
         "post_check_out": post.get("check_out") or {},
+        "during": during,
+        "protocol_id": row[3],
+        "chamber_id": row[4],
+        "target_ata": row[5],
+        "actual_ata": row[6],
+        "pressure_input_value": row[7],
+        "pressure_input_unit": row[8],
+        "pressure_deviation": row[9],
+        "session_timing": {
+            "compression_time_min": row[17],
+            "exposure_time_min": row[18],
+            "decompression_time_min": row[19],
+            "total_duration_min": row[20],
+        },
+        "execution_status": row[21],
+        "deviation_reason": row[22],
+        "program_enrollment_id": row[23],
+        "protocol": {
+            "protocol_id": row[3],
+            "code": row[10],
+            "name": row[11],
+            "mode": row[12],
+            "planned_duration_min": row[13],
+            "target_ata": row[5],
+            "version": row[24],
+        },
+        "chamber": {
+            "chamber_id": row[4],
+            "code": row[14],
+            "name": row[15],
+            "location": row[16],
+        },
     }
+    cursor.execute(
+        """
+        SELECT
+            sequence_no,
+            phase,
+            actual_duration_min,
+            target_ata,
+            actual_ata,
+            oxygen_mode,
+            note
+        FROM session_segments
+        WHERE session_id = %s
+        ORDER BY sequence_no
+        """,
+        (session_id,),
+    )
+    context["segments"] = [
+        {
+            "sequence_no": segment[0],
+            "phase": segment[1],
+            "actual_duration_min": segment[2],
+            "target_ata": segment[3],
+            "actual_ata": segment[4],
+            "oxygen_mode": segment[5],
+            "note": segment[6],
+        }
+        for segment in cursor.fetchall()
+    ]
+    return context
 
 
 def summarize_session_context(context: dict[str, Any]) -> dict[str, Any]:

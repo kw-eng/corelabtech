@@ -77,29 +77,6 @@ function formatScore(data){
     return `${escapeHtml(value)}<span class="metric-unit">/100</span>`
 }
 
-function riskLabel(data){
-    const score =
-        data.score ??
-        data.overall_score
-
-    return data.risk_level || (
-        score >= 90
-            ? "Low"
-            : score >= 70
-                ? "Moderate"
-                : "High"
-    )
-}
-
-function riskClass(label){
-    const normalized = String(label || "").toLowerCase()
-
-    if(normalized.includes("high")) return "status-high"
-    if(normalized.includes("moderate")) return "status-moderate"
-
-    return "status-low"
-}
-
 function wellnessStatus(data){
     const features = data.features || {}
     const warnings = qualityWarnings(data, features)
@@ -258,14 +235,20 @@ function getSubjectId(data){
     return data.user_id || data.result?.user_id || null
 }
 
-function baselineReadiness(records){
-    const count = Number(records || 0)
+function baselineReadiness(records, baseline = null){
+    const count = Number(
+        baseline?.sessions_count_30d ??
+        records ??
+        0
+    )
+    const quality = Number(baseline?.data_quality_score)
 
-    if(count >= 14){
+    if(count >= 14 && (!Number.isFinite(quality) || quality >= 70)){
         return {
             label: "Trend baseline ready",
             className: "status-low",
-            text: "There is enough history for a useful rolling wellness trend."
+            text: "There is enough quality-controlled history for a useful rolling wellness trend.",
+            count
         }
     }
 
@@ -273,15 +256,36 @@ function baselineReadiness(records){
         return {
             label: "Early trend forming",
             className: "status-moderate",
-            text: "The system can start comparing sessions, but confidence will improve with more data."
+            text: "The system can compare sessions, but confidence will improve with more consistent data.",
+            count
         }
     }
 
     return {
         label: "Collect more sessions",
         className: "status-moderate",
-        text: "Use this as a single-session review. At least 5 consistent sessions are recommended for trend coaching."
+        text: "Use this as a session review. At least 5 consistent sessions are recommended for early trend coaching.",
+        count
     }
+}
+
+function baselineDelta(current, reference){
+    const currentValue = Number(current)
+    const referenceValue = Number(reference)
+
+    if(
+        !Number.isFinite(currentValue) ||
+        !Number.isFinite(referenceValue) ||
+        referenceValue === 0
+    ){
+        return "comparison unavailable"
+    }
+
+    const delta =
+        ((currentValue - referenceValue) / Math.abs(referenceValue)) * 100
+    const prefix = delta > 0 ? "+" : ""
+
+    return `${prefix}${delta.toFixed(1)}% vs baseline`
 }
 
 function coachTrendLabel(trend){
@@ -400,10 +404,16 @@ function formatContextSummary(data){
     return parts.join(". ") || "Daily context recorded."
 }
 
-function renderCoachPanel(data, trend = null){
+function renderCoachPanel(data, trend = null, wellness = null){
     const features = data.features || {}
-    const readiness = baselineReadiness(trend?.records)
+    const baseline = wellness?.baseline || null
+    const readiness = baselineReadiness(trend?.records, baseline)
     const confidence = confidenceLevel(data, features)
+    const protocol =
+        data.protocol ||
+        data.result?.protocol ||
+        trend?.protocol ||
+        {}
 
     return `
         <div class="coach-card" id="coachPanel">
@@ -420,14 +430,56 @@ function renderCoachPanel(data, trend = null){
 
             <div class="coach-grid">
                 <div>
+                    <span>Protocol-matched trend</span>
+                    <strong>${escapeHtml(protocol.name || "Protocol not recorded")}</strong>
+                    <p>
+                        Target ${formatMetric(protocol.target_ata, "ATA")}.
+                        History excludes sessions using other protocols.
+                    </p>
+                </div>
+                <div>
                     <span>Trend history</span>
-                    <strong>${escapeHtml(trend?.records ?? 0)} sessions</strong>
+                    <strong>${escapeHtml(readiness.count)} unique sessions</strong>
                     <p>${escapeHtml(trend?.trend_direction || "More sessions needed for direction.")}</p>
                 </div>
                 <div>
-                    <span>Interpretation confidence</span>
+                    <span>Session confidence</span>
                     <strong>${escapeHtml(confidence.label)}</strong>
                     <p>${escapeHtml(confidence.reason)}</p>
+                </div>
+                <div>
+                    <span>RMSSD baseline</span>
+                    <strong>
+                        7d ${formatMetric(baseline?.rmssd_7d, "ms")} /
+                        14d ${formatMetric(baseline?.rmssd_14d, "ms")} /
+                        30d ${formatMetric(baseline?.rmssd_30d, "ms")}
+                    </strong>
+                    <p>
+                        Current ${formatMetric(pickMetric(features, "avg_hrv"), "ms")} ·
+                        ${escapeHtml(baselineDelta(
+                            pickMetric(features, "avg_hrv"),
+                            baseline?.rmssd_30d
+                        ))}
+                    </p>
+                </div>
+                <div>
+                    <span>HR and SpO2 baseline</span>
+                    <strong>
+                        HR ${formatMetric(baseline?.resting_hr_7d, "bpm")} ·
+                        SpO2 ${formatMetric(baseline?.spo2_avg, "%")}
+                    </strong>
+                    <p>
+                        Current HR ${formatMetric(pickMetric(features, "avg_heart_rate", "avg_fit_hr"), "bpm")}
+                        (${escapeHtml(baselineDelta(
+                            pickMetric(features, "avg_heart_rate", "avg_fit_hr"),
+                            baseline?.resting_hr_7d
+                        ))});
+                        current SpO2 ${formatMetric(pickMetric(features, "avg_spo2", "avg_csv_spo2"), "%")}
+                        (${escapeHtml(baselineDelta(
+                            pickMetric(features, "avg_spo2", "avg_csv_spo2"),
+                            baseline?.spo2_avg
+                        ))}).
+                    </p>
                 </div>
                 <div>
                     <span>Daily context</span>
@@ -453,17 +505,43 @@ async function hydrateCoachPanel(data){
     }
 
     try{
-        const res = await fetch(`/api/user_trends/${encodeURIComponent(subjectId)}`, {
-            credentials: "same-origin"
-        })
+        const protocolId =
+            data.protocol?.protocol_id ||
+            data.result?.protocol?.protocol_id ||
+            data.features?.session_context?.protocol_id
+        const protocolQuery = protocolId
+            ? `?protocol_id=${encodeURIComponent(protocolId)}`
+            : ""
+        const [trendRes, wellnessRes] = await Promise.all([
+            fetch(`/api/user_trends/${encodeURIComponent(subjectId)}${protocolQuery}`, {
+                credentials: "same-origin"
+            }),
+            fetch(`/api/wellness/summary/${encodeURIComponent(subjectId)}${protocolQuery}`, {
+                credentials: "same-origin"
+            })
+        ])
 
-        if(!res.ok){
+        if(!trendRes.ok || !wellnessRes.ok){
             return
         }
 
-        const trend = await parseJsonResponse(res, "AI LAB USER TREND")
+        const trend = await parseJsonResponse(trendRes, "AI LAB USER TREND")
+        const wellness = await parseJsonResponse(
+            wellnessRes,
+            "AI LAB WELLNESS BASELINE"
+        )
+        const readiness = baselineReadiness(
+            trend?.records,
+            wellness?.baseline
+        )
 
-        panel.outerHTML = renderCoachPanel(data, trend)
+        panel.outerHTML = renderCoachPanel(data, trend, wellness)
+
+        const baselineConfidence =
+            document.getElementById("baselineConfidenceValue")
+        if(baselineConfidence){
+            baselineConfidence.textContent = readiness.label
+        }
     }catch(err){
         console.error("hydrateCoachPanel error:", err)
     }
@@ -712,7 +790,7 @@ async function runAnalysis(sessionId){
             `<b>Summary:</b> ${escapeHtml(conciseSummary(data.summary))}`
 
         document.getElementById("ai-score").innerHTML =
-            `<b>Score:</b> ${data.score ?? "-"} / 100`
+            `<b>Wellness response:</b> ${data.score ?? "-"} / 100`
 
         document.getElementById("ai-anomaly").innerHTML =
             `<b>Wellness status:</b> ${wellnessLabel(status)}`
@@ -830,12 +908,12 @@ function renderAIVisualization(data){
 
             <div class="ai-kpi-grid">
                 <div class="ai-kpi-card">
-                    <span>Wellness score</span>
+                    <span>Wellness response</span>
                     <strong>${formatScore(data)}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Wellness status</span>
-                    <strong>${escapeHtml(wellnessLabel(status))}</strong>
+                    <span>Baseline confidence</span>
+                    <strong id="baselineConfidenceValue">Loading history...</strong>
                 </div>
                 <div class="ai-kpi-card">
                     <span>Data quality</span>
@@ -1237,8 +1315,8 @@ function renderBatchVisualization(results){
             <table border="1" style="width:100%;">
                 <tbody>
                     <tr><td>Sessions analyzed</td><td>${results.length}</td></tr>
-                    <tr><td>Average score</td><td>${avg(scores)} / 100</td></tr>
-                    <tr><td>Flagged sessions</td><td>${results.filter(r => r.anomaly ?? r.anomaly_detected).length}</td></tr>
+                    <tr><td>Average wellness response</td><td>${avg(scores)} / 100</td></tr>
+                    <tr><td>Sessions recommended for review</td><td>${results.filter(r => r.anomaly ?? r.anomaly_detected).length}</td></tr>
                 </tbody>
             </table>
         </div>
@@ -1262,12 +1340,12 @@ function renderBatchVisualization(results){
             labels: labels,
             datasets: [
                 {
-                    label: "AI Score",
+                    label: "Wellness Response",
                     data: scores,
                     borderWidth: 2
                 },
                 {
-                    label: "POST SpO2",
+                    label: "Recovery SpO2",
                     data: postSpo2,
                     borderWidth: 2
                 }

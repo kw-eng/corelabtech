@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="content-page">
+    <p class="page-eyebrow">Operator onboarding</p>
+    <h1>Run a Consistent Wellness Session</h1>
+    <p>
+        Use the same client, sensor setup and timing approach across repeat
+        sessions. Consistency improves synchronization quality and makes the
+        personal baseline more useful.
+    </p>
+
+    <div class="onboarding-grid">
+        <article>
+            <strong>1. Select the client</strong>
+            <p>Create or select the correct client and confirm the wellness acknowledgement.</p>
+        </article>
+        <article>
+            <strong>2. Record Check-in context</strong>
+            <p>Add SpO2, pulse, sleep, stress, recent training load, fatigue and session goal.</p>
+        </article>
+        <article>
+            <strong>3. Upload session signals</strong>
+            <p>Upload HR/HRV FIT and SpO2/pulse CSV files, then review timestamp synchronization.</p>
+        </article>
+        <article>
+            <strong>4. Complete Recovery</strong>
+            <p>Record physiology and perceived energy, relaxation, fatigue and discomfort.</p>
+        </article>
+        <article>
+            <strong>5. Review the insight</strong>
+            <p>Read Wellness Response, Data Quality and Baseline Confidence separately.</p>
+        </article>
+        <article>
+            <strong>6. Build the baseline</strong>
+            <p>Use 5 sessions for an early trend and 14 quality sessions for a stronger baseline.</p>
+        </article>
+    </div>
+
+    {% if current_user.is_authenticated and current_user.role in ["operator", "researcher", "admin"] %}
+        <p><a class="button-link" href="{{ url_for('research.chamber_testing') }}">Open Physiology Session</a></p>
+    {% endif %}
+</section>
+
+{% endblock %}

@@ -1,0 +1,95 @@
+services:
+  web:
+    build:
+      context: ../..
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      APP_ENV: production
+      FLASK_ENV: production
+      PERFORMANCE_TESTING: "false"
+      DISABLE_DEBUG_ROUTES: "true"
+    command: >
+      gunicorn app:app
+      --workers ${GUNICORN_WORKERS:-2}
+      --threads ${GUNICORN_THREADS:-4}
+      --worker-class gthread
+      --bind 0.0.0.0:5000
+      --timeout ${GUNICORN_TIMEOUT:-300}
+    expose:
+      - "5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../../logs:/app/logs
+      - ../../data:/app/data
+      - ../../files:/app/files:ro
+      - ../../reports:/app/reports
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - private
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - private
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/corelabtech.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - private
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["certificate"]
+    ports:
+      - "80:80"
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    command: >
+      certonly --standalone --non-interactive --agree-tos
+      --email ${LETSENCRYPT_EMAIL}
+      -d ${DOMAIN}
+
+networks:
+  private:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  letsencrypt:
+  certbot_webroot:

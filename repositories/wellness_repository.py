@@ -17,6 +17,9 @@ def upsert_session_features(
     window_end: datetime | None,
     features: dict[str, Any],
     result: dict[str, Any],
+    protocol_id: int,
+    target_ata: float | None = None,
+    actual_ata: float | None = None,
 ) -> None:
     """Persist one analyzed wellness feature row for a session."""
 
@@ -25,6 +28,7 @@ def upsert_session_features(
         INSERT INTO session_features (
             session_id,
             user_id,
+            protocol_id,
             phase,
             window_start,
             window_end,
@@ -45,18 +49,21 @@ def upsert_session_features(
             deviation_from_baseline,
             status,
             data_quality_score,
+            target_ata,
+            actual_ata,
             features_json
         )
         VALUES (
-            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s,
             %s::jsonb
         )
         ON CONFLICT (session_id, phase, window_start, window_end)
         DO UPDATE SET
             user_id = EXCLUDED.user_id,
+            protocol_id = EXCLUDED.protocol_id,
             avg_hr = EXCLUDED.avg_hr,
             min_hr = EXCLUDED.min_hr,
             max_hr = EXCLUDED.max_hr,
@@ -74,11 +81,14 @@ def upsert_session_features(
             deviation_from_baseline = EXCLUDED.deviation_from_baseline,
             status = EXCLUDED.status,
             data_quality_score = EXCLUDED.data_quality_score,
+            target_ata = EXCLUDED.target_ata,
+            actual_ata = EXCLUDED.actual_ata,
             features_json = EXCLUDED.features_json
         """,
         (
             session_id,
             user_id,
+            protocol_id,
             phase,
             window_start,
             window_end,
@@ -99,6 +109,8 @@ def upsert_session_features(
             features.get("deviation_from_baseline"),
             result.get("wellness_status"),
             result.get("data_quality_score"),
+            target_ata,
+            actual_ata,
             json.dumps(
                 {
                     **features,
@@ -116,8 +128,26 @@ def refresh_daily_baseline(
     *,
     user_id: str,
     baseline_date: date,
+    protocol_id: int | None = None,
 ) -> dict[str, Any]:
-    """Recalculate one user's daily rolling baseline from session features."""
+    """Recalculate a rolling baseline for one client and protocol."""
+
+    if protocol_id is None:
+        cursor.execute(
+            """
+            SELECT protocol_id
+            FROM session_features
+            WHERE user_id = %s
+            ORDER BY COALESCE(window_start, created_at) DESC, id DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        protocol_row = cursor.fetchone()
+        protocol_id = protocol_row[0] if protocol_row else None
+
+    if protocol_id is None:
+        raise ValueError("protocol_id is required for baseline calculation")
 
     cursor.execute(
         """
@@ -125,6 +155,7 @@ def refresh_daily_baseline(
             SELECT *
         FROM session_features
         WHERE user_id = %s
+          AND protocol_id = %s
           AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
           AND COALESCE(window_start::date, created_at::date) <= %s
           AND COALESCE(window_start::date, created_at::date) >= %s::date - INTERVAL '29 days'
@@ -182,6 +213,7 @@ def refresh_daily_baseline(
         """,
         (
             user_id,
+            protocol_id,
             baseline_date,
             baseline_date,
             baseline_date,
@@ -197,6 +229,7 @@ def refresh_daily_baseline(
 
     baseline = {
         "user_id": user_id,
+        "protocol_id": protocol_id,
         "baseline_date": baseline_date.isoformat(),
         "rmssd_avg": row[0] if row else None,
         "rmssd_7d": row[1] if row else None,
@@ -217,6 +250,7 @@ def refresh_daily_baseline(
         """
         INSERT INTO daily_baselines (
             user_id,
+            protocol_id,
             baseline_date,
             rmssd_avg,
             rmssd_7d,
@@ -234,11 +268,11 @@ def refresh_daily_baseline(
             baseline_json
         )
         VALUES (
-            %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s::jsonb
         )
-        ON CONFLICT (user_id, baseline_date)
+        ON CONFLICT (user_id, baseline_date, protocol_id)
         DO UPDATE SET
             rmssd_avg = EXCLUDED.rmssd_avg,
             rmssd_7d = EXCLUDED.rmssd_7d,
@@ -257,6 +291,7 @@ def refresh_daily_baseline(
         """,
         (
             user_id,
+            protocol_id,
             baseline_date,
             baseline["rmssd_avg"],
             baseline["rmssd_7d"],
@@ -283,8 +318,25 @@ def get_wellness_summary(
     *,
     user_id: str,
     limit: int = 5,
+    protocol_id: int | None = None,
 ) -> dict[str, Any]:
-    """Return mobile-friendly latest wellness status and historical context."""
+    """Return wellness history for one client and one compatible protocol."""
+
+    if protocol_id is None:
+        cursor.execute(
+            """
+            SELECT protocol_id
+            FROM full_sessions
+            WHERE user_id = %s
+              AND completed = 1
+              AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        protocol_row = cursor.fetchone()
+        protocol_id = protocol_row[0] if protocol_row else None
 
     cursor.execute(
         """
@@ -306,10 +358,11 @@ def get_wellness_summary(
             baseline_json
         FROM daily_baselines
         WHERE user_id = %s
+          AND protocol_id = %s
         ORDER BY baseline_date DESC, id DESC
         LIMIT 1
         """,
-        (user_id,),
+        (user_id, protocol_id),
     )
     baseline_row = cursor.fetchone()
 
@@ -317,6 +370,7 @@ def get_wellness_summary(
     if baseline_row:
         baseline = {
             "baseline_date": baseline_row[0].isoformat() if baseline_row[0] else None,
+            "protocol_id": protocol_id,
             "rmssd_avg": baseline_row[1],
             "rmssd_7d": baseline_row[2],
             "rmssd_14d": baseline_row[3],
@@ -350,12 +404,14 @@ def get_wellness_summary(
             created_at
         FROM session_features
         WHERE user_id = %s
+          AND protocol_id = %s
           AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
         ORDER BY COALESCE(window_start, created_at) DESC, id DESC
         LIMIT %s
         """,
         (
             user_id,
+            protocol_id,
             limit,
         ),
     )
@@ -379,15 +435,35 @@ def get_wellness_summary(
     ]
 
     latest = sessions[0] if sessions else None
+    baseline_session_count = int(
+        (baseline or {}).get("sessions_count_30d") or 0
+    )
+    baseline_quality = (baseline or {}).get("data_quality_score")
+
+    if (
+        baseline_session_count >= 14
+        and (
+            baseline_quality is None
+            or float(baseline_quality) >= 70
+        )
+    ):
+        baseline_confidence = "ready"
+    elif baseline_session_count >= 5:
+        baseline_confidence = "early"
+    else:
+        baseline_confidence = "collecting"
 
     return {
         "user_id": user_id,
+        "protocol_id": protocol_id,
         "wellness_status": (
             latest.get("status")
             if latest
             else (baseline or {}).get("status", "data_quality_warning")
         ),
         "baseline": baseline,
+        "baseline_confidence": baseline_confidence,
+        "unique_sessions_30d": baseline_session_count,
         "latest_session": latest,
         "recent_sessions": sessions,
         "records": len(sessions),

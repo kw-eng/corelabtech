@@ -52,3 +52,21 @@ def about():
 def contact():
 
     return render_template("contact.html")
+
+
+@main_bp.route("/wellness-start")
+def wellness_start():
+
+    return render_template("wellness_start.html")
+
+
+@main_bp.route("/privacy")
+def privacy():
+
+    return render_template("privacy.html")
+
+
+@main_bp.route("/terms")
+def terms():
+
+    return render_template("terms.html")

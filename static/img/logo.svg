@@ -899,21 +899,12 @@
   <text
      x="241.31982"
      y="167.96954"
-     font-size="28px"
-     letter-spacing="8"
+     font-size="27px"
+     letter-spacing="3"
      font-family="'Segoe UI', Arial, sans-serif"
      fill="#333333"
      id="text9"
-     style="fill:#44aa00">Research &amp; AI Testing Lab</text>
-  <!-- linie -->
-  <line
-     x1="208.83249"
-     y1="158.47716"
-     x2="238.47717"
-     y2="158.47716"
-     stroke="#777777"
-     stroke-width="1.57308"
-     id="line9"
+     style="fill:#44aa00">Wellness Physiology &amp; Research Platform</text>
      style="fill:#44aa00" />
   <text
      x="220"

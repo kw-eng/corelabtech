@@ -217,6 +217,55 @@ HBOT CHAMBER TESTING
     gap:6px;
 }
 
+.session-plan-preview{
+    grid-column:1 / -1;
+    padding:12px 14px;
+    border:1px solid #28506a;
+    background:#071725;
+    color:#d9f6ff;
+    line-height:1.45;
+}
+
+.program-actions{
+    grid-column:1 / -1;
+    display:grid;
+    grid-template-columns:minmax(220px, 0.45fr) auto minmax(220px, 1fr);
+    align-items:center;
+    gap:10px;
+}
+
+.detailed-timeline-toggle{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:14px;
+}
+
+.segments-editor{
+    margin-top:14px;
+    padding:14px;
+    border:1px solid #28506a;
+    background:#06121f;
+}
+
+.segment-row{
+    display:grid;
+    grid-template-columns:minmax(140px, 0.7fr) repeat(3, minmax(100px, 0.5fr)) minmax(180px, 1fr) auto;
+    gap:8px;
+    margin-bottom:8px;
+}
+
+.segment-row button{
+    min-width:42px;
+}
+
+@media (max-width:900px){
+    .program-actions,
+    .segment-row{
+        grid-template-columns:1fr;
+    }
+}
+
 input,
 select,
 textarea{
@@ -249,6 +298,32 @@ textarea:focus{
     box-shadow:0 0 0 3px #00ffcc22;
 }
 
+.consent-card{
+    background:#07111f;
+}
+
+.wellness-consent{
+    align-items:flex-start;
+    color:#dbeafe;
+    display:flex;
+    gap:10px;
+    line-height:1.5;
+}
+
+.wellness-consent input{
+    flex:0 0 auto;
+    margin-top:4px;
+}
+
+.consent-card p{
+    color:#94a3b8;
+    margin:10px 0 0 26px;
+}
+
+.consent-card a{
+    color:#00ffcc;
+}
+
 button{
     background:#00ffcc;
     border:0;
@@ -271,6 +346,12 @@ button:hover{
     color:#fff;
 }
 
+.secondary-btn{
+    background:#102338;
+    border:1px solid #2d5874;
+    color:#dbeafe;
+}
+
 .danger-btn.subtle{
     background:#84202933;
     border:1px solid #dc354588;
@@ -291,7 +372,7 @@ button:hover{
 
 .compact-session-controls{
     align-items:end;
-    grid-template-columns:minmax(220px, 0.35fr) 1fr;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
 }
 
 .phase-panel{
@@ -442,7 +523,7 @@ td button{
 #ai-anomaly:empty::before,
 #chartsContainer:empty::before{
     color:#64748b;
-    content:"No AI output yet.";
+    content:"No wellness insight yet.";
 }
 
 #chartsContainer:empty{
