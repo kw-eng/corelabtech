@@ -65,6 +65,7 @@ jobs:
           FLASK_ENV: production
           APP_ENV: test
           SECRET_KEY: e2e-secret
+          INTERNAL_TOOLS_ENABLED: "true"
           SESSION_COOKIE_SECURE: "False"
           DATABASE_URL: "postgresql://corelabtech:corelabtech@127.0.0.1:5432/corelabtech_test"
         run: |
@@ -152,6 +153,7 @@ jobs:
           APP_ENV: test
           PERFORMANCE_TESTING: "true"
           SECRET_KEY: performance-secret-key-2026
+          INTERNAL_TOOLS_ENABLED: "true"
           SESSION_COOKIE_SECURE: "False"
           DATABASE_URL: "postgresql://corelabtech:corelabtech@127.0.0.1:5432/corelabtech_test"
         run: |
