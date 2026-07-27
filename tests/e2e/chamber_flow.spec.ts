@@ -39,6 +39,30 @@ test.describe.serial("Wellness client FIT/CSV session flow", () => {
   test("01 - loads the wellness physiology session", async ({ page }) => {
     await page.goto("/chamber");
 
+    // test
+const debugProtocolsResponse = await page.request.get("/api/protocols");
+console.log(
+  "PROTOCOLS STATUS:",
+  debugProtocolsResponse.status(),
+);
+console.log(
+  "PROTOCOLS BODY:",
+  await debugProtocolsResponse.text(),
+);
+
+const protocolSelect = page.locator("#protocol_id");
+
+console.log(
+  "PROTOCOL SELECT VALUE:",
+  await protocolSelect.inputValue(),
+);
+
+console.log(
+  "PROTOCOL OPTIONS:",
+  await protocolSelect.locator("option").allTextContents(),
+);
+    // test
+
     await expect(page.locator("h1")).toContainText(
       "Physiology Session",
     );
