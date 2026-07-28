@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from services.session_service import generate_session_report
+from services.report_generator import generate_report_for_session
 
 
 def generate_report(
@@ -17,11 +17,14 @@ def generate_report(
     *,
     requesting_user_id: str | None = None,
     requesting_role: str = "admin",
+    requesting_organization_id: int | None = None,
 ) -> Path:
     """Generate a PDF report for one session using the current data model."""
 
-    return generate_session_report(
+    export = generate_report_for_session(
         session_id=session_id,
         requesting_user_id=requesting_user_id,
         requesting_role=requesting_role,
+        requesting_organization_id=requesting_organization_id,
     )
+    return export.path

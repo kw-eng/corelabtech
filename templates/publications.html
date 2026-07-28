@@ -5,21 +5,145 @@
 <section class="publications-page">
     <div class="publications-hero">
         <div>
-            <span class="page-eyebrow">Research Library</span>
-            <h1>Research Publications</h1>
+            <span class="page-eyebrow">Research &amp; AI Testing Lab</span>
+            <h1>CoreLabTech Research</h1>
             <p>
-                Curated CoreLabTech materials for HBOT monitoring, telemetry
-                synchronization, AI scoring and software quality validation.
+                The research layer documents how physiological session data moves
+                through synchronization, analysis, AI-assisted review and quality
+                validation before it becomes a wellness report.
             </p>
         </div>
 
         <div class="publications-status">
-            <span>Available files</span>
+            <span>CoreLabTech files</span>
             <strong>{{ papers|length }}</strong>
         </div>
     </div>
 
+    <section class="research-lab-flow-card">
+        <div>
+            <span class="publication-type">Validation pipeline</span>
+            <h2>Research &amp; AI Testing Lab</h2>
+            <p>
+                This is the internal R&amp;D and quality layer behind the commercial
+                wellness workflow.
+            </p>
+        </div>
+
+        <div class="research-lab-flow">
+            <span>Physiological Data</span>
+            <span>Synchronization</span>
+            <span>Analysis</span>
+            <span>AI</span>
+            <span>QA Validation</span>
+        </div>
+    </section>
+
+    <section class="external-reference-section">
+        <div class="publications-section-heading">
+            <span class="publication-type">External references</span>
+            <h2>Research &amp; Safety Context</h2>
+            <p>
+                External references are provided for scientific and safety context
+                only. These resources are not CoreLabTech publications and do not
+                imply affiliation, endorsement, sponsorship or validation of
+                CoreLabTech by PubMed, DAN or DAN Europe.
+            </p>
+        </div>
+
+        <div class="research-reference-grid">
+        <article class="research-reference-card">
+            <span class="publication-type">Scientific background</span>
+            <h2>HBOT and Physiology</h2>
+            <p>
+                External literature search for hyperbaric oxygen therapy,
+                oxygenation and physiology monitoring.
+            </p>
+            <a href="https://pubmed.ncbi.nlm.nih.gov/?term=hyperbaric+oxygen+therapy+physiology" target="_blank" rel="noopener">
+                Search PubMed
+            </a>
+        </article>
+
+        <article class="research-reference-card">
+            <span class="publication-type">Scientific background</span>
+            <h2>HRV and Recovery</h2>
+            <p>
+                External literature search for heart-rate variability, recovery
+                and autonomic response.
+            </p>
+            <a href="https://pubmed.ncbi.nlm.nih.gov/?term=heart+rate+variability+recovery+physiology" target="_blank" rel="noopener">
+                Search PubMed
+            </a>
+        </article>
+
+        <article class="research-reference-card">
+            <span class="publication-type">Scientific background</span>
+            <h2>Pulse Oximetry Data</h2>
+            <p>
+                External literature search for pulse oximetry, SpO2 measurement
+                and signal quality.
+            </p>
+            <a href="https://pubmed.ncbi.nlm.nih.gov/?term=pulse+oximetry+SpO2+signal+quality" target="_blank" rel="noopener">
+                Search PubMed
+            </a>
+        </article>
+
+        <article class="research-reference-card">
+            <span class="publication-type">Safety background</span>
+            <h2>DAN Research &amp; Reports</h2>
+            <p>
+                External reference hub for diving medicine, physiology, incident
+                learning and safety-oriented research reports.
+            </p>
+            <a href="https://dan.org/research-reports/" target="_blank" rel="noopener">
+                Open DAN
+            </a>
+        </article>
+
+        <article class="research-reference-card">
+            <span class="publication-type">Safety background</span>
+            <h2>DAN Publication Library</h2>
+            <p>
+                External publication library with DAN articles, annual reports,
+                workshop proceedings and safety materials.
+            </p>
+            <a href="https://dan.org/research-reports/publication-library/" target="_blank" rel="noopener">
+                Open Library
+            </a>
+        </article>
+
+        <article class="research-reference-card">
+            <span class="publication-type">Safety background</span>
+            <h2>DAN Europe Research</h2>
+            <p>
+                External DAN Europe research page focused on diving medicine,
+                physiology and hyperbaric exposure context.
+            </p>
+            <a href="https://www.daneurope.org/en/diving-medical-research" target="_blank" rel="noopener">
+                Open DAN Europe
+            </a>
+        </article>
+
+        <article class="research-reference-card">
+            <span class="publication-type">Safety background</span>
+            <h2>DAN Europe Publications</h2>
+            <p>
+                External list of selected scientific publications on diving
+                medicine and physiology.
+            </p>
+            <a href="https://www.daneurope.org/publications" target="_blank" rel="noopener">
+                Open Publications
+            </a>
+        </article>
+        </div>
+    </section>
+
     {% if papers %}
+        <section class="publications-section-heading">
+            <span class="publication-type">CoreLabTech publications</span>
+            <h2>Uploaded Research Files</h2>
+        </section>
+
         <div class="publication-grid">
             {% for paper in papers %}
                 <article class="publication-card">
@@ -40,11 +164,12 @@
         </div>
     {% else %}
         <section class="publications-empty">
-            <span>Library ready</span>
-            <h2>No public research files uploaded yet</h2>
+            <span>CoreLabTech publications</span>
+            <h2>No CoreLabTech outcome publications yet</h2>
             <p>
-                Add PDF, DOCX, TXT or Markdown files to the research papers
-                folder. Internal placeholder files are hidden from this page.
+                Do not list external papers as CoreLabTech publications. Add
+                platform-generated reports, white papers or validation notes here
+                after they are prepared for public release.
             </p>
         </section>
     {% endif %}

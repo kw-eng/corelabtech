@@ -11,6 +11,12 @@ let state = {
 }
 
 const STANDARD_ATMOSPHERE_KPA = 101.325
+const DEFAULT_PRESSURE_INPUT_UNIT = "kpa_gauge"
+const PRESSURE_OPERATIONAL_TOLERANCE_ATA = 0.05
+const CONCENTRATOR_MIN_FLOW_LPM = 2
+const CONCENTRATOR_MAX_FLOW_LPM = 10
+const CONCENTRATOR_MIN_OXYGEN_PERCENT = 87
+const CONCENTRATOR_MAX_OXYGEN_PERCENT = 96
 const TABLE_PREVIEW_LIMIT = 5000
 const TABLE_RENDER_CHUNK_SIZE = 100
 const FIT_UPLOAD_TIMEOUT_MS = 120000
@@ -134,16 +140,23 @@ function inputValue(id) {
     return element ? element.value.trim() : ""
 }
 
-function numericInputValue(id) {
-    const value = inputValue(id)
-
-    if (value === "") {
+function parseLocalizedNumber(value) {
+    if (value === null || value === undefined || value === "") {
         return null
     }
 
-    const number = Number(value)
+    const normalized = String(value).trim().replace(",", ".")
+    const number = Number(normalized)
 
     return Number.isFinite(number) ? number : null
+}
+
+function numericInputValue(id) {
+    return parseLocalizedNumber(inputValue(id))
+}
+
+function optionalNumberInput(id) {
+    return numericInputValue(id)
 }
 
 function collectPreCheckIn() {
@@ -367,7 +380,7 @@ function initPressurePreview() {
 }
 
 function pressureToAta(value, unit) {
-    const numericValue = Number(value)
+    const numericValue = parseLocalizedNumber(value)
 
     if (!Number.isFinite(numericValue) || numericValue <= 0) {
         return null
@@ -460,10 +473,10 @@ async function loadCommercialContext() {
             )
         }
         if (programsResponse.ok && Array.isArray(programs)) {
-            state.programs = programs
+            state.programs = sortProgramsBySize(programs)
             const select = document.getElementById("program_catalog")
             select.replaceChildren()
-            programs.forEach(program => {
+            state.programs.forEach(program => {
                 const option = document.createElement("option")
                 option.value = program.program_id
                 option.textContent =
@@ -476,7 +489,23 @@ async function loadCommercialContext() {
     }
 }
 
-async function loadClientPrograms() {
+function sortProgramsBySize(programs) {
+    return programs.slice().sort((a, b) => {
+        const aSessions = Number(a.total_sessions) || 0
+        const bSessions = Number(b.total_sessions) || 0
+
+        if (aSessions !== bSessions) {
+            return aSessions - bSessions
+        }
+
+        const aName = String(a.name || a.program_name || "")
+        const bName = String(b.name || b.program_name || "")
+
+        return aName.localeCompare(bName)
+    })
+}
+
+async function loadClientPrograms(preferredEnrollmentId = null) {
     const clientId = getSelectedSubjectId()
     const select = document.getElementById("program_enrollment_id")
     select.replaceChildren()
@@ -501,19 +530,29 @@ async function loadClientPrograms() {
     )
     if (!response.ok || !Array.isArray(enrollments)) return
 
-    state.enrollments = enrollments
-    enrollments
-        .filter(enrollment => enrollment.status === "active")
+    state.enrollments = sortProgramsBySize(enrollments)
+    state.enrollments
+        .filter(enrollment => ["active", "paused"].includes(enrollment.status))
         .forEach(enrollment => {
             const option = document.createElement("option")
             option.value = enrollment.enrollment_id
+            option.dataset.status = enrollment.status
+            option.dataset.protocolId = enrollment.protocol_id || ""
+            const statusLabel =
+                enrollment.status === "paused"
+                    ? "Paused | "
+                    : ""
             option.textContent =
-                `${enrollment.program_name} | ` +
+                `${statusLabel}${enrollment.program_name} | ` +
                 `${enrollment.completed_sessions}/${enrollment.total_sessions}`
             select.appendChild(option)
         })
 
-    if (select.options.length > 1) {
+    if (preferredEnrollmentId) {
+        select.value = String(preferredEnrollmentId)
+    }
+
+    if (!select.value && select.options.length > 1) {
         select.selectedIndex = 1
     }
     renderProgramProgress()
@@ -527,10 +566,23 @@ function renderProgramProgress() {
     const enrollment = state.enrollments.find(
         item => Number(item.enrollment_id) === enrollmentId
     )
+    renderProgramManagementControls(enrollment)
+
     if (!enrollment) {
         setText("program_progress", "Single session, outside a package.")
         return
     }
+
+    if (enrollment.status === "paused") {
+        setText(
+            "program_progress",
+            `${enrollment.program_name}: paused at ` +
+            `${enrollment.completed_sessions}/${enrollment.total_sessions}. ` +
+            "Resume it before assigning new sessions."
+        )
+        return
+    }
+
     setText(
         "program_progress",
         `${enrollment.program_name}: ${enrollment.completed_sessions}/` +
@@ -542,6 +594,21 @@ function renderProgramProgress() {
         applyProtocolTimingDefaults()
         updatePressurePreview()
     }
+}
+
+function renderProgramManagementControls(enrollment) {
+    const pauseButton = document.getElementById("pause_program_btn")
+    const resumeButton = document.getElementById("resume_program_btn")
+    const cancelButton = document.getElementById("cancel_program_btn")
+
+    if (!pauseButton || !resumeButton || !cancelButton) {
+        return
+    }
+
+    pauseButton.hidden = !enrollment || enrollment.status !== "active"
+    resumeButton.hidden = !enrollment || enrollment.status !== "paused"
+    cancelButton.hidden =
+        !enrollment || !["active", "paused"].includes(enrollment.status)
 }
 
 async function enrollSelectedClient() {
@@ -567,7 +634,45 @@ async function enrollSelectedClient() {
         alert(data.error || "Client enrollment failed")
         return
     }
-    await loadClientPrograms()
+    await loadClientPrograms(data.enrollment_id)
+}
+
+async function updateSelectedProgramStatus(status) {
+    const enrollmentId = Number(
+        document.getElementById("program_enrollment_id")?.value
+    )
+    const enrollment = state.enrollments.find(
+        item => Number(item.enrollment_id) === enrollmentId
+    )
+
+    if (!enrollment) {
+        alert("Select a client program first")
+        return
+    }
+
+    if (
+        status === "cancelled" &&
+        !confirm(`Cancel ${enrollment.program_name} for this client?`)
+    ) {
+        return
+    }
+
+    const response = await fetch(`/api/client-programs/${enrollmentId}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({status})
+    })
+    const data = await parseJsonResponse(response, "UPDATE CLIENT PROGRAM")
+
+    if (!response.ok || data.error) {
+        alert(data.error || "Program update failed")
+        return
+    }
+
+    await loadClientPrograms(
+        status === "cancelled" ? null : enrollmentId
+    )
 }
 
 function toggleDetailedTimeline() {
@@ -696,7 +801,8 @@ function updatePressurePreview() {
     const pressureValue =
         document.getElementById("during_pressure")?.value
     const pressureUnit =
-        document.getElementById("during_pressure_unit")?.value
+        document.getElementById("during_pressure_unit")?.value ||
+        DEFAULT_PRESSURE_INPUT_UNIT
     const actualAta = pressureToAta(pressureValue, pressureUnit)
     const selectedProtocol = getSelectedProtocol()
 
@@ -720,8 +826,8 @@ function updatePressurePreview() {
         `${difference >= 0 ? "+" : ""}${difference.toFixed(3)} ATA`
 
     preview.textContent =
-        `Target: ${targetAta.toFixed(2)} ATA · ` +
-        `Recorded: ${actualAta.toFixed(3)} ATA · ` +
+        `Target: ${targetAta.toFixed(2)} ATA | ` +
+        `Recorded: ${actualAta.toFixed(3)} ATA | ` +
         `Difference: ${differenceLabel}`
 }
 
@@ -787,17 +893,17 @@ async function loadSessionConfiguration() {
         applyProtocolTimingDefaults()
         }
 
-        const selectedChamber = getSelectedChamber()
-        if (selectedChamber?.pressure_input_unit) {
-            document.getElementById("during_pressure_unit").value =
-                selectedChamber.pressure_input_unit
+        const pressureUnitInput =
+            document.getElementById("during_pressure_unit")
+        if (pressureUnitInput) {
+            pressureUnitInput.value = DEFAULT_PRESSURE_INPUT_UNIT
         }
 
         chamberSelect.addEventListener("change", () => {
-            const chamber = getSelectedChamber()
-            if (chamber?.pressure_input_unit) {
-                document.getElementById("during_pressure_unit").value =
-                    chamber.pressure_input_unit
+            const pressureUnitInput =
+                document.getElementById("during_pressure_unit")
+            if (pressureUnitInput) {
+                pressureUnitInput.value = DEFAULT_PRESSURE_INPUT_UNIT
             }
             updatePressurePreview()
         })
@@ -833,25 +939,67 @@ function initOxygenPreview() {
     if (!oxygen) return
 
     const renderRecordedOxygen = () => {
-        const lpm = Number(oxygen.value)
-        const oxygenPercent = Number(percent?.value)
+        const lpm = parseLocalizedNumber(oxygen.value)
+        const calculatedPercent = flowToConcentratorOxygenPercent(lpm)
+
+        if (
+            percent &&
+            calculatedPercent !== null &&
+            (
+                !percent.value ||
+                percent.dataset.autoCalculated === "true"
+            )
+        ) {
+            percent.value = calculatedPercent.toFixed(1)
+            percent.dataset.autoCalculated = "true"
+        }
+
+        const oxygenPercent = parseLocalizedNumber(percent?.value)
         const values = []
 
         if (Number.isFinite(lpm) && lpm > 0) {
             values.push(`${lpm.toFixed(1)} L/min`)
         }
         if (Number.isFinite(oxygenPercent) && oxygenPercent > 0) {
-            values.push(`${oxygenPercent.toFixed(1)}% O2 setting`)
+            values.push(`${oxygenPercent.toFixed(1)}% O2 in mask`)
         }
 
         document.getElementById("oxygen_preview").innerText =
             values.length
-                ? `Recorded: ${values.join(" · ")}`
-                : "Record configured device values; O2 percentage is not inferred from flow."
+                ? `Recorded: ${values.join(" | ")}`
+                : "Enter concentrator flow; Mask O2 is estimated from 2-10 L/min = 87-96% O2."
     }
 
     oxygen.addEventListener("input", renderRecordedOxygen)
-    percent?.addEventListener("input", renderRecordedOxygen)
+    percent?.addEventListener("input", () => {
+        percent.dataset.autoCalculated = "false"
+        renderRecordedOxygen()
+    })
+    renderRecordedOxygen()
+}
+
+function flowToConcentratorOxygenPercent(flowValue) {
+    const flow = parseLocalizedNumber(flowValue)
+
+    if (!Number.isFinite(flow) || flow <= 0) {
+        return null
+    }
+
+    const boundedFlow = Math.min(
+        CONCENTRATOR_MAX_FLOW_LPM,
+        Math.max(CONCENTRATOR_MIN_FLOW_LPM, flow)
+    )
+    const flowRatio =
+        (boundedFlow - CONCENTRATOR_MIN_FLOW_LPM) /
+        (CONCENTRATOR_MAX_FLOW_LPM - CONCENTRATOR_MIN_FLOW_LPM)
+
+    return (
+        CONCENTRATOR_MIN_OXYGEN_PERCENT +
+        flowRatio * (
+            CONCENTRATOR_MAX_OXYGEN_PERCENT -
+            CONCENTRATOR_MIN_OXYGEN_PERCENT
+        )
+    )
 }
 
 // ========================================
@@ -1924,9 +2072,10 @@ async function saveDURING() {
         getSelectedSubjectId()
 
     const pressure =
-        Number(document.getElementById("during_pressure").value)
+        numericInputValue("during_pressure")
     const pressureUnit =
-        document.getElementById("during_pressure_unit").value
+        document.getElementById("during_pressure_unit")?.value ||
+        DEFAULT_PRESSURE_INPUT_UNIT
     const selectedProtocol = getSelectedProtocol()
     const selectedChamber = getSelectedChamber()
     const compressionTimeMin =
@@ -1952,29 +2101,37 @@ async function saveDURING() {
         document.getElementById("during_deviation_reason").value.trim()
     const programEnrollmentId =
         Number(document.getElementById("program_enrollment_id").value) || null
+    const selectedEnrollment = state.enrollments.find(
+        item => Number(item.enrollment_id) === programEnrollmentId
+    )
 
     const temp =
-        Number(document.getElementById("during_temp").value)
+        optionalNumberInput("during_temp")
 
     const bodyTemp =
-        Number(document.getElementById("during_body_temp").value)
+        optionalNumberInput("during_body_temp")
 
     const humidity =
-        Number(document.getElementById("during_humidity").value)
+        optionalNumberInput("during_humidity")
 
     const oxygenLpm =
-        Number(document.getElementById("during_oxygen_lpm").value)
+        optionalNumberInput("during_oxygen_lpm")
 
     const oxygenPercent =
-        Number(document.getElementById("during_oxygen_percent").value)
+        optionalNumberInput("during_oxygen_percent")
 
     if (!selectedChamber || !selectedProtocol) {
         alert("Select chamber and protocol")
         return
     }
 
-    if (!pressure || !temp) {
-        alert("Fill chamber data")
+    if (selectedEnrollment && selectedEnrollment.status !== "active") {
+        alert("Resume the selected program before assigning this session to it.")
+        return
+    }
+
+    if (!Number.isFinite(pressure) || pressure <= 0) {
+        alert("Enter recorded pressure")
         return
     }
 
@@ -2008,7 +2165,10 @@ async function saveDURING() {
         return
     }
 
-    if (ata > Number(selectedChamber.max_ata) + 0.02) {
+    if (
+        ata >
+        Number(selectedChamber.max_ata) + PRESSURE_OPERATIONAL_TOLERANCE_ATA
+    ) {
         alert("Recorded ATA exceeds the selected chamber maximum")
         return
     }
@@ -3571,6 +3731,7 @@ window.loadSubjects = loadSubjects
 window.generateSession = generateSession
 window.exportClient = exportClient
 window.enrollSelectedClient = enrollSelectedClient
+window.updateSelectedProgramStatus = updateSelectedProgramStatus
 window.addSessionSegment = addSessionSegment
 
 window.savePRE = savePRE
