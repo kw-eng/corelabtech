@@ -57,6 +57,7 @@
                 <button type="button">Wellness</button>
                 <div class="nav-menu">
                     {% if current_user.role in ["operator", "researcher", "admin"] %}
+                        <a href="{{ url_for('research.operator_dashboard') }}">Operator Dashboard</a>
                         <a href="{{ url_for('research.chamber_testing') }}">New Session</a>
                     {% endif %}
                     <a href="{{ url_for('research.research_dashboard') }}">Session Reports</a>
@@ -113,7 +114,7 @@
 </main>
 
 <footer>
-    <p>&copy; CoreLabTech Wellness 2026</p>
+    <p>&copy; 2026 CoreLabTech. Wellness Physiology &amp; Research Platform.</p>
     <p>
         <a href="{{ url_for('main.privacy') }}">Privacy Notice</a>
         ·

@@ -4,7 +4,7 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/ai_lab.css') }}?v=mission-control-polish-20260721"
+    href="{{ url_for('static', filename='css/ai_lab.css') }}?v=mission-control-series-auto-20260728"
 >
 
 <div class="mission-control-page">
@@ -22,7 +22,8 @@
                 <select id="sessionSelect" aria-label="Select session"></select>
                 <button type="button" onclick="loadDashboardSession()">Load Session</button>
                 <button type="button" onclick="runSelectedAI()">Run AI Analysis</button>
-                <button type="button" onclick="loadUserTrend()">User Trend</button>
+                <button type="button" onclick="loadUserTrend()">Load Series</button>
+                <button type="button" onclick="generateSeriesReport()">Series Report</button>
                 {% if current_user.role in ["researcher", "admin"] %}
                 <button type="button" onclick="generateResearchReport()">Generate Report</button>
                 {% endif %}
@@ -88,14 +89,39 @@
         <article class="mission-card">
             <div class="mission-section-heading">
                 <div>
-                    <h2>User Trend</h2>
+                    <h2>Session Series Analysis</h2>
                     <p>Longitudinal context for the subject assigned to this session.</p>
                 </div>
+                <select id="trendLimitSelect" class="mission-compact-select" aria-label="Session series range" onchange="loadUserTrend()">
+                    <option value="10">Last 10</option>
+                    <option value="25" selected>Last 25</option>
+                    <option value="50">Last 50</option>
+                    <option value="100">Last 100</option>
+                </select>
             </div>
             <div id="trendBox" class="mission-analysis">
-                No trend loaded.
+                Load a session to display its series analysis.
             </div>
         </article>
+    </section>
+
+    <section class="mission-card">
+        <div class="mission-section-heading">
+            <div>
+                <h2>Session Traceability</h2>
+                <p>Operational history from session creation through report export.</p>
+            </div>
+            <button
+                type="button"
+                class="mission-inline-button"
+                onclick="loadSessionTraceability()"
+            >
+                Refresh Trace
+            </button>
+        </div>
+        <div id="traceabilityBox" class="mission-traceability">
+            Select a session to display its operational trace.
+        </div>
     </section>
 
     <section class="mission-card">
@@ -132,6 +158,7 @@
 <script>
 let dashboardSessions = []
 let missionChart = null
+let seriesTrendChart = null
 const MAX_CHART_POINTS = 700
 const RAW_TIMELINE_PREVIEW = 20
 
@@ -242,6 +269,22 @@ function formatMetric(value, unit, digits = 1){
     return formatted === "-" ? "-" : `${formatted} ${unit}`
 }
 
+function formatDelta(value, digits = 1){
+    const numeric = Number(value)
+
+    if(!Number.isFinite(numeric)){
+        return "-"
+    }
+
+    return `${numeric >= 0 ? "+" : ""}${formatNumber(numeric, digits)}`
+}
+
+function formatWarningLabel(value){
+    return String(value || "")
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, letter => letter.toUpperCase())
+}
+
 function getScore(data){
     return pick(data, ["overall_score", "score"])
 }
@@ -268,6 +311,24 @@ function getRiskLabel(score, anomaly){
     return "-"
 }
 
+function getReviewLabel(value){
+    const normalized = String(value || "").toLowerCase()
+
+    if(normalized === "low"){
+        return "Stable response"
+    }
+
+    if(normalized === "moderate"){
+        return "Review context"
+    }
+
+    if(normalized === "high"){
+        return "Elevated review"
+    }
+
+    return value || "-"
+}
+
 function getSelectedSessionId(){
     return document.getElementById("sessionSelect")?.value || ""
 }
@@ -275,6 +336,11 @@ function getSelectedSessionId(){
 function getSelectedSession(){
     const id = getSelectedSessionId()
     return dashboardSessions.find(s => s.session_id === id)
+}
+
+function getSelectedTrendLimit(){
+    const value = Number(document.getElementById("trendLimitSelect")?.value)
+    return [10, 25, 50, 100].includes(value) ? value : 25
 }
 
 function setText(id, value){
@@ -313,12 +379,35 @@ async function loadSessions(){
             return
         }
 
-        dashboardSessions.forEach(s => {
+        const sessionsByClient = new Map()
+
+        dashboardSessions.forEach(session => {
+            const clientId = String(session.client_id || session.user_id || "Unassigned")
+            if(!sessionsByClient.has(clientId)){
+                sessionsByClient.set(clientId, [])
+            }
+            sessionsByClient.get(clientId).push(session)
+        })
+
+        sessionsByClient.forEach((sessions, clientId) => {
+            const group = document.createElement("optgroup")
+            group.label = `Client ${clientId}`
+
+            sessions.forEach(s => {
             const option = document.createElement("option")
             option.value = s.session_id
-            option.textContent = `${s.session_id} | ${s.user_id || "-"} | ${s.date || "-"}`
-            select.appendChild(option)
+                option.textContent = formatSessionOption(s)
+                group.appendChild(option)
+            })
+
+            select.appendChild(group)
         })
+
+        const requestedSession = new URLSearchParams(window.location.search).get("session")
+
+        if(requestedSession && dashboardSessions.some(session => session.session_id === requestedSession)){
+            select.value = requestedSession
+        }
 
         updateSelectedSessionLabel()
     }catch(err){
@@ -331,10 +420,36 @@ async function loadSessions(){
 function updateSelectedSessionLabel(){
     const selected = getSelectedSession()
     const label = selected
-        ? `${selected.session_id} | ${selected.user_id || "-"}`
+        ? `Client ${selected.client_id || selected.user_id || "-"} · Session ${selected.client_session_number || "-"}`
         : "No session selected"
 
     setText("selectedSessionLabel", label)
+}
+
+function formatSessionOption(session){
+    const number = session.client_session_number || "-"
+    const protocol = session.protocol_name || "Session"
+    const date = formatSessionDate(session.created_at || session.date)
+    return `Session ${number} · ${date} · ${protocol}`
+}
+
+function formatSessionDate(value){
+    if(!value){
+        return "Date unavailable"
+    }
+
+    const date = new Date(value)
+    if(Number.isNaN(date.getTime())){
+        return String(value)
+    }
+
+    return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    }).format(date)
 }
 
 async function loadDashboardSession(){
@@ -360,6 +475,10 @@ async function loadDashboardSession(){
             resetDashboardState("No saved AI analysis for this session. Run AI Analysis to create one.")
             setText("analysisStatus", "Not analyzed")
             setText("rawOutput", prettyCompact(data))
+            await loadSessionTraceability()
+            await loadUserTrend({
+                updateRaw: false
+            })
             return
         }
 
@@ -374,6 +493,10 @@ async function loadDashboardSession(){
 
         renderAnalysis(normalized)
         setText("rawOutput", prettyCompact(normalized))
+        await loadSessionTraceability()
+        await loadUserTrend({
+            updateRaw: false
+        })
     }catch(err){
         console.error("loadDashboardSession error:", err)
         resetDashboardState("Latest analysis could not be loaded.")
@@ -419,6 +542,10 @@ async function runSelectedAI(){
 
         renderAnalysis(data)
         setText("rawOutput", prettyCompact(data))
+        await loadSessionTraceability()
+        await loadUserTrend({
+            updateRaw: false
+        })
     }catch(err){
         console.error("runSelectedAI error:", err)
         document.getElementById("ai").innerHTML = `
@@ -429,6 +556,119 @@ async function runSelectedAI(){
         setText("analysisStatus", "Crashed")
         setText("rawOutput", String(err))
     }
+}
+
+async function loadSessionTraceability(){
+    const sessionId = getSelectedSessionId()
+    const box = document.getElementById("traceabilityBox")
+
+    if(!box){
+        return
+    }
+
+    if(!sessionId){
+        box.innerHTML = "Select a session to display its operational trace."
+        return
+    }
+
+    box.innerHTML = `<div class="mission-muted">Loading session trace...</div>`
+
+    try{
+        const res = await fetch(`/api/session_traceability/${encodeURIComponent(sessionId)}`, {
+            credentials: "same-origin"
+        })
+        const data = await parseJsonResponse(res, "SESSION TRACEABILITY")
+
+        if(!res.ok || data.error){
+            box.innerHTML = `
+                <div class="mission-warning">
+                    Traceability could not be loaded: ${escapeHtml(data.error || res.status)}
+                </div>
+            `
+            return
+        }
+
+        renderSessionTraceability(data)
+    }catch(err){
+        box.innerHTML = `
+            <div class="mission-warning">
+                Traceability request failed: ${escapeHtml(err.message || err)}
+            </div>
+        `
+    }
+}
+
+function renderSessionTraceability(data){
+    const box = document.getElementById("traceabilityBox")
+    const steps = Array.isArray(data.steps) ? data.steps : []
+    const events = Array.isArray(data.events) ? data.events : []
+
+    if(!box){
+        return
+    }
+
+    const stepsHtml = steps.map(step => {
+        const status = step.status || "pending"
+        const timestamp = step.timestamp ? formatSessionDate(step.timestamp) : "Not recorded"
+        const detail = step.detail || ""
+
+        return `
+            <div class="mission-trace-step ${escapeHtml(status)}">
+                <span class="mission-trace-dot"></span>
+                <div>
+                    <strong>${escapeHtml(step.label || step.key || "Trace step")}</strong>
+                    <p>${escapeHtml(detail)}</p>
+                    <small>${escapeHtml(timestamp)}</small>
+                </div>
+                <span class="mission-trace-status">${escapeHtml(status.replace("_", " "))}</span>
+            </div>
+        `
+    }).join("")
+
+    const eventsHtml = events.slice(0, 6).map(event => `
+        <tr>
+            <td>${escapeHtml(formatSessionDate(event.created_at))}</td>
+            <td>${escapeHtml(event.action || "-")}</td>
+            <td>${escapeHtml(event.actor_role || "-")}</td>
+            <td>${escapeHtml(event.outcome || "-")}</td>
+        </tr>
+    `).join("")
+
+    box.innerHTML = `
+        <div class="mission-trace-summary">
+            <div>
+                <span>Client</span>
+                <strong>${escapeHtml(data.client_id || "-")}</strong>
+            </div>
+            <div>
+                <span>Session</span>
+                <strong>${escapeHtml(data.session_id || "-")}</strong>
+            </div>
+            <div>
+                <span>Report export</span>
+                <strong>${data.report_exported ? "Exported" : "Pending"}</strong>
+            </div>
+        </div>
+        <div class="mission-trace-list">
+            ${stepsHtml || `<div class="mission-muted">No trace steps available.</div>`}
+        </div>
+        <div class="mission-trace-events">
+            <h3>Latest audit events</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Action</th>
+                        <th>Role</th>
+                        <th>Outcome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${eventsHtml || `<tr><td colspan="4">No audit events recorded for this session.</td></tr>`}
+                </tbody>
+            </table>
+        </div>
+    `
 }
 
 function resetDashboardState(message){
@@ -463,9 +703,10 @@ function renderAIMetrics(data){
     const score = getScore(data)
     const anomaly = getAnomaly(data)
     const risk = data.risk_level || getRiskLabel(score, anomaly)
+    const reviewLabel = getReviewLabel(risk)
 
     setText("aiScore", score !== null ? `${formatNumber(score, 0)}/100` : "-")
-    setText("riskLevel", risk)
+    setText("riskLevel", reviewLabel)
     setText("spo2Metric", formatMetric(pick(features, ["avg_spo2", "avg_csv_spo2"]), "%"))
     setText("pulseMetric", formatMetric(pick(features, ["avg_pulse", "avg_csv_pulse"]), "bpm"))
     setText("hrvMetric", formatMetric(pick(features, ["avg_hrv"]), "ms"))
@@ -478,10 +719,10 @@ function renderAIMetrics(data){
 
     if(anomaly){
         alarm.className = "mission-alert mission-alert-warning"
-        alarm.innerText = "Session flag detected. Review synchronized telemetry and sensor quality."
+        alarm.innerText = "Data quality review recommended: HR/pulse alignment difference detected."
     }else{
         alarm.className = "mission-alert mission-alert-ok"
-        alarm.innerText = "No critical session flag detected."
+        alarm.innerText = "No data quality review flag detected for this session."
     }
 }
 
@@ -502,6 +743,7 @@ function renderAIText(data){
     const score = getScore(data)
     const anomaly = getAnomaly(data)
     const risk = data.risk_level || getRiskLabel(score, anomaly)
+    const reviewLabel = getReviewLabel(risk)
 
     document.getElementById("ai").innerHTML = `
         <div class="mission-analysis-grid">
@@ -514,8 +756,8 @@ function renderAIText(data){
                 <strong>${score !== null ? `${formatNumber(score, 0)}/100` : "-"}</strong>
             </div>
             <div>
-                <span>Risk</span>
-                <strong>${escapeHtml(risk)}</strong>
+                <span>Review level</span>
+                <strong>${escapeHtml(reviewLabel)}</strong>
             </div>
             <div>
                 <span>Data quality</span>
@@ -524,14 +766,14 @@ function renderAIText(data){
         </div>
 
         <div class="mission-analysis-block">
-            <h3>Summary</h3>
+            <h3>Wellness interpretation</h3>
             <p>${escapeHtml(data.summary || "No analysis summary available.")}</p>
         </div>
 
         <div class="mission-analysis-columns">
             <div>
-                <h3>Warnings</h3>
-                ${renderList(data.reasons, "No rule-based warnings detected.")}
+                <h3>Operator review notes</h3>
+                ${renderList(data.reasons, "No operator review notes generated from available data.")}
             </div>
             <div>
                 <h3>Positive findings</h3>
@@ -540,7 +782,7 @@ function renderAIText(data){
         </div>
 
         <p class="mission-disclaimer">
-            ${escapeHtml(data.wellness_disclaimer || data.medical_disclaimer || "Wellness insight only. Not a medical diagnosis.")}
+            ${escapeHtml(data.wellness_disclaimer || data.medical_disclaimer || "Wellness insight only. Not a medical diagnosis. Interpret trends together with session data quality and operator review.")}
         </p>
     `
 }
@@ -717,23 +959,178 @@ function renderDashboardChart(timeline, totalSamples = null){
     setText("chartSampleCount", sampleLabel)
 }
 
-async function loadUserTrend(){
-    const selected = getSelectedSession()
+function renderSeriesTrendChart(analyses){
+    const canvas = document.getElementById("seriesTrendChart")
+    const empty = document.getElementById("seriesTrendEmpty")
 
-    if(!selected || !selected.user_id){
-        alert("Selected session has no user_id")
+    if(!canvas){
         return
     }
 
+    if(seriesTrendChart && typeof seriesTrendChart.destroy === "function"){
+        seriesTrendChart.destroy()
+        seriesTrendChart = null
+    }
+
+    if(!Array.isArray(analyses) || analyses.length < 2 || typeof Chart === "undefined"){
+        if(empty){
+            empty.style.display = "flex"
+        }
+        return
+    }
+
+    if(empty){
+        empty.style.display = "none"
+    }
+
+    const labels = analyses.map((row, index) => {
+        const date = row.created_at ? new Date(row.created_at) : null
+
+        if(date && !Number.isNaN(date.getTime())){
+            return date.toLocaleDateString([], {
+                month: "short",
+                day: "numeric"
+            })
+        }
+
+        return `S${index + 1}`
+    })
+    const wellnessScores = analyses.map(row => {
+        const value = Number(row.overall_score)
+        return Number.isFinite(value) ? value : null
+    })
+    const dataQualityScores = analyses.map(row => {
+        const value = Number(row.data_quality_score)
+        return Number.isFinite(value) ? value : null
+    })
+    const coverageScores = analyses.map(row => {
+        const value = Number(row.coverage_percent)
+        return Number.isFinite(value) ? value : null
+    })
+    const syncQuality = analyses.map(row => {
+        const value = Number(row.match_rate)
+        return Number.isFinite(value) ? value : null
+    })
+
+    seriesTrendChart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Wellness response",
+                    data: wellnessScores,
+                    borderColor: "#00ffcc",
+                    backgroundColor: "#00ffcc22",
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    tension: 0.25,
+                    spanGaps: true
+                },
+                {
+                    label: "Data quality",
+                    data: dataQualityScores,
+                    borderColor: "#facc15",
+                    backgroundColor: "#facc1522",
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    tension: 0.25,
+                    spanGaps: true
+                },
+                {
+                    label: "Sync quality",
+                    data: syncQuality,
+                    borderColor: "#38bdf8",
+                    backgroundColor: "#38bdf822",
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.2,
+                    spanGaps: true
+                },
+                {
+                    label: "Coverage",
+                    data: coverageScores,
+                    borderColor: "#a78bfa",
+                    backgroundColor: "#a78bfa22",
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.2,
+                    spanGaps: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: "#cbd5e1",
+                        boxWidth: 14,
+                        usePointStyle: true
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: "#12263a"
+                    },
+                    ticks: {
+                        color: "#94a3b8",
+                        maxTicksLimit: 8
+                    }
+                },
+                y: {
+                    min: 0,
+                    max: 100,
+                    grid: {
+                        color: "#12263a"
+                    },
+                    ticks: {
+                        color: "#94a3b8"
+                    }
+                }
+            }
+        }
+    })
+}
+
+async function loadUserTrend(options = {}){
+    const selected = getSelectedSession()
+    const limit = getSelectedTrendLimit()
+    const trendBox = document.getElementById("trendBox")
+
+    if(!selected || !selected.user_id){
+        if(trendBox){
+            trendBox.innerHTML = `
+                <div class="mission-warning">
+                    Selected session has no user_id, so series analysis cannot be loaded.
+                </div>
+            `
+        }
+        return
+    }
+
+    if(trendBox){
+        trendBox.innerHTML = `
+            <p class="mission-muted">Loading session series...</p>
+        `
+    }
+
     try{
-        const res = await fetch(`/api/user_trends/${encodeURIComponent(selected.user_id)}`, {
+        const res = await fetch(`/api/user_trends/${encodeURIComponent(selected.user_id)}?limit=${limit}`, {
             credentials: "same-origin"
         })
 
         const data = await parseJsonResponse(res, "USER TREND")
 
         if(!res.ok || data.error){
-            document.getElementById("trendBox").innerHTML = `
+            trendBox.innerHTML = `
                 <div class="mission-warning">
                     Trend failed: ${escapeHtml(data.error || res.status)}
                 </div>
@@ -746,53 +1143,186 @@ async function loadUserTrend(){
         const avgSpo2 = formatMetric(data.avg_spo2, "%")
         const avgPulse = formatMetric(data.avg_pulse, "bpm")
         const avgHrv = formatMetric(data.avg_hrv, "ms")
+        const avgQuality = formatMetric(data.avg_data_quality, "/100", 0)
+        const avgCoverage = formatMetric(data.avg_coverage, "%")
+        const latestQuality = formatMetric(data.latest_data_quality, "/100", 0)
+        const avgMatchRate = formatMetric(data.avg_match_rate, "%")
+        const analyses = Array.isArray(data.analyses) ? data.analyses : []
+        const comparison = data.first_last_comparison || {}
+        const qualityEngine = data.data_quality_engine || {}
+        const warningCounts = qualityEngine.warning_counts || {}
+        const firstScore = analyses.length ? getScore(analyses[0]) : null
+        const lastScore = analyses.length ? getScore(analyses[analyses.length - 1]) : null
+        const scoreDelta = (
+            Number.isFinite(Number(firstScore)) &&
+            Number.isFinite(Number(lastScore))
+        )
+            ? Number(lastScore) - Number(firstScore)
+            : null
+        const deltaLabel = scoreDelta === null
+            ? "-"
+            : `${scoreDelta >= 0 ? "+" : ""}${formatNumber(scoreDelta, 1)}`
+        const warningSummary = Object.entries(warningCounts)
+            .map(([warning, count]) => `${formatWarningLabel(warning)}: ${count}`)
+            .join("; ")
+        const seriesRows = analyses
+            .slice()
+            .reverse()
+            .map(row => `
+                <tr>
+                    <td>${escapeHtml(row.session_id || "-")}</td>
+                    <td>${escapeHtml(formatNumber(row.overall_score, 0))}</td>
+                    <td>${escapeHtml(formatNumber(row.data_quality_score, 0))}</td>
+                    <td>${escapeHtml(formatMetric(row.coverage_percent, "%"))}</td>
+                    <td>${escapeHtml(formatMetric(row.match_rate, "%"))}</td>
+                    <td>${escapeHtml(row.missing_samples ?? "-")}</td>
+                    <td>${escapeHtml(formatMetric(row.avg_spo2, "%"))}</td>
+                    <td>${escapeHtml(formatMetric(row.avg_pulse, "bpm"))}</td>
+                    <td>${escapeHtml(row.quality_warning_count || 0)}</td>
+                    <td>${escapeHtml(row.session_flagged || row.quality_warning_count ? "Review" : "OK")}</td>
+                </tr>
+            `)
+            .join("")
 
-        document.getElementById("trendBox").innerHTML = `
-            <div class="mission-analysis-grid">
+        trendBox.innerHTML = `
+            <div class="mission-series-summary">
                 <div>
-                    <span>User</span>
-                    <strong>${escapeHtml(data.user_id || selected.user_id)}</strong>
-                </div>
-                <div>
-                    <span>Analyses</span>
+                    <span>Analyzed</span>
                     <strong>${escapeHtml(data.records ?? 0)}</strong>
-                </div>
-                <div>
-                    <span>Sessions</span>
-                    <strong>${escapeHtml(data.session_count ?? "-")}</strong>
                 </div>
                 <div>
                     <span>Trend</span>
                     <strong>${escapeHtml(data.trend_direction || "-")}</strong>
                 </div>
-            </div>
-            <div class="mission-analysis-grid">
                 <div>
                     <span>Avg score</span>
                     <strong>${avgScore}</strong>
                 </div>
                 <div>
-                    <span>Latest score</span>
-                    <strong>${latestScore}</strong>
-                </div>
-                <div>
-                    <span>Avg SpO2</span>
-                    <strong>${avgSpo2}</strong>
-                </div>
-                <div>
-                    <span>Avg pulse</span>
-                    <strong>${avgPulse}</strong>
+                    <span>Avg data quality</span>
+                    <strong>${avgQuality}</strong>
                 </div>
             </div>
-            <p class="mission-muted">
-                Avg HRV: ${avgHrv}. Flagged analyses: ${escapeHtml(data.flagged_session_count ?? data.anomaly_count ?? 0)}.
-            </p>
+            <div class="mission-series-meta">
+                <span>Client ${escapeHtml(data.user_id || selected.user_id)}</span>
+                <span>Last ${escapeHtml(data.series_limit ?? limit)}</span>
+                <span>${escapeHtml(data.session_count ?? "-")} total sessions</span>
+                <span>${escapeHtml(data.flagged_session_count ?? data.anomaly_count ?? 0)} review flags</span>
+            </div>
+            <div class="mission-series-chart-panel">
+                <canvas id="seriesTrendChart"></canvas>
+                <div id="seriesTrendEmpty" class="mission-chart-empty">
+                    Load at least two analyzed sessions to render a series trend.
+                </div>
+            </div>
+            <div class="mission-analysis-columns">
+                <div>
+                    <h3>First 5 vs Last 5</h3>
+                    <div class="mission-mini-metrics">
+                        <span>Score: ${escapeHtml(formatMetric(comparison.first_avg_score, "/100", 0))} -> ${escapeHtml(formatMetric(comparison.last_avg_score, "/100", 0))}</span>
+                        <strong>${escapeHtml(formatDelta(comparison.score_delta))}</strong>
+                    </div>
+                    <div class="mission-mini-metrics">
+                        <span>Data quality: ${escapeHtml(formatMetric(comparison.first_avg_data_quality, "/100", 0))} -> ${escapeHtml(formatMetric(comparison.last_avg_data_quality, "/100", 0))}</span>
+                        <strong>${escapeHtml(formatDelta(comparison.data_quality_delta))}</strong>
+                    </div>
+                </div>
+                <div>
+                    <h3>Wellness-only interpretation</h3>
+                    <p>${escapeHtml(data.wellness_interpretation || "Interpret the trend together with session data quality. This is not a diagnosis.")}</p>
+                </div>
+            </div>
+            <div class="mission-analysis-block">
+                <h3>Session Data Quality Engine</h3>
+                <p>${escapeHtml(qualityEngine.explanation || "Data quality describes confidence in the session data, not client health.")}</p>
+                <div class="mission-analysis-grid mission-series-detail-grid">
+                    <div>
+                        <span>Latest score</span>
+                        <strong>${latestScore}</strong>
+                    </div>
+                    <div>
+                        <span>Score delta</span>
+                        <strong>${escapeHtml(deltaLabel)}</strong>
+                    </div>
+                    <div>
+                        <span>Latest data quality</span>
+                        <strong>${latestQuality}</strong>
+                </div>
+                <div>
+                    <span>Coverage</span>
+                    <strong>${avgCoverage}</strong>
+                </div>
+                    <div>
+                        <span>Avg sync quality</span>
+                        <strong>${avgMatchRate}</strong>
+                    </div>
+                    <div>
+                        <span>Data quality trend</span>
+                        <strong>${escapeHtml(data.data_quality_trend || "-")}</strong>
+                    </div>
+                    <div>
+                        <span>Missing samples</span>
+                        <strong>${escapeHtml(qualityEngine.total_missing_samples ?? 0)}</strong>
+                    </div>
+                    <div>
+                        <span>Sensor gaps</span>
+                        <strong>${escapeHtml(qualityEngine.sensor_gap_sessions ?? 0)}</strong>
+                    </div>
+                    <div>
+                        <span>HR/pulse mismatch</span>
+                        <strong>${escapeHtml(qualityEngine.hr_pulse_mismatch_sessions ?? 0)}</strong>
+                    </div>
+                    <div>
+                        <span>SpO2 warnings</span>
+                        <strong>${escapeHtml(qualityEngine.spo2_warning_sessions ?? 0)}</strong>
+                    </div>
+                    <div>
+                        <span>Avg SpO2</span>
+                        <strong>${avgSpo2}</strong>
+                    </div>
+                    <div>
+                        <span>Avg pulse</span>
+                        <strong>${avgPulse}</strong>
+                    </div>
+                    <div>
+                        <span>Avg HRV</span>
+                        <strong>${avgHrv}</strong>
+                    </div>
+                </div>
+                <p class="mission-muted">
+                    ${escapeHtml(warningSummary || "No repeated data-quality warnings in this range.")}
+                </p>
+            </div>
+            <div class="mission-series-table-wrap">
+                <table class="mission-series-table">
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>Score</th>
+                            <th>Quality</th>
+                            <th>Coverage</th>
+                            <th>Sync</th>
+                            <th>Missing</th>
+                            <th>SpO2</th>
+                            <th>Pulse</th>
+                            <th>Warnings</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${seriesRows || `<tr><td colspan="10">No analyzed sessions in this range.</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
         `
+        renderSeriesTrendChart(analyses)
 
-        setText("rawOutput", prettyCompact(data))
+        if(options.updateRaw !== false){
+            setText("rawOutput", prettyCompact(data))
+        }
     }catch(err){
         console.error("loadUserTrend error:", err)
-        document.getElementById("trendBox").innerHTML = `
+        trendBox.innerHTML = `
             <div class="mission-warning">
                 Trend could not be loaded: ${escapeHtml(err.message || err)}
             </div>
@@ -811,6 +1341,19 @@ async function generateResearchReport(){
     setText("rawOutput", `Opening PDF report for session ${sessionId}...`)
 
     window.location.href = `/report/${encodeURIComponent(sessionId)}`
+}
+
+function generateSeriesReport(){
+    const selected = getSelectedSession()
+    const limit = getSelectedTrendLimit()
+
+    if(!selected || !selected.user_id){
+        alert("Select a session with client assignment first")
+        return
+    }
+
+    setText("rawOutput", `Opening series PDF report for client ${selected.user_id}...`)
+    window.location.href = `/report/series/${encodeURIComponent(selected.user_id)}?limit=${limit}`
 }
 </script>
 

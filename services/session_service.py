@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +21,13 @@ from core.pressure import calculate_pressure_ata
 from database_postgres import db
 from repositories.wellness_repository import get_wellness_summary
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
 from reportlab.platypus import (
+    KeepTogether,
+    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -43,6 +48,9 @@ SESSION_CLIENT_TABLES = (
     "hrv_imports",
     "hrv_intervals",
 )
+PRESSURE_OPERATIONAL_TOLERANCE_ATA = 0.05
+
+
 @dataclass(frozen=True)
 class PhaseResult:
     """Database identity of one saved phase row."""
@@ -390,7 +398,27 @@ def list_research_sessions(
                     fs.completed,
                     fs.created_at,
                     p.name,
-                    fs.actual_ata
+                    fs.actual_ata,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY fs.user_id
+                        ORDER BY fs.created_at ASC, fs.id ASC
+                    ),
+                    EXISTS (
+                        SELECT 1
+                        FROM audit_log al
+                        WHERE al.action = 'report.export'
+                          AND al.entity_type = 'session'
+                          AND al.entity_id = fs.session_id
+                          AND al.outcome = 'success'
+                    ) AS report_exported,
+                    (
+                        SELECT MAX(al.created_at)
+                        FROM audit_log al
+                        WHERE al.action = 'report.export'
+                          AND al.entity_type = 'session'
+                          AND al.entity_id = fs.session_id
+                          AND al.outcome = 'success'
+                    ) AS report_exported_at
                 FROM full_sessions fs
                 LEFT JOIN protocols p
                     ON p.protocol_id = fs.protocol_id
@@ -408,7 +436,27 @@ def list_research_sessions(
                     fs.completed,
                     fs.created_at,
                     p.name
-                    ,fs.actual_ata
+                    ,fs.actual_ata,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY fs.user_id
+                        ORDER BY fs.created_at ASC, fs.id ASC
+                    ),
+                    EXISTS (
+                        SELECT 1
+                        FROM audit_log al
+                        WHERE al.action = 'report.export'
+                          AND al.entity_type = 'session'
+                          AND al.entity_id = fs.session_id
+                          AND al.outcome = 'success'
+                    ) AS report_exported,
+                    (
+                        SELECT MAX(al.created_at)
+                        FROM audit_log al
+                        WHERE al.action = 'report.export'
+                          AND al.entity_type = 'session'
+                          AND al.entity_id = fs.session_id
+                          AND al.outcome = 'success'
+                    ) AS report_exported_at
                 FROM full_sessions fs
                 LEFT JOIN protocols p
                     ON p.protocol_id = fs.protocol_id
@@ -428,7 +476,27 @@ def list_research_sessions(
                     fs.completed,
                     fs.created_at,
                     p.name,
-                    fs.actual_ata
+                    fs.actual_ata,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY fs.user_id
+                        ORDER BY fs.created_at ASC, fs.id ASC
+                    ),
+                    EXISTS (
+                        SELECT 1
+                        FROM audit_log al
+                        WHERE al.action = 'report.export'
+                          AND al.entity_type = 'session'
+                          AND al.entity_id = fs.session_id
+                          AND al.outcome = 'success'
+                    ) AS report_exported,
+                    (
+                        SELECT MAX(al.created_at)
+                        FROM audit_log al
+                        WHERE al.action = 'report.export'
+                          AND al.entity_type = 'session'
+                          AND al.entity_id = fs.session_id
+                          AND al.outcome = 'success'
+                    ) AS report_exported_at
                 FROM full_sessions fs
                 LEFT JOIN protocols p
                     ON p.protocol_id = fs.protocol_id
@@ -449,6 +517,9 @@ def list_research_sessions(
                 "created_at": row[4].isoformat() if row[4] else None,
                 "protocol_name": row[5],
                 "actual_ata": row[6],
+                "client_session_number": int(row[7]),
+                "report_exported": bool(row[8]),
+                "report_exported_at": row[9].isoformat() if row[9] else None,
             }
             for row in cursor.fetchall()
         ]
@@ -727,6 +798,20 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                     WHERE completed_fs.program_enrollment_id =
                         fs.program_enrollment_id
                       AND completed_fs.completed = 1
+                ),
+                (
+                    SELECT COUNT(*)
+                    FROM full_sessions client_fs
+                    WHERE client_fs.user_id = fs.user_id
+                      AND client_fs.session_id NOT LIKE
+                          'PIPELINE_VALIDATION_%%'
+                      AND (
+                          client_fs.created_at < fs.created_at
+                          OR (
+                              client_fs.created_at = fs.created_at
+                              AND client_fs.id <= fs.id
+                          )
+                      )
                 )
             FROM full_sessions fs
             LEFT JOIN users u
@@ -783,6 +868,7 @@ def load_report_data(*, session_id: str) -> dict[str, Any]:
                 "program_name": subject_row[24],
                 "program_total_sessions": subject_row[25],
                 "program_completed_sessions": subject_row[26],
+                "client_session_number": subject_row[27],
             }
         else:
             session_config = None
@@ -875,301 +961,1125 @@ def build_pdf_report(
     session: dict[str, Any],
     report_data: dict[str, Any],
 ) -> None:
-    """Render report data into a compact PDF document."""
+    """Render a concise, client-facing wellness session report."""
 
     styles = getSampleStyleSheet()
+    styles.add(
+        ParagraphStyle(
+            name="BrandTitle",
+            parent=styles["Title"],
+            alignment=0,
+            fontSize=18,
+            leading=21,
+            textColor=colors.HexColor("#0b8f7f"),
+            spaceAfter=0,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="BrandSubtitle",
+            parent=styles["BodyText"],
+            alignment=0,
+            fontSize=8.5,
+            leading=11,
+            textColor=colors.HexColor("#64748b"),
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="ReportTitle",
+            parent=styles["Heading1"],
+            alignment=2,
+            fontSize=17,
+            leading=20,
+            textColor=colors.HexColor("#13283a"),
+            spaceAfter=0,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="ReportSection",
+            parent=styles["Heading2"],
+            fontSize=11.5,
+            leading=14,
+            textColor=colors.HexColor("#13283a"),
+            spaceBefore=9,
+            spaceAfter=6,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="MetricLabel",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontSize=7.5,
+            leading=9,
+            textColor=colors.HexColor("#64748b"),
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="MetricValue",
+            parent=styles["Heading2"],
+            alignment=TA_CENTER,
+            fontSize=15,
+            leading=18,
+            textColor=colors.HexColor("#0f766e"),
+            spaceAfter=0,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="NoticeText",
+            parent=styles["BodyText"],
+            fontSize=8,
+            leading=10.5,
+            textColor=colors.HexColor("#64748b"),
+        )
+    )
+
     doc = SimpleDocTemplate(
         str(path),
         pagesize=A4,
         title=f"CoreLabTech wellness report {session['session_id']}",
+        author="CoreLabTech",
+        subject="Wellness session report",
+        leftMargin=17 * mm,
+        rightMargin=17 * mm,
+        topMargin=14 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    session_config = report_data.get("session_config") or {}
+    subject = report_data.get("subject") or {}
+    analysis = report_data.get("analysis") or {}
+    analysis_result = analysis.get("result") or {}
+    wellness_flags = analysis_result.get("wellness_flags") or {}
+    features = analysis.get("features") or {}
+    wellness_history = report_data.get("wellness_history") or {}
+    baseline = wellness_history.get("baseline") or {}
+    quality_warnings = analysis_result.get("quality_warnings") or []
+    client_session_number = session_config.get("client_session_number") or "-"
+    program_name = session_config.get("program_name") or "Single session"
+    program_progress = (
+        f"{session_config.get('program_completed_sessions')} of "
+        f"{session_config.get('program_total_sessions')}"
+        if session_config.get("program_name")
+        else "Not enrolled"
+    )
+    synchronized_samples = int(report_data.get("merged_samples") or 0)
+    source_samples = max(
+        int(report_data.get("fit_samples") or 0),
+        int(report_data.get("csv_samples") or 0),
+    )
+    missing_samples = (
+        max(0, source_samples - synchronized_samples)
+        if source_samples
+        else None
     )
 
     story = [
-        Paragraph("CoreLabTech Wellness Session Report", styles["Title"]),
-        Spacer(1, 12),
-        Paragraph("Session Summary", styles["Heading2"]),
-        make_table(
-            [
-                ("Session ID", session.get("session_id")),
-                ("Client ID", session.get("user_id")),
-                ("Status", session.get("status")),
-                ("Completed", session.get("completed")),
-                ("Created at", session.get("created_at")),
-                (
-                    "Organization",
-                    (report_data.get("session_config") or {}).get(
-                        "organization_name"
-                    ),
-                ),
-                (
-                    "Location",
-                    (report_data.get("session_config") or {}).get(
-                        "location_name"
-                    ),
-                ),
-                ("Chamber", session.get("chamber_name")),
-                ("Protocol", session.get("protocol_name")),
-                ("Protocol version", session.get("protocol_version")),
-                (
-                    "Program",
-                    (report_data.get("session_config") or {}).get(
-                        "program_name"
-                    ),
-                ),
-                (
-                    "Program progress",
-                    (
-                        f"{(report_data.get('session_config') or {}).get('program_completed_sessions')}/"
-                        f"{(report_data.get('session_config') or {}).get('program_total_sessions')}"
-                        if (report_data.get("session_config") or {}).get(
-                            "program_name"
-                        )
-                        else "-"
-                    ),
-                ),
-                ("Execution status", session.get("execution_status")),
-                ("Deviation reason", session.get("deviation_reason")),
-                ("Target ATA", session.get("target_ata")),
-                ("Recorded ATA", session.get("actual_ata")),
-                ("ATA difference", session.get("pressure_deviation")),
-                (
-                    "Planned total time (min)",
-                    (report_data.get("session_config") or {}).get(
-                        "planned_duration_min"
-                    ),
-                ),
-                (
-                    "Actual compression (min)",
-                    session.get("compression_time_min"),
-                ),
-                (
-                    "Actual time at target pressure (min)",
-                    session.get("exposure_time_min"),
-                ),
-                (
-                    "Actual decompression (min)",
-                    session.get("decompression_time_min"),
-                ),
-                ("Actual total time (min)", session.get("total_duration_min")),
-            ]
+        make_report_header(
+            session=session,
+            report_data=report_data,
+            styles=styles,
         ),
         Spacer(1, 12),
-        Paragraph("Session Timeline", styles["Heading2"]),
-        make_table(
+        make_metric_strip(
             [
                 (
-                    f"{segment.get('sequence_no')}. "
-                    f"{str(segment.get('phase') or '').replace('_', ' ').title()}",
-                    (
-                        f"{segment.get('actual_duration_min')} min; "
-                        f"ATA {segment.get('actual_ata') or '-'}; "
-                        f"{segment.get('note') or 'no note'}"
-                    ),
-                )
-                for segment in session.get("segments") or []
-            ]
-            or [("Timeline", "No segment data available")]
-        ),
-        Spacer(1, 12),
-        Paragraph("Client", styles["Heading2"]),
-        make_table(
-            [
-                ("Client ID", (report_data.get("subject") or {}).get("user_id")),
-                ("Email", (report_data.get("subject") or {}).get("email")),
-                ("Sex", (report_data.get("subject") or {}).get("sex")),
-                ("Age", (report_data.get("subject") or {}).get("age")),
-                ("Weight", (report_data.get("subject") or {}).get("weight")),
-                ("Notes", (report_data.get("subject") or {}).get("notes")),
-            ]
-        ),
-        Spacer(1, 12),
-        Paragraph("Data Sources", styles["Heading2"]),
-        make_table(
-            [
-                ("HR/HRV Timeline samples", report_data.get("fit_samples")),
-                ("SpO2/Pulse Timeline samples", report_data.get("csv_samples")),
-                ("Synchronized samples", report_data.get("merged_samples")),
-            ]
-        ),
-        Spacer(1, 12),
-        Paragraph("Check-in / Session / Recovery", styles["Heading2"]),
-        make_table(
-            [
-                ("Check-in SpO2", phase_metric(session.get("pre"), "spo2", "avg_spo2")),
-                ("Check-in pulse / HR", phase_metric(session.get("pre"), "pulse", "hr", "heart_rate")),
-                ("Check-in HRV", phase_metric(session.get("pre"), "hrv", "rmssd", "avg_hrv")),
-                ("Check-in context", format_context(phase_metric(session.get("pre"), "check_in"))),
-                (
-                    "Wellness acknowledgement",
-                    format_context(
-                        phase_metric(
-                            session.get("pre"),
-                            "wellness_consent",
-                        )
-                    ),
+                    "WELLNESS RESPONSE",
+                    format_score(analysis.get("overall_score")),
                 ),
-                ("Session avg SpO2", phase_metric(session.get("during"), "avg_spo2", "spo2")),
-                ("Session min SpO2", phase_metric(session.get("during"), "min_spo2")),
-                ("Session avg pulse / HR", phase_metric(session.get("during"), "avg_pulse", "avg_hr", "pulse", "hr")),
-                ("Session avg HRV", phase_metric(session.get("during"), "avg_hrv", "rmssd", "hrv")),
-                ("Session pressure", phase_metric(session.get("during"), "pressure_ata", "ata")),
-                ("Session temperature", phase_metric(session.get("during"), "chamber_temperature", "temperature")),
-                ("Session oxygen flow", phase_metric(session.get("during"), "oxygen_flow_lpm")),
-                ("Session oxygen setting", phase_metric(session.get("during"), "oxygen_mask_percent", "oxygen_percent")),
-                ("Recovery SpO2", phase_metric(session.get("post"), "spo2", "avg_spo2")),
-                ("Recovery pulse / HR", phase_metric(session.get("post"), "pulse", "hr", "heart_rate")),
-                ("Recovery HRV", phase_metric(session.get("post"), "hrv", "rmssd", "avg_hrv")),
-                ("Recovery context", format_context(phase_metric(session.get("post"), "check_out"))),
+                (
+                    "DATA QUALITY",
+                    format_score(analysis.get("data_quality_score")),
+                ),
+                (
+                    "SYNC QUALITY",
+                    format_percent(features.get("match_rate")),
+                ),
+                (
+                    "SPO2 MINIMUM",
+                    format_measurement(analysis.get("hypoxia_score"), "%", 1),
+                ),
+            ],
+            styles,
+        ),
+        Spacer(1, 8),
+        KeepTogether(
+            [
+                Paragraph("Session Overview", styles["ReportSection"]),
+                make_table(
+                    [
+                        ("Client", subject.get("user_id")),
+                        ("Client session", f"Session {client_session_number}"),
+                        ("Date", format_report_datetime(session.get("created_at"))),
+                        ("Program", f"{program_name} - {program_progress}"),
+                        ("Protocol", session.get("protocol_name")),
+                        (
+                            "Location",
+                            " / ".join(
+                                value
+                                for value in (
+                                    session_config.get("location_name"),
+                                    session.get("chamber_name"),
+                                )
+                                if value
+                            ),
+                        ),
+                        (
+                            "Pressure",
+                            (
+                                f"{format_measurement(session.get('actual_ata'), ' ATA', 2)} "
+                                f"(target {format_measurement(session.get('target_ata'), ' ATA', 2)})"
+                            ),
+                        ),
+                        (
+                            "Duration",
+                            format_measurement(
+                                session.get("total_duration_min"),
+                                " min",
+                                0,
+                            ),
+                        ),
+                        (
+                            "Session status",
+                            format_report_status(
+                                session.get("execution_status")
+                                or session.get("status")
+                            ),
+                        ),
+                    ]
+                ),
             ]
         ),
     ]
 
-    wellness_history = report_data.get("wellness_history") or {}
-    baseline = wellness_history.get("baseline") or {}
-
-    story.extend(
-        [
-            Spacer(1, 12),
-            Paragraph("Personal Baseline", styles["Heading2"]),
-            make_table(
-                [
-                    (
-                        "Baseline confidence",
-                        wellness_history.get("baseline_confidence"),
-                    ),
-                    (
-                        "Unique sessions (30 days)",
-                        wellness_history.get("unique_sessions_30d"),
-                    ),
-                    ("RMSSD 7 days", baseline.get("rmssd_7d")),
-                    ("RMSSD 14 days", baseline.get("rmssd_14d")),
-                    ("RMSSD 30 days", baseline.get("rmssd_30d")),
-                    (
-                        "Session HR reference (7 days)",
-                        baseline.get("resting_hr_7d"),
-                    ),
-                    ("SpO2 average", baseline.get("spo2_avg")),
-                    ("SpO2 minimum", baseline.get("spo2_min")),
-                    (
-                        "Baseline data quality",
-                        baseline.get("data_quality_score"),
-                    ),
-                ]
-            ),
-        ]
-    )
-
-    analysis = report_data.get("analysis")
-
-    story.extend(
-        [
-            Spacer(1, 12),
-            Paragraph("Wellness Analysis", styles["Heading2"]),
-        ]
-    )
-
     if analysis:
-        analysis_result = analysis.get("result") or {}
-        wellness_flags = analysis_result.get("wellness_flags") or {}
-        quality_warnings = analysis_result.get("quality_warnings") or []
-
-        story.append(
-            make_table(
-                [
-                    ("Analysis result ID", analysis.get("ai_result_id")),
-                    ("Merge ID", analysis.get("merge_id")),
-                    ("Model", analysis.get("model_name")),
-                    ("Model version", analysis.get("model_version")),
-                    ("Product mode", analysis_result.get("product_mode", "wellness")),
-                    ("Wellness status", analysis_result.get("wellness_status")),
-                    ("Wellness response", analysis.get("overall_score")),
-                    ("Load score", analysis.get("stress_score")),
-                    ("Oxygenation minimum", analysis.get("hypoxia_score")),
-                    (
-                        "Heart-rate peak",
-                        analysis.get("cardiovascular_score"),
-                    ),
-                    ("Data quality score", analysis.get("data_quality_score")),
-                    ("Data quality warnings", format_list(quality_warnings)),
-                    (
-                        "Session review recommended",
-                        analysis_result.get(
-                            "session_flagged",
-                            analysis.get("anomaly_detected"),
-                        ),
-                    ),
-                    (
-                        "Elevated load flag",
-                        wellness_flags.get(
-                            "elevated_load",
-                            analysis.get("stress_detected"),
-                        ),
-                    ),
-                    (
-                        "Low oxygenation trend flag",
-                        wellness_flags.get(
-                            "oxygenation_drop",
-                            analysis.get("hypoxia_detected"),
-                        ),
-                    ),
-                    (
-                        "Sensor alignment warning",
-                        wellness_flags.get(
-                            "sensor_alignment_warning",
-                            False,
-                        ),
-                    ),
-                    ("Created at", analysis.get("created_at")),
-                ]
-            )
-        )
-
         story.extend(
             [
-                Spacer(1, 10),
-                Paragraph("Summary", styles["Heading3"]),
-                Paragraph(escape_text(analysis.get("summary")), styles["BodyText"]),
-                Spacer(1, 8),
-                Paragraph("Recommendations", styles["Heading3"]),
-                Paragraph(
-                    escape_text(analysis.get("recommendations")),
-                    styles["BodyText"],
+                KeepTogether(
+                    [
+                        Paragraph(
+                            "Wellness Interpretation",
+                            styles["ReportSection"],
+                        ),
+                        Spacer(1, 2),
+                        Paragraph(
+                            escape_text(analysis.get("summary")),
+                            styles["BodyText"],
+                        ),
+                    ]
+                ),
+                KeepTogether(
+                    [
+                        Paragraph(
+                            "Operator Review",
+                            styles["ReportSection"],
+                        ),
+                        Spacer(1, 2),
+                        Paragraph(
+                            escape_text(analysis.get("recommendations")),
+                            styles["BodyText"],
+                        ),
+                    ]
                 ),
             ]
         )
     else:
-        story.append(
-            Paragraph(
-                "No wellness analysis result is available for this session yet.",
-                styles["BodyText"],
-            )
+        story.extend(
+            [
+                Paragraph("Wellness Interpretation", styles["ReportSection"]),
+                Paragraph(
+                    "No wellness analysis is available for this session yet.",
+                    styles["BodyText"],
+                ),
+            ]
         )
+
+    story.append(
+        KeepTogether(
+            [
+                Paragraph("Session Data Quality", styles["ReportSection"]),
+                make_table(
+                    [
+                        (
+                            "Data quality score",
+                            format_score(analysis.get("data_quality_score")),
+                        ),
+                        (
+                            "Coverage",
+                            format_percent(features.get("coverage_percent")),
+                        ),
+                        (
+                            "Synchronization quality",
+                            format_percent(features.get("match_rate")),
+                        ),
+                        ("Missing samples", missing_samples),
+                        (
+                            "HR / pulse alignment",
+                            (
+                                "Operator review recommended"
+                                if wellness_flags.get(
+                                    "sensor_alignment_warning"
+                                )
+                                else "No alignment warning"
+                            ),
+                        ),
+                        (
+                            "SpO2 range",
+                            (
+                                "Operator review recommended"
+                                if wellness_flags.get("oxygenation_drop")
+                                else "No range warning"
+                            ),
+                        ),
+                        (
+                            "Quality notes",
+                            format_warning_list(quality_warnings),
+                        ),
+                    ]
+                ),
+                Spacer(1, 5),
+                Paragraph(
+                    "Interpretation confidence depends on signal coverage, "
+                    "synchronization quality and operator review.",
+                    styles["NoticeText"],
+                ),
+            ]
+        )
+    )
 
     story.extend(
         [
-            Spacer(1, 12),
-            Paragraph("Wellness Notice", styles["Heading2"]),
+            PageBreak(),
+            make_page_header("Session Details", styles),
+            Spacer(1, 6),
+            KeepTogether(
+                [
+                    Paragraph("Session Timeline", styles["ReportSection"]),
+                    make_table(
+                        [
+                            (
+                                f"{segment.get('sequence_no')}. "
+                                f"{str(segment.get('phase') or '').replace('_', ' ').title()}",
+                                (
+                                    f"{format_measurement(segment.get('actual_duration_min'), ' min', 0)}"
+                                    f" at {format_measurement(segment.get('actual_ata'), ' ATA', 2)}"
+                                    + (
+                                        f" - {segment.get('note')}"
+                                        if segment.get("note")
+                                        else ""
+                                    )
+                                ),
+                            )
+                            for segment in session.get("segments") or []
+                        ]
+                        or [("Timeline", "No segment data available")]
+                    ),
+                ]
+            ),
+            KeepTogether(
+                [
+                    Paragraph(
+                        "Check-in and Recovery",
+                        styles["ReportSection"],
+                    ),
+                    make_comparison_table(
+                        [
+                            (
+                                "SpO2",
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("pre"),
+                                        "spo2",
+                                        "avg_spo2",
+                                    ),
+                                    "%",
+                                    0,
+                                ),
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("post"),
+                                        "spo2",
+                                        "avg_spo2",
+                                    ),
+                                    "%",
+                                    0,
+                                ),
+                            ),
+                            (
+                                "Pulse / HR",
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("pre"),
+                                        "pulse",
+                                        "hr",
+                                        "heart_rate",
+                                    ),
+                                    " bpm",
+                                    0,
+                                ),
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("post"),
+                                        "pulse",
+                                        "hr",
+                                        "heart_rate",
+                                    ),
+                                    " bpm",
+                                    0,
+                                ),
+                            ),
+                            (
+                                "HRV",
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("pre"),
+                                        "hrv",
+                                        "rmssd",
+                                        "avg_hrv",
+                                    ),
+                                    " ms",
+                                    1,
+                                ),
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("post"),
+                                        "hrv",
+                                        "rmssd",
+                                        "avg_hrv",
+                                    ),
+                                    " ms",
+                                    1,
+                                ),
+                            ),
+                        ]
+                    ),
+                    Spacer(1, 5),
+                    Paragraph(
+                        "<b>Check-in context:</b> "
+                        + escape_text(
+                            format_context(
+                                phase_metric(
+                                    session.get("pre"),
+                                    "check_in",
+                                )
+                            )
+                        ),
+                        styles["NoticeText"],
+                    ),
+                    Paragraph(
+                        "<b>Recovery context:</b> "
+                        + escape_text(
+                            format_context(
+                                phase_metric(
+                                    session.get("post"),
+                                    "check_out",
+                                )
+                            )
+                        ),
+                        styles["NoticeText"],
+                    ),
+                ]
+            ),
+            KeepTogether(
+                [
+                    Paragraph("Session Environment", styles["ReportSection"]),
+                    make_table(
+                        [
+                            (
+                                "Oxygen flow",
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("during"),
+                                        "oxygen_flow_lpm",
+                                    ),
+                                    " L/min",
+                                    1,
+                                ),
+                            ),
+                            (
+                                "Estimated mask O2",
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("during"),
+                                        "oxygen_mask_percent",
+                                        "oxygen_percent",
+                                    ),
+                                    "%",
+                                    1,
+                                ),
+                            ),
+                            (
+                                "Chamber temperature",
+                                format_measurement(
+                                    phase_metric(
+                                        session.get("during"),
+                                        "chamber_temperature",
+                                        "temperature",
+                                    ),
+                                    " C",
+                                    1,
+                                ),
+                            ),
+                            (
+                                "Pressure deviation",
+                                format_measurement(
+                                    session.get("pressure_deviation"),
+                                    " ATA",
+                                    3,
+                                ),
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            KeepTogether(
+                [
+                    Paragraph("Data Sources", styles["ReportSection"]),
+                    make_table(
+                        [
+                            (
+                                "HR / HRV samples",
+                                report_data.get("fit_samples"),
+                            ),
+                            (
+                                "SpO2 / pulse samples",
+                                report_data.get("csv_samples"),
+                            ),
+                            (
+                                "Synchronized samples",
+                                report_data.get("merged_samples"),
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            KeepTogether(
+                [
+                    Paragraph("Personal Baseline", styles["ReportSection"]),
+                    make_table(
+                        [
+                            (
+                                "Baseline status",
+                                format_report_status(
+                                    wellness_history.get(
+                                        "baseline_confidence"
+                                    )
+                                ),
+                            ),
+                            (
+                                "Sessions in last 30 days",
+                                wellness_history.get("unique_sessions_30d"),
+                            ),
+                            (
+                                "RMSSD - 7 days",
+                                format_measurement(
+                                    baseline.get("rmssd_7d"),
+                                    " ms",
+                                    1,
+                                ),
+                            ),
+                            (
+                                "SpO2 average",
+                                format_measurement(
+                                    baseline.get("spo2_avg"),
+                                    "%",
+                                    1,
+                                ),
+                            ),
+                            (
+                                "SpO2 minimum",
+                                format_measurement(
+                                    baseline.get("spo2_min"),
+                                    "%",
+                                    1,
+                                ),
+                            ),
+                            (
+                                "Baseline data quality",
+                                format_score(
+                                    baseline.get("data_quality_score")
+                                ),
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            Spacer(1, 4),
             Paragraph(
-                "This report provides wellness and educational insights only. "
-                "It is not intended to diagnose, treat, cure, or prevent disease. "
-                "It should be interpreted together with session context, sensor quality "
-                "and professional judgement where appropriate.",
-                styles["BodyText"],
+                "<b>Wellness notice:</b> Educational wellness insights only. "
+                "Review together with session context, sensor quality and "
+                "operator judgment.",
+                styles["NoticeText"],
             ),
         ]
     )
 
-    doc.build(story)
+    doc.build(
+        story,
+        onFirstPage=draw_report_footer,
+        onLaterPages=draw_report_footer,
+    )
+
+
+def build_series_pdf_report(
+    *,
+    path: Path,
+    series_data: dict[str, Any],
+) -> None:
+    """Render a concise wellness series report for one client."""
+
+    styles = getSampleStyleSheet()
+    styles.add(
+        ParagraphStyle(
+            name="BrandTitle",
+            parent=styles["Title"],
+            alignment=0,
+            fontSize=18,
+            leading=21,
+            textColor=colors.HexColor("#0b8f7f"),
+            spaceAfter=0,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="BrandSubtitle",
+            parent=styles["BodyText"],
+            alignment=0,
+            fontSize=8.5,
+            leading=11,
+            textColor=colors.HexColor("#64748b"),
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="ReportTitle",
+            parent=styles["Heading1"],
+            alignment=2,
+            fontSize=17,
+            leading=20,
+            textColor=colors.HexColor("#13283a"),
+            spaceAfter=0,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="ReportSection",
+            parent=styles["Heading2"],
+            fontSize=11.5,
+            leading=14,
+            textColor=colors.HexColor("#13283a"),
+            spaceBefore=9,
+            spaceAfter=6,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="MetricLabel",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontSize=7.5,
+            leading=9,
+            textColor=colors.HexColor("#64748b"),
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="MetricValue",
+            parent=styles["Heading2"],
+            alignment=TA_CENTER,
+            fontSize=15,
+            leading=18,
+            textColor=colors.HexColor("#0f766e"),
+            spaceAfter=0,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="NoticeText",
+            parent=styles["BodyText"],
+            fontSize=8,
+            leading=10.5,
+            textColor=colors.HexColor("#64748b"),
+        )
+    )
+
+    doc = SimpleDocTemplate(
+        str(path),
+        pagesize=A4,
+        title=f"CoreLabTech wellness series report {series_data.get('user_id')}",
+        author="CoreLabTech",
+        subject="Wellness session series report",
+        leftMargin=17 * mm,
+        rightMargin=17 * mm,
+        topMargin=14 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    analyses = series_data.get("analyses") or []
+    comparison = series_data.get("first_last_comparison") or {}
+    quality_engine = series_data.get("data_quality_engine") or {}
+    protocol = series_data.get("protocol") or {}
+    warnings = quality_engine.get("warning_counts") or {}
+    warning_summary = (
+        ", ".join(
+            f"{str(key).replace('_', ' ').title()}: {value}"
+            for key, value in warnings.items()
+        )
+        if warnings
+        else "No repeated quality warnings"
+    )
+    latest_session = analyses[-1] if analyses else {}
+    flagged_sessions = series_data.get(
+        "flagged_session_count",
+        series_data.get("anomaly_count", 0),
+    )
+
+    header = Table(
+        [
+            [
+                Paragraph("CoreLabTech", styles["BrandTitle"]),
+                Paragraph("Wellness Series Report", styles["ReportTitle"]),
+            ],
+            [
+                Paragraph(
+                    "Wellness Physiology &amp; Research Platform",
+                    styles["BrandSubtitle"],
+                ),
+                Paragraph(
+                    (
+                        f"Client {escape_text(series_data.get('user_id'))}"
+                        f" &nbsp; | &nbsp; Last {escape_text(series_data.get('series_limit'))}"
+                    ),
+                    ParagraphStyle(
+                        "SeriesHeaderMeta",
+                        parent=styles["BrandSubtitle"],
+                        alignment=2,
+                    ),
+                ),
+            ],
+        ],
+        colWidths=[240, 240],
+    )
+    header.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("LINEBELOW", (0, 1), (-1, 1), 1.5, colors.HexColor("#14b8a6")),
+                ("LEFTPADDING", (0, 0), (0, -1), 0),
+                ("RIGHTPADDING", (1, 0), (1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+                ("BOTTOMPADDING", (0, 1), (-1, 1), 7),
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ]
+        )
+    )
+
+    story = [
+        header,
+        Spacer(1, 12),
+        make_metric_strip(
+            [
+                ("ANALYZED", series_data.get("records", 0)),
+                ("TREND", str(series_data.get("trend_direction") or "-").title()),
+                ("AVG SCORE", format_score(series_data.get("avg_score"))),
+                (
+                    "DATA QUALITY",
+                    format_score(series_data.get("avg_data_quality")),
+                ),
+            ],
+            styles,
+        ),
+        Spacer(1, 8),
+        KeepTogether(
+            [
+                Paragraph("Series Overview", styles["ReportSection"]),
+                make_table(
+                    [
+                        ("Client", series_data.get("user_id")),
+                        ("Range", f"Last {series_data.get('series_limit')} sessions"),
+                        ("Protocol", protocol.get("name") or protocol.get("code")),
+                        ("Total sessions", series_data.get("session_count")),
+                        ("Analyzed sessions", series_data.get("records")),
+                        ("Review flags", flagged_sessions),
+                        (
+                            "Latest session",
+                            latest_session.get("session_id") or "-",
+                        ),
+                        (
+                            "Latest score",
+                            format_score(series_data.get("latest_score")),
+                        ),
+                    ]
+                ),
+            ]
+        ),
+        KeepTogether(
+            [
+                Paragraph("Wellness Series Interpretation", styles["ReportSection"]),
+                Paragraph(
+                    escape_text(
+                        series_data.get("wellness_interpretation")
+                        or "Interpret the trend together with session data quality.",
+                    ),
+                    styles["BodyText"],
+                ),
+            ]
+        ),
+        KeepTogether(
+            [
+                Paragraph("First 5 vs Last 5", styles["ReportSection"]),
+                make_table(
+                    [
+                        (
+                            "Wellness score",
+                            (
+                                f"{format_score(comparison.get('first_avg_score'))}"
+                                f" -> {format_score(comparison.get('last_avg_score'))}"
+                                f" ({format_delta_text(comparison.get('score_delta'))})"
+                            ),
+                        ),
+                        (
+                            "Data quality",
+                            (
+                                f"{format_score(comparison.get('first_avg_data_quality'))}"
+                                f" -> {format_score(comparison.get('last_avg_data_quality'))}"
+                                f" ({format_delta_text(comparison.get('data_quality_delta'))})"
+                            ),
+                        ),
+                    ]
+                ),
+            ]
+        ),
+        KeepTogether(
+            [
+                Paragraph("Data Quality Engine", styles["ReportSection"]),
+                make_table(
+                    [
+                        ("Average coverage", format_percent(series_data.get("avg_coverage"))),
+                        ("Average sync quality", format_percent(series_data.get("avg_match_rate"))),
+                        ("Missing samples", quality_engine.get("total_missing_samples")),
+                        ("Sensor gap sessions", quality_engine.get("sensor_gap_sessions")),
+                        (
+                            "HR / pulse mismatch",
+                            quality_engine.get("hr_pulse_mismatch_sessions"),
+                        ),
+                        (
+                            "SpO2 warnings",
+                            quality_engine.get("spo2_warning_sessions"),
+                        ),
+                        ("Warning summary", warning_summary),
+                    ]
+                ),
+                Spacer(1, 5),
+                Paragraph(
+                    escape_text(
+                        quality_engine.get("explanation")
+                        or "Data quality describes confidence in session data, not client health.",
+                    ),
+                    styles["NoticeText"],
+                ),
+            ]
+        ),
+        PageBreak(),
+        make_page_header("Series Session Table", styles),
+        Spacer(1, 6),
+        make_series_session_table(analyses, styles),
+        Spacer(1, 8),
+        Paragraph(
+            "<b>Wellness notice:</b> Educational wellness insights only. "
+            "Series trends are not diagnoses and should be reviewed together "
+            "with data quality and operator context.",
+            styles["NoticeText"],
+        ),
+    ]
+
+    doc.build(
+        story,
+        onFirstPage=draw_report_footer,
+        onLaterPages=draw_report_footer,
+    )
+
+
+def make_report_header(
+    *,
+    session: dict[str, Any],
+    report_data: dict[str, Any],
+    styles,
+) -> Table:
+    """Create a light, restrained report header."""
+
+    session_config = report_data.get("session_config") or {}
+    session_number = session_config.get("client_session_number") or "-"
+
+    header = Table(
+        [
+            [
+                Paragraph("CoreLabTech", styles["BrandTitle"]),
+                Paragraph(
+                    "Wellness Session Report",
+                    styles["ReportTitle"],
+                ),
+            ],
+            [
+                Paragraph(
+                    "Wellness Physiology &amp; Research Platform",
+                    styles["BrandSubtitle"],
+                ),
+                Paragraph(
+                    f"Session {escape_text(session_number)}"
+                    f" &nbsp; | &nbsp; "
+                    f"{escape_text(format_report_datetime(session.get('created_at')))}",
+                    ParagraphStyle(
+                        "HeaderMeta",
+                        parent=styles["BrandSubtitle"],
+                        alignment=2,
+                    ),
+                )
+            ],
+        ],
+        colWidths=[240, 240],
+    )
+    header.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("LINEBELOW", (0, 1), (-1, 1), 1.5, colors.HexColor("#14b8a6")),
+                ("LEFTPADDING", (0, 0), (0, -1), 0),
+                ("RIGHTPADDING", (1, 0), (1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+                ("BOTTOMPADDING", (0, 1), (-1, 1), 7),
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ]
+        )
+    )
+
+    return header
+
+
+def make_metric_strip(
+    metrics: list[tuple[str, Any]],
+    styles,
+) -> Table:
+    """Create a compact strip of headline session metrics."""
+
+    cells = [
+        [
+            Paragraph(escape_text(label), styles["MetricLabel"]),
+            Spacer(1, 3),
+            Paragraph(escape_text(value), styles["MetricValue"]),
+        ]
+        for label, value in metrics
+    ]
+    table = Table([cells], colWidths=[120] * len(cells))
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f4faf9")),
+                ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#c9e6e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#c9e6e1")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ]
+        )
+    )
+    return table
+
+
+def make_page_header(title: str, styles) -> Table:
+    """Create a restrained continuation header for later report pages."""
+
+    table = Table(
+        [
+            [
+                Paragraph("CoreLabTech", styles["BrandTitle"]),
+                Paragraph(escape_text(title), styles["ReportTitle"]),
+            ]
+        ],
+        colWidths=[240, 240],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("LINEBELOW", (0, 0), (-1, -1), 1.5, colors.HexColor("#14b8a6")),
+                ("LEFTPADDING", (0, 0), (0, 0), 0),
+                ("RIGHTPADDING", (1, 0), (1, 0), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ]
+        )
+    )
+    return table
+
+
+def make_comparison_table(rows: list[tuple[str, Any, Any]]) -> Table:
+    """Create a check-in versus recovery comparison table."""
+
+    body_style = getSampleStyleSheet()["BodyText"]
+    header_style = ParagraphStyle(
+        "ComparisonHeader",
+        parent=body_style,
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#475569"),
+    )
+    table_data = [
+        [
+            Paragraph("METRIC", header_style),
+            Paragraph("CHECK-IN", header_style),
+            Paragraph("RECOVERY", header_style),
+        ],
+        *[
+            [
+                Paragraph(escape_text(label), body_style),
+                Paragraph(escape_text(check_in), body_style),
+                Paragraph(escape_text(recovery), body_style),
+            ]
+            for label, check_in, recovery in rows
+        ],
+    ]
+    table = Table(table_data, colWidths=[180, 150, 150])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e9f5f3")),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.HexColor("#d6dee5")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    return table
+
+
+def make_series_session_table(
+    analyses: list[dict[str, Any]],
+    styles,
+) -> Table:
+    """Create a compact table of analyzed sessions for the series report."""
+
+    body_style = ParagraphStyle(
+        "SeriesTableBody",
+        parent=getSampleStyleSheet()["BodyText"],
+        fontSize=7.4,
+        leading=9,
+    )
+    header_style = ParagraphStyle(
+        "SeriesTableHeader",
+        parent=body_style,
+        fontSize=7,
+        leading=8,
+        textColor=colors.HexColor("#475569"),
+    )
+    rows = [
+        [
+            Paragraph("SESSION", header_style),
+            Paragraph("DATE", header_style),
+            Paragraph("SCORE", header_style),
+            Paragraph("QUALITY", header_style),
+            Paragraph("SYNC", header_style),
+            Paragraph("SPO2", header_style),
+            Paragraph("PULSE", header_style),
+            Paragraph("REVIEW", header_style),
+        ]
+    ]
+
+    for row in analyses:
+        rows.append(
+            [
+                Paragraph(escape_text(row.get("session_id")), body_style),
+                Paragraph(escape_text(format_report_datetime(row.get("created_at"))), body_style),
+                Paragraph(escape_text(format_score(row.get("overall_score"))), body_style),
+                Paragraph(escape_text(format_score(row.get("data_quality_score"))), body_style),
+                Paragraph(escape_text(format_percent(row.get("match_rate"))), body_style),
+                Paragraph(escape_text(format_measurement(row.get("avg_spo2"), "%", 1)), body_style),
+                Paragraph(escape_text(format_measurement(row.get("avg_pulse"), " bpm", 0)), body_style),
+                Paragraph(
+                    "Review" if row.get("session_flagged") or row.get("quality_warning_count") else "OK",
+                    body_style,
+                ),
+            ]
+        )
+
+    if len(rows) == 1:
+        rows.append(
+            [
+                Paragraph("-", body_style),
+                Paragraph("-", body_style),
+                Paragraph("-", body_style),
+                Paragraph("-", body_style),
+                Paragraph("-", body_style),
+                Paragraph("-", body_style),
+                Paragraph("-", body_style),
+                Paragraph("No analyzed sessions", body_style),
+            ]
+        )
+
+    table = Table(
+        rows,
+        colWidths=[92, 72, 56, 58, 48, 44, 48, 62],
+        repeatRows=1,
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e9f5f3")),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#d6dee5")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    return table
+
+
+def draw_report_footer(canvas, doc) -> None:
+    """Draw a consistent footer on each generated report page."""
+
+    canvas.saveState()
+    width, _ = A4
+    canvas.setStrokeColor(colors.HexColor("#c9ced6"))
+    canvas.setLineWidth(0.25)
+    canvas.line(17 * mm, 14 * mm, width - 17 * mm, 14 * mm)
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor("#4f6475"))
+    canvas.drawString(
+        17 * mm,
+        9 * mm,
+        "CoreLabTech - Wellness insight only, not a medical diagnosis.",
+    )
+    canvas.drawRightString(
+        width - 17 * mm,
+        9 * mm,
+        f"Page {doc.page}",
+    )
+    canvas.restoreState()
 
 
 def make_table(rows: list[tuple[str, Any]]) -> Table:
     """Create a consistently styled two-column report table."""
 
+    body_style = getSampleStyleSheet()["BodyText"]
     table = Table(
         [
             [
-                Paragraph(str(label), getSampleStyleSheet()["BodyText"]),
-                Paragraph(escape_text(value), getSampleStyleSheet()["BodyText"]),
+                Paragraph(str(label), body_style),
+                Paragraph(escape_text(value), body_style),
             ]
             for label, value in rows
         ],
@@ -1179,13 +2089,13 @@ def make_table(rows: list[tuple[str, Any]]) -> Table:
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f2f4f7")),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#c9ced6")),
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f4f7f9")),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#d6dee5")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 5.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5.5),
             ]
         )
     )
@@ -1256,17 +2166,130 @@ def format_list(values: Any) -> str:
     return str(values)
 
 
+def format_score(value: Any) -> str:
+    """Format a normalized report score on a 100-point scale."""
+
+    measurement = format_measurement(value, "", 1)
+    return f"{measurement} / 100" if measurement != "-" else "-"
+
+
+def format_delta_text(value: Any) -> str:
+    """Format score deltas with an explicit sign."""
+
+    if value in (None, ""):
+        return "-"
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    sign = "+" if numeric >= 0 else ""
+    return f"{sign}{format_measurement(numeric, '', 1)}"
+
+
+def format_percent(value: Any) -> str:
+    """Format percentage values for PDF metrics."""
+
+    return format_measurement(value, "%", 1)
+
+
+def format_measurement(
+    value: Any,
+    suffix: str = "",
+    decimals: int = 1,
+) -> str:
+    """Format report measurements without exposing database precision."""
+
+    if value in (None, ""):
+        return "-"
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return f"{value}{suffix}"
+
+    text = f"{numeric:.{decimals}f}"
+    if decimals:
+        text = text.rstrip("0").rstrip(".")
+
+    return f"{text}{suffix}"
+
+
+def format_report_datetime(value: Any) -> str:
+    """Format ISO timestamps for a human-facing report."""
+
+    if value in (None, ""):
+        return "-"
+
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return str(value)
+
+    return parsed.strftime("%d %b %Y, %H:%M")
+
+
+def format_report_status(value: Any) -> str:
+    """Convert internal enum values into readable status labels."""
+
+    if value in (None, ""):
+        return "-"
+
+    labels = {
+        "active": "Active",
+        "as_planned": "Completed as planned",
+        "baseline": "Baseline building",
+        "collecting": "Baseline building",
+        "completed": "Completed",
+        "modified": "Completed with changes",
+        "paused": "Paused",
+        "cancelled": "Cancelled",
+    }
+    key = str(value).strip().lower()
+    return labels.get(key, key.replace("_", " ").title())
+
+
+def format_warning_list(values: Any) -> str:
+    """Translate internal quality warning codes for report readers."""
+
+    labels = {
+        "sensor_alignment_warning": "HR / pulse alignment requires review",
+        "low_coverage": "Low sensor coverage",
+        "sync_quality_warning": "Synchronization quality requires review",
+        "spo2_range_warning": "SpO2 range requires review",
+    }
+
+    if not values:
+        return "No quality warnings"
+
+    if not isinstance(values, (list, tuple, set)):
+        values = [values]
+
+    return "; ".join(
+        labels.get(str(value), str(value).replace("_", " ").title())
+        for value in values
+    )
+
+
 def format_context(value: Any) -> str:
     """Format optional check-in/check-out context for the PDF."""
 
     if not isinstance(value, dict):
         return "-"
 
-    pairs = [
-        f"{key.replace('_', ' ')}: {item}"
-        for key, item in value.items()
-        if item not in (None, "")
-    ]
+    pairs = []
+    for key, item in value.items():
+        if item in (None, ""):
+            continue
+
+        label = key.replace("_", " ").title()
+        if isinstance(item, bool):
+            item = "Yes" if item else "No"
+        pairs.append(f"{label}: {item}")
 
     return "; ".join(pairs) if pairs else "-"
 
@@ -1438,7 +2461,7 @@ def resolve_session_configuration(
     if target_ata > chamber_max_ata:
         raise ValueError("protocol target exceeds chamber maximum ATA")
 
-    if actual_ata > chamber_max_ata + 0.02:
+    if actual_ata > chamber_max_ata + PRESSURE_OPERATIONAL_TOLERANCE_ATA:
         raise ValueError("recorded ATA exceeds chamber maximum")
 
     compression_time_min = positive_int_or_default(
@@ -1514,7 +2537,7 @@ def resolve_session_configuration(
             compression_time_min != planned_compression,
             exposure_time_min != planned_exposure,
             decompression_time_min != planned_decompression,
-            abs(actual_ata - target_ata) > 0.02,
+            abs(actual_ata - target_ata) > PRESSURE_OPERATIONAL_TOLERANCE_ATA,
         )
     )
     execution_status = optional_text(

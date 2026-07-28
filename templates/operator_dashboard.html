@@ -1,0 +1,550 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/operator_dashboard.css') }}?v=operator-dashboard-20260728"
+>
+
+<div class="operator-page">
+    <section class="operator-hero">
+        <div>
+            <span class="operator-eyebrow">Daily operations</span>
+            <h1>Operator Dashboard</h1>
+            <p>
+                Review today's wellness sessions, missing analysis, data quality
+                flags and report export status from one operational view.
+            </p>
+        </div>
+
+        <div class="operator-kpi-grid">
+            <div>
+                <span>Today's sessions</span>
+                <strong id="kpiToday">-</strong>
+            </div>
+            <div>
+                <span>Without AI</span>
+                <strong id="kpiMissingAi">-</strong>
+            </div>
+            <div>
+                <span>Quality review</span>
+                <strong id="kpiReview">-</strong>
+            </div>
+            <div>
+                <span>Reports pending</span>
+                <strong id="kpiReportReady">-</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="operator-toolbar">
+        <div class="operator-field">
+            <label for="operatorFilter">Operational filter</label>
+            <select id="operatorFilter" onchange="renderOperatorDashboard()">
+                <option value="all">All sessions</option>
+                <option value="today">Today</option>
+                <option value="missing_ai">Without AI analysis</option>
+                <option value="review">Quality review</option>
+                <option value="low_quality">Low data quality</option>
+                <option value="missing_telemetry">Missing telemetry</option>
+                <option value="without_report">Without exported report</option>
+                <option value="report_exported">Report exported</option>
+            </select>
+        </div>
+
+        <div class="operator-actions">
+            <button type="button" onclick="loadOperatorDashboard()">Refresh</button>
+            <a href="{{ url_for('research.chamber_testing') }}">New Session</a>
+        </div>
+    </section>
+
+    <div id="operatorStatus" class="operator-status"></div>
+
+    <section class="operator-section">
+        <div class="operator-section-header">
+            <div>
+                <h2>Session Worklist</h2>
+                <p>Prioritized sessions with quick actions for review and reporting.</p>
+            </div>
+        </div>
+
+        <div class="operator-table-wrap">
+            <table class="operator-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Client / Session</th>
+                        <th>AI</th>
+                        <th>Score</th>
+                        <th>Data quality</th>
+                        <th>Telemetry</th>
+                        <th>Review</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="operatorRows"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="operator-grid">
+        <article class="operator-section">
+            <div class="operator-section-header">
+                <div>
+                    <h2>Data Quality Queue</h2>
+                    <p>Sessions requiring operator review before trend interpretation.</p>
+                </div>
+            </div>
+            <div id="qualityQueue" class="operator-card-list"></div>
+        </article>
+
+        <article class="operator-section">
+            <div class="operator-section-header">
+                <div>
+                    <h2>Report Queue</h2>
+                    <p>Analyzed sessions that still need a tracked PDF export.</p>
+                </div>
+            </div>
+            <div id="reportQueue" class="operator-card-list"></div>
+        </article>
+    </section>
+</div>
+
+<script>
+let operatorSessions = []
+const CURRENT_ROLE = document.body?.dataset?.role || "anonymous"
+
+window.addEventListener("load", () => {
+    loadOperatorDashboard()
+})
+
+function escapeHtml(value){
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;")
+}
+
+async function parseJsonResponse(res, label){
+    const text = await res.text()
+
+    try{
+        return JSON.parse(text)
+    }catch(err){
+        return {
+            status: "error",
+            error: `${label} returned HTML/non-JSON response`,
+            raw: text
+        }
+    }
+}
+
+function setOperatorStatus(message, type = "info"){
+    const box = document.getElementById("operatorStatus")
+
+    if(!box){
+        return
+    }
+
+    if(!message){
+        box.innerHTML = ""
+        return
+    }
+
+    box.innerHTML = `<div class="operator-alert ${type}">${escapeHtml(message)}</div>`
+}
+
+function numericValue(value){
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatNumber(value, digits = 1){
+    const numeric = numericValue(value)
+    return numeric === null ? "-" : numeric.toFixed(digits).replace(/\.0$/, "")
+}
+
+function formatMetric(value, unit, digits = 1){
+    const formatted = formatNumber(value, digits)
+    return formatted === "-" ? "-" : `${formatted}${unit ? ` ${unit}` : ""}`
+}
+
+function formatDate(value){
+    if(!value){
+        return "-"
+    }
+
+    const parsed = new Date(value)
+
+    if(Number.isNaN(parsed.getTime())){
+        return String(value).replace("T", " ").slice(0, 16)
+    }
+
+    return parsed.toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit"
+    })
+}
+
+function isToday(value){
+    if(!value){
+        return false
+    }
+
+    const parsed = new Date(value)
+
+    if(Number.isNaN(parsed.getTime())){
+        return false
+    }
+
+    const today = new Date()
+    return parsed.getFullYear() === today.getFullYear()
+        && parsed.getMonth() === today.getMonth()
+        && parsed.getDate() === today.getDate()
+}
+
+function sessionNumberLabel(session){
+    const client = session.user_id || session.client_id || "-"
+    const number = session.client_session_number || session.session_number
+    return number ? `Client ${client} / Session ${number}` : `Client ${client}`
+}
+
+function getFeatures(session){
+    return session.ai?.features || session.ai?.result?.features || {}
+}
+
+function getTimelineCount(session){
+    const timeline = session.ai?.result?.timeline || session.ai?.timeline || []
+    return Array.isArray(timeline) ? timeline.length : 0
+}
+
+function hasAi(session){
+    return Boolean(session.ai && session.ai.status !== "missing" && !session.ai.error)
+}
+
+function hasExportedReport(session){
+    return Boolean(session.report_exported)
+}
+
+function getScore(session){
+    return numericValue(session.ai?.overall_score ?? session.ai?.result?.overall_score ?? session.ai?.result?.score)
+}
+
+function getQuality(session){
+    return numericValue(session.ai?.data_quality_score ?? session.ai?.result?.data_quality_score)
+}
+
+function getQualityWarnings(session){
+    const result = session.ai?.result || {}
+    const features = getFeatures(session)
+    const warnings = result.quality_warnings || features.quality_warnings || []
+    return Array.isArray(warnings) ? warnings : []
+}
+
+function needsReview(session){
+    const result = session.ai?.result || {}
+    return Boolean(
+        session.ai?.anomaly_detected ||
+        result.anomaly_detected ||
+        result.session_flagged ||
+        getQualityWarnings(session).length ||
+        (getQuality(session) !== null && getQuality(session) < 70)
+    )
+}
+
+function hasMissingTelemetry(session){
+    const features = getFeatures(session)
+    const total = numericValue(features.samples_total)
+    const synchronized = numericValue(features.samples_synchronized)
+    const timelineCount = getTimelineCount(session)
+
+    if(!hasAi(session)){
+        return false
+    }
+
+    return total === 0 || synchronized === 0 || timelineCount === 0
+}
+
+function reviewLabel(session){
+    if(!hasAi(session)){
+        return "Needs AI"
+    }
+
+    if(needsReview(session)){
+        return "Review data quality"
+    }
+
+    return "OK"
+}
+
+async function loadLatestAnalysis(session){
+    try{
+        const res = await fetch(`/api/analysis/${encodeURIComponent(session.session_id)}/latest?timeline_sample=1`, {
+            credentials: "same-origin"
+        })
+        const data = await parseJsonResponse(res, "LATEST ANALYSIS")
+
+        if(!res.ok || data.error){
+            return {
+                ...session,
+                ai: {
+                    status: "missing",
+                    error: data.error || "No stored AI result"
+                }
+            }
+        }
+
+        return {
+            ...session,
+            ai: data
+        }
+    }catch(err){
+        return {
+            ...session,
+            ai: {
+                status: "error",
+                error: String(err)
+            }
+        }
+    }
+}
+
+async function loadOperatorDashboard(){
+    setOperatorStatus("Loading operator worklist...", "info")
+
+    try{
+        const res = await fetch("/api/sessions", {
+            credentials: "same-origin"
+        })
+        const data = await parseJsonResponse(res, "SESSIONS")
+        const sessions = Array.isArray(data)
+            ? data
+            : Array.isArray(data.sessions)
+                ? data.sessions
+                : []
+
+        operatorSessions = await Promise.all(sessions.map(loadLatestAnalysis))
+        renderOperatorDashboard()
+        setOperatorStatus("", "info")
+    }catch(err){
+        setOperatorStatus(`Could not load operator dashboard: ${err}`, "error")
+    }
+}
+
+function filteredOperatorSessions(){
+    const filter = document.getElementById("operatorFilter")?.value || "all"
+    let rows = operatorSessions.slice()
+
+    if(filter === "today"){
+        rows = rows.filter(session => isToday(session.created_at))
+    }
+
+    if(filter === "missing_ai"){
+        rows = rows.filter(session => !hasAi(session))
+    }
+
+    if(filter === "review"){
+        rows = rows.filter(needsReview)
+    }
+
+    if(filter === "low_quality"){
+        rows = rows.filter(session => {
+            const quality = getQuality(session)
+            return quality !== null && quality < 70
+        })
+    }
+
+    if(filter === "missing_telemetry"){
+        rows = rows.filter(hasMissingTelemetry)
+    }
+
+    if(filter === "without_report"){
+        rows = rows.filter(session => hasAi(session) && !hasExportedReport(session))
+    }
+
+    if(filter === "report_exported"){
+        rows = rows.filter(hasExportedReport)
+    }
+
+    return rows
+}
+
+function renderOperatorDashboard(){
+    renderOperatorKpis()
+    renderOperatorRows()
+    renderOperatorQueues()
+}
+
+function renderOperatorKpis(){
+    document.getElementById("kpiToday").innerText =
+        operatorSessions.filter(session => isToday(session.created_at)).length
+    document.getElementById("kpiMissingAi").innerText =
+        operatorSessions.filter(session => !hasAi(session)).length
+    document.getElementById("kpiReview").innerText =
+        operatorSessions.filter(needsReview).length
+    document.getElementById("kpiReportReady").innerText =
+        operatorSessions.filter(session => hasAi(session) && !hasExportedReport(session)).length
+}
+
+function renderOperatorRows(){
+    const tbody = document.getElementById("operatorRows")
+    const rows = filteredOperatorSessions()
+
+    if(!tbody){
+        return
+    }
+
+    if(rows.length === 0){
+        tbody.innerHTML = `<tr><td colspan="8">No sessions match this filter.</td></tr>`
+        return
+    }
+
+    tbody.innerHTML = rows.map(session => {
+        const features = getFeatures(session)
+        const sessionId = session.session_id || "-"
+        const clientId = session.user_id || session.client_id || "-"
+        const warnings = getQualityWarnings(session).length
+        const telemetryLabel = hasAi(session)
+            ? `${formatMetric(features.match_rate, "%")} sync`
+            : "-"
+        const review = reviewLabel(session)
+        const reportLabel = hasExportedReport(session)
+            ? `Report exported${session.report_exported_at ? ` ${formatDate(session.report_exported_at)}` : ""}`
+            : hasAi(session)
+                ? "Report pending"
+                : "Run AI first"
+
+        return `
+            <tr>
+                <td>${escapeHtml(formatDate(session.created_at))}</td>
+                <td>
+                    <strong>${escapeHtml(sessionNumberLabel(session))}</strong>
+                    <code>${escapeHtml(sessionId)}</code>
+                </td>
+                <td>${hasAi(session) ? "Loaded" : "Missing"}</td>
+                <td>${hasAi(session) ? escapeHtml(formatMetric(getScore(session), "/100", 0)) : "-"}</td>
+                <td>${hasAi(session) ? escapeHtml(formatMetric(getQuality(session), "/100", 0)) : "-"}</td>
+                <td>${escapeHtml(telemetryLabel)}</td>
+                <td>
+                    <span class="operator-pill ${needsReview(session) ? "warn" : hasAi(session) ? "ok" : "neutral"}">
+                        ${escapeHtml(review)}
+                    </span>
+                    ${warnings ? `<small>${warnings} warning(s)</small>` : ""}
+                    <small>${escapeHtml(reportLabel)}</small>
+                </td>
+                <td>
+                    <div class="operator-row-actions">
+                        <a href="/research?session=${encodeURIComponent(sessionId)}">Open</a>
+                        <button type="button" onclick="analyzeOperatorSession('${encodeURIComponent(sessionId)}')">Analyze</button>
+                        ${hasAi(session) ? `<a href="/report/${encodeURIComponent(sessionId)}">Report</a>` : ""}
+                        <a href="/report/series/${encodeURIComponent(clientId)}?limit=10">Series</a>
+                        ${CURRENT_ROLE === "admin" ? `<button type="button" class="operator-danger" onclick="deleteOperatorSession('${encodeURIComponent(sessionId)}')">Delete</button>` : ""}
+                    </div>
+                </td>
+            </tr>
+        `
+    }).join("")
+}
+
+function renderOperatorQueues(){
+    const qualityRows = operatorSessions
+        .filter(needsReview)
+        .slice(0, 6)
+    const reportRows = operatorSessions
+        .filter(session => hasAi(session) && !hasExportedReport(session))
+        .slice(0, 6)
+
+    document.getElementById("qualityQueue").innerHTML = renderQueueCards(
+        qualityRows,
+        "No quality review items."
+    )
+    document.getElementById("reportQueue").innerHTML = renderQueueCards(
+        reportRows,
+        "No pending report exports."
+    )
+}
+
+function renderQueueCards(rows, emptyText){
+    if(rows.length === 0){
+        return `<div class="operator-empty">${escapeHtml(emptyText)}</div>`
+    }
+
+    return rows.map(session => `
+        <div class="operator-mini-card">
+            <span>${escapeHtml(formatDate(session.created_at))}</span>
+            <strong>${escapeHtml(sessionNumberLabel(session))}</strong>
+            <small>${escapeHtml(reviewLabel(session))}</small>
+        </div>
+    `).join("")
+}
+
+async function analyzeOperatorSession(encodedSessionId){
+    const sessionId = decodeURIComponent(encodedSessionId)
+    setOperatorStatus(`Running AI analysis for ${sessionId}...`, "info")
+
+    try{
+        const res = await fetch("/api/run_analysis", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                session_id: sessionId
+            })
+        })
+        const data = await parseJsonResponse(res, "RUN ANALYSIS")
+
+        if(!res.ok || data.error){
+            setOperatorStatus(data.error || "AI analysis failed.", "error")
+            return
+        }
+
+        await loadOperatorDashboard()
+        setOperatorStatus(`AI analysis completed for ${sessionId}.`, "success")
+    }catch(err){
+        setOperatorStatus(`AI analysis crashed: ${err}`, "error")
+    }
+}
+
+async function deleteOperatorSession(encodedSessionId){
+    const sessionId = decodeURIComponent(encodedSessionId)
+
+    if(!confirm(`Delete session ${sessionId}?`)){
+        return
+    }
+
+    setOperatorStatus(`Deleting ${sessionId}...`, "info")
+
+    try{
+        const res = await fetch("/api/delete_sessions", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                sessions: [sessionId]
+            })
+        })
+        const data = await parseJsonResponse(res, "DELETE SESSION")
+
+        if(!res.ok || data.error){
+            setOperatorStatus(data.error || "Delete failed.", "error")
+            return
+        }
+
+        await loadOperatorDashboard()
+        setOperatorStatus(`Deleted ${sessionId}.`, "success")
+    }catch(err){
+        setOperatorStatus(`Delete crashed: ${err}`, "error")
+    }
+}
+</script>
+
+{% endblock %}

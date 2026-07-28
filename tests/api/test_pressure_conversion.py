@@ -11,6 +11,13 @@ class PressureConversionTests(unittest.TestCase):
             places=6,
         )
 
+    def test_real_chamber_gauge_reading_to_ata(self):
+        self.assertAlmostEqual(
+            calculate_pressure_ata(53, "kpa_gauge"),
+            1.523,
+            places=3,
+        )
+
     def test_absolute_kpa_to_ata(self):
         self.assertAlmostEqual(
             calculate_pressure_ata(151.9875, "kpa_absolute"),

@@ -77,11 +77,16 @@ from services.data_merge import (
 from services.session_service import (
     complete_session,
     delete_research_sessions,
-    generate_session_report,
     get_research_session,
     list_research_sessions,
     save_session_phase,
 )
+from services.report_generator import (
+    generate_report_for_session,
+    generate_series_report_for_client,
+)
+from services.series_service import get_user_series_trends
+from services.traceability_service import get_session_traceability
 
 
 #------------------------------
@@ -190,6 +195,74 @@ def write_audit_event(
     finally:
         cursor.close()
         connection.close()
+
+
+def ensure_extended_wellness_programs(cursor) -> None:
+    """Ensure default long-range wellness programs exist for this tenant."""
+
+    cursor.execute(
+        """
+        WITH default_protocol AS (
+            SELECT
+                p.protocol_id,
+                p.organization_id
+            FROM protocols p
+            WHERE p.organization_id = %s
+              AND p.code = 'WELLNESS_1_5'
+              AND p.is_active = TRUE
+            ORDER BY p.protocol_id
+            LIMIT 1
+        ),
+        program_rows AS (
+            SELECT
+                'RECOVERY_50' AS code,
+                'Recovery 50' AS name,
+                50 AS total_sessions,
+                3 AS frequency_per_week,
+                'Fifty-session wellness response tracking program.' AS description
+            UNION ALL
+            SELECT
+                'RECOVERY_100',
+                'Recovery 100',
+                100,
+                3,
+                'One-hundred-session longitudinal wellness tracking program.'
+        )
+        INSERT INTO wellness_programs (
+            organization_id,
+            location_id,
+            protocol_id,
+            code,
+            name,
+            total_sessions,
+            frequency_per_week,
+            description
+        )
+        SELECT
+            dp.organization_id,
+            %s,
+            dp.protocol_id,
+            pr.code,
+            pr.name,
+            pr.total_sessions,
+            pr.frequency_per_week,
+            pr.description
+        FROM default_protocol dp
+        CROSS JOIN program_rows pr
+        ON CONFLICT (organization_id, code)
+        DO UPDATE SET
+            name = EXCLUDED.name,
+            total_sessions = EXCLUDED.total_sessions,
+            frequency_per_week = EXCLUDED.frequency_per_week,
+            description = EXCLUDED.description,
+            is_active = TRUE,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            current_user.organization_id,
+            current_user.location_id,
+        ),
+    )
 
 
 def record_session_consent_and_audit(
@@ -303,6 +376,19 @@ def research_platform():
 def research_dashboard():
     return render_template(
         "research_dashboard.html"
+    )
+
+
+@research_bp.route("/operator-dashboard")
+@login_required
+@role_required(
+    "operator",
+    "researcher",
+    "admin",
+)
+def operator_dashboard():
+    return render_template(
+        "operator_dashboard.html"
     )
 
 
@@ -612,6 +698,9 @@ def wellness_programs():
     connection = db()
     cursor = connection.cursor()
     try:
+        ensure_extended_wellness_programs(cursor)
+        connection.commit()
+
         cursor.execute(
             """
             SELECT
@@ -629,7 +718,7 @@ def wellness_programs():
             JOIN protocols p ON p.protocol_id = wp.protocol_id
             WHERE wp.organization_id = %s
               AND wp.is_active = TRUE
-            ORDER BY wp.name
+            ORDER BY wp.total_sessions, wp.name
             """,
             (current_user.organization_id,),
         )
@@ -772,6 +861,7 @@ def client_programs():
                 ON fs.program_enrollment_id = cp.enrollment_id
             WHERE cp.client_id = %s
               AND u.organization_id = %s
+              AND cp.status IN ('active', 'paused')
             GROUP BY
                 cp.enrollment_id,
                 cp.status,
@@ -783,7 +873,7 @@ def client_programs():
                 wp.total_sessions,
                 wp.frequency_per_week,
                 wp.protocol_id
-            ORDER BY cp.created_at DESC
+            ORDER BY wp.total_sessions, wp.name, cp.created_at DESC
             """,
             (
                 client_id,
@@ -812,6 +902,105 @@ def client_programs():
     except Exception as exc:
         connection.rollback()
         return error_response(str(exc), 400)
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@csrf.exempt
+@research_bp.route("/api/client-programs/<int:enrollment_id>", methods=["PATCH"])
+@login_required
+@role_required("admin", "researcher", "operator")
+@limiter.limit("30 per minute")
+def update_client_program_status(enrollment_id: int):
+    """Pause, resume or cancel one client program enrollment."""
+
+    data = request.get_json(silent=True) or {}
+    status = clean_value(data.get("status")).lower()
+
+    if status not in {"active", "paused", "cancelled"}:
+        return error_response("invalid program status", 400)
+
+    connection = db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                cp.client_id,
+                cp.status,
+                wp.program_id,
+                wp.name
+            FROM client_programs cp
+            JOIN wellness_programs wp
+                ON wp.program_id = cp.program_id
+            JOIN users u
+                ON u.user_id = cp.client_id
+            WHERE cp.enrollment_id = %s
+              AND u.organization_id = %s
+            LIMIT 1
+            """,
+            (
+                enrollment_id,
+                current_user.organization_id,
+            ),
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            return error_response("program enrollment not found", 404)
+
+        client_id = row[0]
+        previous_status = row[1]
+
+        cursor.execute(
+            """
+            UPDATE client_programs
+            SET
+                status = %s,
+                completed_at = CASE
+                    WHEN %s = 'cancelled' THEN CURRENT_DATE
+                    ELSE NULL
+                END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE enrollment_id = %s
+            """,
+            (
+                status,
+                status,
+                enrollment_id,
+            ),
+        )
+        record_audit_event(
+            cursor,
+            actor_user_id=current_user_id(),
+            actor_role=current_user.role,
+            action="program.status_update",
+            entity_type="client_program",
+            entity_id=str(enrollment_id),
+            client_id=client_id,
+            details={
+                "previous_status": previous_status,
+                "new_status": status,
+                "program_id": row[2],
+                "program_name": row[3],
+            },
+            **audit_request_metadata(),
+        )
+        connection.commit()
+
+        return jsonify({
+            "status": status,
+            "enrollment_id": enrollment_id,
+            "client_id": client_id,
+        })
+
+    except Exception as exc:
+        connection.rollback()
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
     finally:
         cursor.close()
         connection.close()
@@ -1898,6 +2087,43 @@ def get_session(session_id: str):
     return jsonify(result)
 
 
+@research_bp.route(
+    "/api/session_traceability/<session_id>",
+)
+@login_required
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
+@limiter.limit(PERF_LIMIT)
+def session_traceability(session_id: str):
+    """Return an operational trace for one session without physiology payloads."""
+
+    normalized_session_id = clean_value(session_id)
+
+    if not normalized_session_id:
+        return error_response("missing session_id", 400)
+
+    session = get_research_session(
+        session_id=normalized_session_id,
+        requesting_user_id=get_current_user_id(),
+        requesting_role=current_user.role,
+        requesting_organization_id=current_user.organization_id,
+    )
+
+    if not session:
+        return error_response("session not found", 404)
+
+    try:
+        return jsonify(get_session_traceability(session=session))
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+
 @csrf.exempt
 @research_bp.route(
     "/api/delete_sessions",
@@ -2100,9 +2326,6 @@ def user_trends(user_id: str):
             400,
         )
 
-    connection = db()
-    cursor = connection.cursor()
-
     try:
         if not can_access_client_record(
             requesting_role=current_user.role,
@@ -2118,191 +2341,20 @@ def user_trends(user_id: str):
         protocol_id = parse_optional_int(
             request.args.get("protocol_id")
         )
-        if protocol_id is None:
-            cursor.execute(
-                """
-                SELECT protocol_id
-                FROM full_sessions
-                WHERE user_id = %s
-                  AND completed = 1
-                  AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
-                ORDER BY created_at DESC, id DESC
-                LIMIT 1
-                """,
-                (subject_id,),
-            )
-            protocol_row = cursor.fetchone()
-            protocol_id = protocol_row[0] if protocol_row else None
-
-        cursor.execute(
-            """
-            SELECT
-                session_id,
-                overall_score,
-                data_quality_score,
-                anomaly_detected,
-                summary,
-                features_json,
-                result_json,
-                created_at
-            FROM (
-                SELECT DISTINCT ON (ar.session_id)
-                    ar.session_id,
-                    ar.overall_score,
-                    ar.data_quality_score,
-                    ar.anomaly_detected,
-                    ar.summary,
-                    ar.features_json,
-                    ar.result_json,
-                    ar.created_at,
-                    ar.ai_result_id
-                FROM ai_results ar
-                JOIN full_sessions fs
-                    ON fs.session_id = ar.session_id
-                WHERE fs.user_id = %s
-                  AND fs.protocol_id = %s
-                  AND ar.session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
-                ORDER BY
-                    ar.session_id,
-                    ar.created_at DESC,
-                    ar.ai_result_id DESC
-            ) latest_per_session
-            ORDER BY created_at ASC, ai_result_id ASC
-            """,
-            (subject_id, protocol_id),
+        trend_limit = parse_preview_limit(
+            request.args.get("limit"),
+            default=25,
+            maximum=100,
         )
-
-        analysis_rows = cursor.fetchall()
-
-        analyses = []
-        scores = []
-        hrv_values = []
-        spo2_values = []
-        pulse_values = []
-
-        for row in analysis_rows:
-            features = row[5] or {}
-            result_json = row[6] or {}
-            wellness_flags = result_json.get("wellness_flags") or {}
-
-            score = row[1]
-            avg_hrv = pick_feature(
-                features,
-                "avg_hrv",
-            )
-            avg_spo2 = pick_feature(
-                features,
-                "avg_spo2",
-                "avg_csv_spo2",
-            )
-            avg_pulse = pick_feature(
-                features,
-                "avg_pulse",
-                "avg_csv_pulse",
-            )
-
-            append_numeric(scores, score)
-            append_numeric(hrv_values, avg_hrv)
-            append_numeric(spo2_values, avg_spo2)
-            append_numeric(pulse_values, avg_pulse)
-
-            analyses.append({
-                "session_id": row[0],
-                "overall_score": score,
-                "data_quality_score": row[2],
-                "anomaly_detected": bool(row[3]),
-                "session_flagged": bool(
-                    result_json.get(
-                        "session_flagged",
-                        row[3],
-                    )
-                ),
-                "wellness_status": result_json.get("wellness_status"),
-                "elevated_load": bool(
-                    wellness_flags.get("elevated_load", False)
-                ),
-                "oxygenation_drop": bool(
-                    wellness_flags.get("oxygenation_drop", False)
-                ),
-                "sensor_alignment_warning": bool(
-                    wellness_flags.get("sensor_alignment_warning", False)
-                ),
-                "summary": row[4],
-                "avg_spo2": avg_spo2,
-                "avg_pulse": avg_pulse,
-                "avg_hrv": avg_hrv,
-                "created_at": (
-                    row[7].isoformat()
-                    if row[7]
-                    else None
-                ),
-            })
-
-        cursor.execute(
-            """
-            SELECT COUNT(DISTINCT session_id)
-            FROM full_sessions
-            WHERE user_id = %s
-              AND protocol_id = %s
-              AND session_id NOT LIKE 'PIPELINE_VALIDATION_%%'
-            """,
-            (subject_id, protocol_id),
-        )
-
-        session_count = cursor.fetchone()[0]
-        cursor.execute(
-            """
-            SELECT code, name, target_ata
-            FROM protocols
-            WHERE protocol_id = %s
-            """,
-            (protocol_id,),
-        )
-        selected_protocol_row = cursor.fetchone()
-        selected_protocol = (
-            {
-                "protocol_id": protocol_id,
-                "code": selected_protocol_row[0],
-                "name": selected_protocol_row[1],
-                "target_ata": selected_protocol_row[2],
-            }
-            if selected_protocol_row
-            else None
-        )
-
-        return jsonify({
-            "status": "ok",
-            "user_id": subject_id,
-            "protocol": selected_protocol,
-            "records": len(analyses),
-            "session_count": session_count,
-            "avg_score": average_or_none(scores),
-            "latest_score": scores[-1] if scores else None,
-            "avg_spo2": average_or_none(spo2_values),
-            "avg_pulse": average_or_none(pulse_values),
-            "avg_hrv": average_or_none(hrv_values),
-            "anomaly_count": sum(
-                1
-                for row in analyses
-                if row["anomaly_detected"]
-            ),
-            "flagged_session_count": sum(
-                1
-                for row in analyses
-                if row["session_flagged"]
-            ),
-            "trend_direction": calculate_trend_direction(scores),
-            "analyses": analyses,
-            "timeline": analyses,
-        })
+        return jsonify(get_user_series_trends(
+            user_id=subject_id,
+            protocol_id=protocol_id,
+            trend_limit=trend_limit,
+        ))
 
     except Exception as exc:
         traceback.print_exc()
         return error_response(str(exc), 500)
-
-    finally:
-        cursor.close()
-        connection.close()
 
 
 @research_bp.route(
@@ -2395,6 +2447,63 @@ def analysis_history(session_id: str):
 # =========================================================
 
 @research_bp.route(
+    "/report/series/<user_id>",
+)
+@login_required
+@role_required(
+    "viewer",
+    "operator",
+    "researcher",
+    "admin",
+)
+@limiter.limit("20 per hour")
+def series_report(user_id: str):
+    """Generate and download a PDF report for a client's session series."""
+
+    subject_id = clean_value(user_id)
+
+    if not subject_id:
+        return error_response("missing user_id", 400)
+
+    try:
+        trend_limit = parse_preview_limit(
+            request.args.get("limit"),
+            default=25,
+            maximum=100,
+        )
+        export = generate_series_report_for_client(
+            user_id=subject_id,
+            requesting_user_id=get_current_user_id(),
+            requesting_role=current_user.role,
+            requesting_organization_id=current_user.organization_id,
+            protocol_id=parse_optional_int(request.args.get("protocol_id")),
+            trend_limit=trend_limit,
+        )
+
+        write_audit_event(
+            action=export.audit_action,
+            entity_type=export.audit_entity_type,
+            entity_id=export.audit_entity_id,
+            client_id=export.audit_client_id,
+            session_id=export.audit_session_id,
+            details=export.audit_details,
+        )
+
+        return send_file(
+            export.path,
+            as_attachment=True,
+            download_name=export.download_name,
+        )
+
+    except PermissionError as exc:
+        return error_response(str(exc), 403)
+
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+
+@research_bp.route(
     "/report/<session_id>",
 )
 @login_required
@@ -2409,19 +2518,26 @@ def report(session_id: str):
     """Generate and download a PDF report for a session."""
 
     try:
-        path = generate_session_report(
+        export = generate_report_for_session(
             session_id=session_id,
             requesting_user_id=get_current_user_id(),
             requesting_role=current_user.role,
             requesting_organization_id=current_user.organization_id,
         )
 
+        write_audit_event(
+            action=export.audit_action,
+            entity_type=export.audit_entity_type,
+            entity_id=export.audit_entity_id,
+            client_id=export.audit_client_id,
+            session_id=export.audit_session_id,
+            details=export.audit_details,
+        )
+
         return send_file(
-            path,
+            export.path,
             as_attachment=True,
-            download_name=(
-                f"corelabtech_{session_id}_report.pdf"
-            ),
+            download_name=export.download_name,
         )
 
     except FileNotFoundError as exc:
@@ -2768,45 +2884,6 @@ def get_current_user_id() -> str | None:
     )
 
 
-def pick_feature(
-    features: dict,
-    *keys: str,
-):
-    """Return the first non-empty feature value from possible key names."""
-
-    for key in keys:
-        value = features.get(key)
-
-        if value is not None:
-            return value
-
-    return None
-
-
-def append_numeric(
-    values: list[float],
-    value,
-) -> None:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return
-
-    values.append(numeric)
-
-
-def average_or_none(
-    values: list[float],
-) -> float | None:
-    if not values:
-        return None
-
-    return round(
-        sum(values) / len(values),
-        2,
-    )
-
-
 def risk_level_from_score(score) -> str:
     try:
         numeric_score = float(score)
@@ -2820,23 +2897,6 @@ def risk_level_from_score(score) -> str:
         return "Moderate"
 
     return "High"
-
-
-def calculate_trend_direction(
-    scores: list[float],
-) -> str:
-    if len(scores) < 2:
-        return "insufficient_data"
-
-    delta = scores[-1] - scores[0]
-
-    if delta >= 5:
-        return "improving"
-
-    if delta <= -5:
-        return "declining"
-
-    return "stable"
 
 
 def create_temp_path(

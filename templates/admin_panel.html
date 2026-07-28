@@ -4,7 +4,7 @@
 
 <link
     rel="stylesheet"
-    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}?v=admin-polish-20260721"
+    href="{{ url_for('static', filename='css/ai_qa_lab.css') }}?v=admin-ops-20260728"
 >
 
 <div class="admin-page">
@@ -49,11 +49,14 @@
                 <option value="high">Elevated load</option>
                 <option value="anomaly">Review recommended</option>
                 <option value="missing">Without AI result</option>
+                <option value="low_quality">Low data quality</option>
+                <option value="missing_data">Missing telemetry</option>
             </select>
         </div>
 
         <div class="admin-actions">
             <button onclick="loadAdminData()">Refresh</button>
+            <button class="admin-danger-button" onclick="deleteSelectedAdminSessions()">Delete Selected</button>
             <button class="ai-qa-secondary" onclick="loadDebugDB()">DB Status</button>
         </div>
     </section>
@@ -72,16 +75,19 @@
             <table id="sessionsTable" class="admin-table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Session</th>
-                        <th>Client</th>
-                        <th>Response</th>
-                        <th>Status</th>
-                        <th>Review</th>
-                        <th>Avg SpO2</th>
-                        <th>Avg Pulse</th>
-                        <th>Timeline</th>
-                        <th>Action</th>
+                        <th class="admin-col-select">
+                            <input type="checkbox" id="adminSelectAll" onclick="toggleAdminSessionSelection(this)">
+                        </th>
+                        <th class="admin-col-date">Date</th>
+                        <th class="admin-col-session">Session</th>
+                        <th class="admin-col-client">Client</th>
+                        <th class="admin-col-score">Response</th>
+                        <th class="admin-col-status">Status</th>
+                        <th class="admin-col-review">Review</th>
+                        <th class="admin-col-metric">Avg SpO2</th>
+                        <th class="admin-col-metric">Avg Pulse</th>
+                        <th class="admin-col-timeline">Timeline</th>
+                        <th class="admin-col-action">Action</th>
                     </tr>
                 </thead>
 
@@ -143,6 +149,15 @@ let analyzedSessions = []
 
 function pretty(data){
     return JSON.stringify(data, null, 2)
+}
+
+function escapeHtml(value){
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;")
 }
 
 function compactTimeline(timeline){
@@ -245,6 +260,41 @@ function formatMetric(value, unit){
     }
 
     return unit ? `${value} ${unit}` : value
+}
+
+function numericValue(value){
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatAdminDate(value){
+    if(!value){
+        return "-"
+    }
+
+    const parsed = new Date(value)
+
+    if(Number.isNaN(parsed.getTime())){
+        return String(value).replace("T", " ").slice(0, 16)
+    }
+
+    return parsed.toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit"
+    })
+}
+
+function adminSessionLabel(row){
+    const client = row.user_id || "-"
+    const number = row.client_session_number || row.session_number || null
+
+    if(number){
+        return `Client ${client} / Session ${number}`
+    }
+
+    return `Client ${client} / Session`
 }
 
 function setAdminStatus(message, type){
@@ -379,7 +429,66 @@ function filteredRows(){
         rows = rows.filter(s => s.score === null || s.score === undefined)
     }
 
+    if(filter === "low_quality"){
+        rows = rows.filter(s => {
+            const quality = numericValue(s.ai?.data_quality_score)
+            return quality !== null && quality < 70
+        })
+    }
+
+    if(filter === "missing_data"){
+        rows = rows.filter(s => {
+            const fitSamples = numericValue(s.fit_samples)
+            const csvSamples = numericValue(s.csv_samples)
+            const mergedSamples = numericValue(s.merged_samples)
+            const timelineSamples = Array.isArray(s.timeline) ? s.timeline.length : 0
+
+            return (
+                fitSamples === 0 ||
+                csvSamples === 0 ||
+                mergedSamples === 0 ||
+                timelineSamples === 0
+            )
+        })
+    }
+
     return rows
+}
+
+function selectedAdminSessionIds(){
+    return Array
+        .from(document.querySelectorAll(".admin-session-checkbox:checked"))
+        .map(cb => cb.value)
+        .filter(Boolean)
+}
+
+function toggleAdminSessionSelection(master){
+    document
+        .querySelectorAll(".admin-session-checkbox")
+        .forEach(cb => {
+            cb.checked = Boolean(master.checked)
+        })
+
+    updateAdminSelectionState()
+}
+
+function updateAdminSelectionState(){
+    const master = document.getElementById("adminSelectAll")
+    const boxes = Array.from(document.querySelectorAll(".admin-session-checkbox"))
+
+    if(!master){
+        return
+    }
+
+    if(boxes.length === 0){
+        master.checked = false
+        master.indeterminate = false
+        return
+    }
+
+    const selected = boxes.filter(cb => cb.checked).length
+    master.checked = selected === boxes.length
+    master.indeterminate = selected > 0 && selected < boxes.length
 }
 
 function renderSessions(){
@@ -391,7 +500,7 @@ function renderSessions(){
     if(rows.length === 0){
         tbody.innerHTML = `
             <tr>
-                <td colspan="10">No sessions found.</td>
+                <td colspan="11">No sessions found.</td>
             </tr>
         `
         return
@@ -403,27 +512,44 @@ function renderSessions(){
             Array.isArray(row.timeline)
                 ? row.timeline.length
                 : 0
+        const sessionId = row.session_id || "-"
+        const createdAt = row.created_at || row.date || null
+        const encodedSessionId = encodeURIComponent(sessionId)
 
         tbody.innerHTML += `
             <tr>
-                <td>${row.created_at || row.date || "-"}</td>
-                <td><code>${row.session_id || "-"}</code></td>
-                <td>${row.user_id || "-"}</td>
-                <td>${row.score ?? "-"}</td>
+                <td>
+                    <input
+                        type="checkbox"
+                        class="admin-session-checkbox"
+                        value="${escapeHtml(sessionId)}"
+                        onchange="updateAdminSelectionState()"
+                    >
+                </td>
+                <td class="admin-date-cell" title="${escapeHtml(createdAt || "-")}">${escapeHtml(formatAdminDate(createdAt))}</td>
+                <td title="${escapeHtml(sessionId)}">
+                    <strong class="admin-session-label">${escapeHtml(adminSessionLabel(row))}</strong>
+                    <code class="admin-session-code">${escapeHtml(sessionId)}</code>
+                </td>
+                <td>${escapeHtml(row.user_id || "-")}</td>
+                <td>${escapeHtml(row.score ?? "-")}</td>
                 <td><span class="admin-risk ${String(row.risk_level || "-").toLowerCase()}">${responseLabel(row.risk_level)}</span></td>
-                <td>${anomalyText(row.anomaly)}</td>
-                <td>${formatMetric(features.avg_spo2 ?? features.avg_csv_spo2, "%")}</td>
-                <td>${formatMetric(features.avg_pulse ?? features.avg_csv_pulse, "bpm")}</td>
-                <td>${timelineCount}</td>
+                <td>${escapeHtml(anomalyText(row.anomaly))}</td>
+                <td>${escapeHtml(formatMetric(features.avg_spo2 ?? features.avg_csv_spo2, "%"))}</td>
+                <td>${escapeHtml(formatMetric(features.avg_pulse ?? features.avg_csv_pulse, "bpm"))}</td>
+                <td>${escapeHtml(timelineCount)}</td>
                 <td>
                     <div class="admin-row-actions">
-                        <button onclick="showDetails('${row.session_id}')">Details</button>
-                        <button class="ai-qa-secondary" onclick="runAnalysisForSession('${row.session_id}')">Analyze</button>
+                        <button onclick="showDetails(decodeURIComponent('${encodedSessionId}'))">Details</button>
+                        <button class="ai-qa-secondary" onclick="runAnalysisForSession(decodeURIComponent('${encodedSessionId}'))">Analyze</button>
+                        <button class="admin-danger-button" onclick="deleteAdminSession(decodeURIComponent('${encodedSessionId}'))">Delete</button>
                     </div>
                 </td>
             </tr>
         `
     })
+
+    updateAdminSelectionState()
 }
 
 function renderTimeline(){
@@ -472,6 +598,69 @@ function showDetails(sessionId){
 
     document.getElementById("details").innerText =
         pretty(compactSessionPayload(session))
+}
+
+async function deleteAdminSession(sessionId){
+    await deleteAdminSessions([sessionId])
+}
+
+async function deleteSelectedAdminSessions(){
+    await deleteAdminSessions(selectedAdminSessionIds())
+}
+
+async function deleteAdminSessions(sessionIds){
+    const sessions = Array.isArray(sessionIds)
+        ? sessionIds.filter(Boolean)
+        : []
+
+    if(sessions.length === 0){
+        setAdminStatus("Select at least one session to delete.", "warn")
+        return
+    }
+
+    const label = sessions.length === 1
+        ? sessions[0]
+        : `${sessions.length} selected sessions`
+
+    if(!confirm(`Delete ${label}? This removes the saved session and related analysis data.`)){
+        return
+    }
+
+    setAdminStatus(`Deleting ${label}...`, "warn")
+
+    try{
+        const res = await fetch("/api/delete_sessions", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                sessions
+            })
+        })
+        const data = await res.json()
+
+        if(!res.ok || data.error){
+            setAdminStatus(data.error || "Delete sessions failed.", "fail")
+            return
+        }
+
+        analyzedSessions = analyzedSessions.filter(
+            session => !sessions.includes(session.session_id)
+        )
+        adminSessions = adminSessions.filter(
+            session => !sessions.includes(session.session_id)
+        )
+
+        renderSessions()
+        renderTimeline()
+        renderKpis()
+        document.getElementById("details").innerText = "No session selected."
+        setAdminStatus(`Deleted ${data.deleted ?? sessions.length} session(s).`, "pass")
+    }catch(err){
+        setAdminStatus(`Delete crashed: ${err}`, "fail")
+    }
 }
 
 async function runAnalysisForSession(sessionId){

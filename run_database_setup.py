@@ -29,6 +29,7 @@ MIGRATIONS = [
     ROOT / "migrations" / "015_create_data_governance.py",
     ROOT / "migrations" / "016_add_session_phase_timing.py",
     ROOT / "migrations" / "017_add_commercial_wellness_model.py",
+    ROOT / "migrations" / "018_add_extended_wellness_programs.py",
 ]
 
 

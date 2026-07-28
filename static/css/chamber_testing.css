@@ -217,6 +217,12 @@ HBOT CHAMBER TESTING
     gap:6px;
 }
 
+.field-hint{
+    color:#8fb3cc;
+    font-size:12px;
+    line-height:1.35;
+}
+
 .session-plan-preview{
     grid-column:1 / -1;
     padding:12px 14px;
@@ -232,6 +238,17 @@ HBOT CHAMBER TESTING
     grid-template-columns:minmax(220px, 0.45fr) auto minmax(220px, 1fr);
     align-items:center;
     gap:10px;
+}
+
+.program-management{
+    grid-column:1 / -1;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.program-management button{
+    width:auto;
 }
 
 .detailed-timeline-toggle{
