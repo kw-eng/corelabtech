@@ -2708,6 +2708,28 @@ AI TESTING LAB PUBLIC PAGE
     }
 }
 
+.nav-language{
+    align-items:center;
+    gap:4px;
+}
+
+.nav-language a{
+    border:1px solid #24445f;
+    border-radius:6px;
+    color:#dbeafe;
+    font-size:12px;
+    font-weight:800;
+    line-height:1;
+    padding:8px 9px;
+    text-decoration:none;
+}
+
+.nav-language a.active{
+    background:#00ffcc;
+    border-color:#00ffcc;
+    color:#001014;
+}
+
 .content-page{
     color:#cbd5e1;
     margin:0 auto;

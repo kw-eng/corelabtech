@@ -11,36 +11,35 @@
 
     <section class="mission-hero">
         <div>
-            <span class="mission-eyebrow">Wellness operations dashboard</span>
-            <h1>Mission Control</h1>
+            <span class="mission-eyebrow">{{ t('mission.eyebrow') }}</span>
+            <h1>{{ t('mission.title') }}</h1>
             <p>
-                Review completed wellness sessions, inspect synchronized telemetry,
-                run AI wellness analysis and generate session reports.
+                {{ t('mission.hero_text') }}
             </p>
 
             <div class="mission-toolbar">
-                <select id="sessionSelect" aria-label="Select session"></select>
-                <button type="button" onclick="loadDashboardSession()">Load Session</button>
-                <button type="button" onclick="runSelectedAI()">Run AI Analysis</button>
-                <button type="button" onclick="loadUserTrend()">Load Series</button>
-                <button type="button" onclick="generateSeriesReport()">Series Report</button>
+                <select id="sessionSelect" aria-label="{{ t('mission.select_session') }}"></select>
+                <button type="button" onclick="loadDashboardSession()">{{ t('mission.load_session') }}</button>
+                <button type="button" onclick="runSelectedAI()">{{ t('mission.run_ai_analysis') }}</button>
+                <button type="button" onclick="loadUserTrend()">{{ t('mission.load_series') }}</button>
+                <button type="button" onclick="generateSeriesReport()">{{ t('mission.series_report') }}</button>
                 {% if current_user.role in ["researcher", "admin"] %}
-                <button type="button" onclick="generateResearchReport()">Generate Report</button>
+                <button type="button" onclick="generateResearchReport()">{{ t('mission.generate_report') }}</button>
                 {% endif %}
             </div>
         </div>
 
         <div class="mission-live-card">
-            <span>Selected session</span>
-            <strong id="selectedSessionLabel">No session selected</strong>
+            <span>{{ t('mission.selected_session') }}</span>
+            <strong id="selectedSessionLabel">{{ t('mission.no_session_selected') }}</strong>
             <div class="mission-live-grid">
                 <div>
-                    <span>Analysis</span>
-                    <strong id="analysisStatus">Waiting</strong>
+                    <span>{{ t('mission.analysis') }}</span>
+                    <strong id="analysisStatus">{{ t('mission.waiting') }}</strong>
                 </div>
                 <div>
-                    <span>Timeline</span>
-                    <strong id="timelineStatus">No data</strong>
+                    <span>{{ t('mission.timeline') }}</span>
+                    <strong id="timelineStatus">{{ t('mission.no_data') }}</strong>
                 </div>
             </div>
         </div>
@@ -48,59 +47,59 @@
 
     <section class="mission-metric-grid">
         <article class="mission-metric-card">
-            <span>Wellness Score</span>
+            <span>{{ t('mission.wellness_score') }}</span>
             <strong id="aiScore">-</strong>
         </article>
         <article class="mission-metric-card">
-            <span>Status</span>
+            <span>{{ t('mission.status') }}</span>
             <strong id="riskLevel">-</strong>
         </article>
         <article class="mission-metric-card">
-            <span>Avg SpO2</span>
+            <span>{{ t('mission.avg_spo2') }}</span>
             <strong id="spo2Metric">-</strong>
         </article>
         <article class="mission-metric-card">
-            <span>Avg Pulse</span>
+            <span>{{ t('mission.avg_pulse') }}</span>
             <strong id="pulseMetric">-</strong>
         </article>
         <article class="mission-metric-card">
-            <span>Avg HRV</span>
+            <span>{{ t('mission.avg_hrv') }}</span>
             <strong id="hrvMetric">-</strong>
         </article>
     </section>
 
     <div id="alarm" class="mission-alert mission-alert-neutral">
-        Select a session to load its latest analysis.
+        {{ t('mission.select_session_latest') }}
     </div>
 
     <section class="mission-two-column">
         <article class="mission-card">
             <div class="mission-section-heading">
                 <div>
-                    <h2>Wellness Analysis</h2>
-                    <p>Wellness summary for the selected synchronized session.</p>
+                    <h2>{{ t('mission.wellness_analysis') }}</h2>
+                    <p>{{ t('mission.wellness_analysis_help') }}</p>
                 </div>
             </div>
             <div id="ai" class="mission-analysis">
-                Select a session and load the latest analysis, or run a new one.
+                {{ t('mission.ai_empty') }}
             </div>
         </article>
 
         <article class="mission-card">
             <div class="mission-section-heading">
                 <div>
-                    <h2>Session Series Analysis</h2>
-                    <p>Longitudinal context for the subject assigned to this session.</p>
+                    <h2>{{ t('mission.series_analysis') }}</h2>
+                    <p>{{ t('mission.series_help') }}</p>
                 </div>
-                <select id="trendLimitSelect" class="mission-compact-select" aria-label="Session series range" onchange="loadUserTrend()">
-                    <option value="10">Last 10</option>
-                    <option value="25" selected>Last 25</option>
-                    <option value="50">Last 50</option>
-                    <option value="100">Last 100</option>
+                <select id="trendLimitSelect" class="mission-compact-select" aria-label="{{ t('mission.series_range') }}" onchange="loadUserTrend()">
+                    <option value="10">{{ t('mission.last_10') }}</option>
+                    <option value="25" selected>{{ t('mission.last_25') }}</option>
+                    <option value="50">{{ t('mission.last_50') }}</option>
+                    <option value="100">{{ t('mission.last_100') }}</option>
                 </select>
             </div>
             <div id="trendBox" class="mission-analysis">
-                Load a session to display its series analysis.
+                {{ t('mission.series_empty') }}
             </div>
         </article>
     </section>
@@ -108,35 +107,35 @@
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
-                <h2>Session Traceability</h2>
-                <p>Operational history from session creation through report export.</p>
+                <h2>{{ t('mission.traceability') }}</h2>
+                <p>{{ t('mission.traceability_help') }}</p>
             </div>
             <button
                 type="button"
                 class="mission-inline-button"
                 onclick="loadSessionTraceability()"
             >
-                Refresh Trace
+                {{ t('mission.refresh_trace') }}
             </button>
         </div>
         <div id="traceabilityBox" class="mission-traceability">
-            Select a session to display its operational trace.
+            {{ t('mission.trace_empty') }}
         </div>
     </section>
 
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
-                <h2>Telemetry Timeline</h2>
-                <p>SpO2, pulse, wearable heart rate and HRV after timeline synchronization.</p>
+                <h2>{{ t('mission.telemetry_timeline') }}</h2>
+                <p>{{ t('mission.telemetry_help') }}</p>
             </div>
-            <span id="chartSampleCount" class="mission-pill">0 samples</span>
+            <span id="chartSampleCount" class="mission-pill">{{ t('mission.samples_count', count=0) }}</span>
         </div>
 
         <div class="mission-chart-panel">
             <canvas id="missionChart"></canvas>
             <div id="missionChartEmpty" class="mission-chart-empty">
-                No telemetry timeline available.
+                {{ t('mission.no_telemetry_timeline') }}
             </div>
         </div>
     </section>
@@ -144,11 +143,11 @@
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
-                <h2>Output / Wellness Report</h2>
-                <p>Detailed JSON response or generated report text.</p>
+                <h2>{{ t('mission.output_report') }}</h2>
+                <p>{{ t('mission.output_help') }}</p>
             </div>
         </div>
-        <pre id="rawOutput" class="mission-raw">Select a session, then load analysis or generate a wellness report.</pre>
+        <pre id="rawOutput" class="mission-raw">{{ t('mission.raw_empty') }}</pre>
     </section>
 
 </div>
@@ -161,6 +160,13 @@ let missionChart = null
 let seriesTrendChart = null
 const MAX_CHART_POINTS = 700
 const RAW_TIMELINE_PREVIEW = 20
+
+function tr(key, params = null){
+    if(typeof window.t === "function"){
+        return window.t(key, params)
+    }
+    return key
+}
 
 window.addEventListener("load", async () => {
     await loadSessions()
@@ -280,7 +286,19 @@ function formatDelta(value, digits = 1){
 }
 
 function formatWarningLabel(value){
-    return String(value || "")
+    const warningKey = String(value || "")
+    const known = {
+        low_match_rate: "mission.warning_low_match_rate",
+        missing_hrv_or_rr: "mission.warning_missing_hrv",
+        missing_spo2: "mission.warning_missing_spo2",
+        sensor_alignment_warning: "mission.warning_sensor_alignment",
+        too_few_total_samples: "mission.warning_too_few_total",
+        too_few_synchronized_samples: "mission.warning_too_few_sync"
+    }
+    if(known[warningKey]){
+        return tr(known[warningKey])
+    }
+    return warningKey
         .replaceAll("_", " ")
         .replace(/\b\w/g, letter => letter.toUpperCase())
 }
@@ -315,15 +333,15 @@ function getReviewLabel(value){
     const normalized = String(value || "").toLowerCase()
 
     if(normalized === "low"){
-        return "Stable response"
+        return tr("mission.stable_response")
     }
 
     if(normalized === "moderate"){
-        return "Review context"
+        return tr("mission.review_context")
     }
 
     if(normalized === "high"){
-        return "Elevated review"
+        return tr("mission.elevated_review")
     }
 
     return value || "-"
@@ -373,16 +391,16 @@ async function loadSessions(){
         select.innerHTML = ""
 
         if(dashboardSessions.length === 0){
-            select.innerHTML = `<option value="">No saved sessions</option>`
-            setText("analysisStatus", "No sessions")
-            setText("selectedSessionLabel", "No saved sessions")
+            select.innerHTML = `<option value="">${escapeHtml(tr("mission.no_saved_sessions"))}</option>`
+            setText("analysisStatus", tr("mission.no_sessions"))
+            setText("selectedSessionLabel", tr("mission.no_saved_sessions"))
             return
         }
 
         const sessionsByClient = new Map()
 
         dashboardSessions.forEach(session => {
-            const clientId = String(session.client_id || session.user_id || "Unassigned")
+            const clientId = String(session.client_id || session.user_id || tr("mission.unassigned"))
             if(!sessionsByClient.has(clientId)){
                 sessionsByClient.set(clientId, [])
             }
@@ -391,7 +409,7 @@ async function loadSessions(){
 
         sessionsByClient.forEach((sessions, clientId) => {
             const group = document.createElement("optgroup")
-            group.label = `Client ${clientId}`
+            group.label = tr("mission.client_label", {client: clientId})
 
             sessions.forEach(s => {
             const option = document.createElement("option")
@@ -412,30 +430,33 @@ async function loadSessions(){
         updateSelectedSessionLabel()
     }catch(err){
         console.error("loadSessions error:", err)
-        setText("analysisStatus", "Load failed")
-        setText("rawOutput", "Cannot load sessions: " + err)
+        setText("analysisStatus", tr("mission.load_failed"))
+        setText("rawOutput", tr("mission.cannot_load_sessions", {error: err}))
     }
 }
 
 function updateSelectedSessionLabel(){
     const selected = getSelectedSession()
     const label = selected
-        ? `Client ${selected.client_id || selected.user_id || "-"} · Session ${selected.client_session_number || "-"}`
-        : "No session selected"
+        ? tr("mission.client_session_label", {
+            client: selected.client_id || selected.user_id || "-",
+            session: selected.client_session_number || "-"
+        })
+        : tr("mission.no_session_selected")
 
     setText("selectedSessionLabel", label)
 }
 
 function formatSessionOption(session){
     const number = session.client_session_number || "-"
-    const protocol = session.protocol_name || "Session"
+    const protocol = session.protocol_name || tr("mission.session")
     const date = formatSessionDate(session.created_at || session.date)
-    return `Session ${number} · ${date} · ${protocol}`
+    return tr("mission.session_option", {number, date, protocol})
 }
 
 function formatSessionDate(value){
     if(!value){
-        return "Date unavailable"
+        return tr("mission.date_unavailable")
     }
 
     const date = new Date(value)
@@ -456,13 +477,13 @@ async function loadDashboardSession(){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
-        alert("Select session")
+        alert(tr("mission.select_session_alert"))
         return
     }
 
     updateSelectedSessionLabel()
-    setText("analysisStatus", "Loading")
-    setText("timelineStatus", "Loading")
+    setText("analysisStatus", tr("mission.loading"))
+    setText("timelineStatus", tr("mission.loading"))
 
     try{
         const res = await fetch(`/api/analysis/${encodeURIComponent(sessionId)}/latest?timeline_sample=${MAX_CHART_POINTS}`, {
@@ -472,8 +493,8 @@ async function loadDashboardSession(){
         const data = await parseJsonResponse(res, "LATEST ANALYSIS")
 
         if(!res.ok || data.error){
-            resetDashboardState("No saved AI analysis for this session. Run AI Analysis to create one.")
-            setText("analysisStatus", "Not analyzed")
+            resetDashboardState(tr("mission.no_saved_ai_analysis"))
+            setText("analysisStatus", tr("mission.not_analyzed"))
             setText("rawOutput", prettyCompact(data))
             await loadSessionTraceability()
             await loadUserTrend({
@@ -499,7 +520,7 @@ async function loadDashboardSession(){
         })
     }catch(err){
         console.error("loadDashboardSession error:", err)
-        resetDashboardState("Latest analysis could not be loaded.")
+        resetDashboardState(tr("mission.latest_analysis_load_failed"))
         setText("rawOutput", String(err))
     }
 }
@@ -508,12 +529,12 @@ async function runSelectedAI(){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
-        alert("Select session")
+        alert(tr("mission.select_session_alert"))
         return
     }
 
     updateSelectedSessionLabel()
-    setText("analysisStatus", "Running")
+    setText("analysisStatus", tr("mission.running"))
 
     try{
         const res = await fetch("/api/run_analysis", {
@@ -532,10 +553,10 @@ async function runSelectedAI(){
         if(!res.ok || data.error){
             document.getElementById("ai").innerHTML = `
                 <div class="mission-warning">
-                    AI analysis failed: ${escapeHtml(data.error || res.status)}
+                    ${escapeHtml(tr("mission.ai_analysis_failed", {error: data.error || res.status}))}
                 </div>
             `
-            setText("analysisStatus", "Failed")
+            setText("analysisStatus", tr("mission.failed"))
             setText("rawOutput", prettyCompact(data))
             return
         }
@@ -550,10 +571,10 @@ async function runSelectedAI(){
         console.error("runSelectedAI error:", err)
         document.getElementById("ai").innerHTML = `
             <div class="mission-warning">
-                AI analysis crashed. Check browser console.
+                ${escapeHtml(tr("mission.ai_analysis_crashed"))}
             </div>
         `
-        setText("analysisStatus", "Crashed")
+        setText("analysisStatus", tr("mission.crashed"))
         setText("rawOutput", String(err))
     }
 }
@@ -567,11 +588,11 @@ async function loadSessionTraceability(){
     }
 
     if(!sessionId){
-        box.innerHTML = "Select a session to display its operational trace."
+        box.innerHTML = escapeHtml(tr("mission.trace_empty"))
         return
     }
 
-    box.innerHTML = `<div class="mission-muted">Loading session trace...</div>`
+    box.innerHTML = `<div class="mission-muted">${escapeHtml(tr("mission.trace_loading"))}</div>`
 
     try{
         const res = await fetch(`/api/session_traceability/${encodeURIComponent(sessionId)}`, {
@@ -582,7 +603,7 @@ async function loadSessionTraceability(){
         if(!res.ok || data.error){
             box.innerHTML = `
                 <div class="mission-warning">
-                    Traceability could not be loaded: ${escapeHtml(data.error || res.status)}
+                    ${escapeHtml(tr("mission.trace_load_failed", {error: data.error || res.status}))}
                 </div>
             `
             return
@@ -592,7 +613,7 @@ async function loadSessionTraceability(){
     }catch(err){
         box.innerHTML = `
             <div class="mission-warning">
-                Traceability request failed: ${escapeHtml(err.message || err)}
+                ${escapeHtml(tr("mission.trace_request_failed", {error: err.message || err}))}
             </div>
         `
     }
@@ -609,14 +630,14 @@ function renderSessionTraceability(data){
 
     const stepsHtml = steps.map(step => {
         const status = step.status || "pending"
-        const timestamp = step.timestamp ? formatSessionDate(step.timestamp) : "Not recorded"
+        const timestamp = step.timestamp ? formatSessionDate(step.timestamp) : tr("mission.not_recorded")
         const detail = step.detail || ""
 
         return `
             <div class="mission-trace-step ${escapeHtml(status)}">
                 <span class="mission-trace-dot"></span>
                 <div>
-                    <strong>${escapeHtml(step.label || step.key || "Trace step")}</strong>
+                    <strong>${escapeHtml(step.label || step.key || tr("mission.trace_step"))}</strong>
                     <p>${escapeHtml(detail)}</p>
                     <small>${escapeHtml(timestamp)}</small>
                 </div>
@@ -637,34 +658,34 @@ function renderSessionTraceability(data){
     box.innerHTML = `
         <div class="mission-trace-summary">
             <div>
-                <span>Client</span>
+                <span>${escapeHtml(tr("mission.client"))}</span>
                 <strong>${escapeHtml(data.client_id || "-")}</strong>
             </div>
             <div>
-                <span>Session</span>
+                <span>${escapeHtml(tr("mission.session"))}</span>
                 <strong>${escapeHtml(data.session_id || "-")}</strong>
             </div>
             <div>
-                <span>Report export</span>
-                <strong>${data.report_exported ? "Exported" : "Pending"}</strong>
+                <span>${escapeHtml(tr("mission.report_export"))}</span>
+                <strong>${escapeHtml(data.report_exported ? tr("mission.exported") : tr("mission.pending"))}</strong>
             </div>
         </div>
         <div class="mission-trace-list">
-            ${stepsHtml || `<div class="mission-muted">No trace steps available.</div>`}
+            ${stepsHtml || `<div class="mission-muted">${escapeHtml(tr("mission.no_trace_steps"))}</div>`}
         </div>
         <div class="mission-trace-events">
-            <h3>Latest audit events</h3>
+            <h3>${escapeHtml(tr("mission.latest_audit_events"))}</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Action</th>
-                        <th>Role</th>
-                        <th>Outcome</th>
+                        <th>${escapeHtml(tr("mission.date"))}</th>
+                        <th>${escapeHtml(tr("mission.action"))}</th>
+                        <th>${escapeHtml(tr("mission.role"))}</th>
+                        <th>${escapeHtml(tr("mission.outcome"))}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${eventsHtml || `<tr><td colspan="4">No audit events recorded for this session.</td></tr>`}
+                    ${eventsHtml || `<tr><td colspan="4">${escapeHtml(tr("mission.no_audit_events"))}</td></tr>`}
                 </tbody>
             </table>
         </div>
@@ -677,8 +698,8 @@ function resetDashboardState(message){
     setText("spo2Metric", "-")
     setText("pulseMetric", "-")
     setText("hrvMetric", "-")
-    setText("timelineStatus", "No data")
-    setText("chartSampleCount", "0 samples")
+    setText("timelineStatus", tr("mission.no_data"))
+    setText("chartSampleCount", tr("mission.samples_count", {count: 0}))
 
     const alarm = document.getElementById("alarm")
     alarm.className = "mission-alert mission-alert-neutral"
@@ -695,7 +716,7 @@ function renderAnalysis(data){
         data.timeline || [],
         data.timeline_total || data.timeline_count || null
     )
-    setText("analysisStatus", "Loaded")
+    setText("analysisStatus", tr("mission.loaded"))
 }
 
 function renderAIMetrics(data){
@@ -719,23 +740,138 @@ function renderAIMetrics(data){
 
     if(anomaly){
         alarm.className = "mission-alert mission-alert-warning"
-        alarm.innerText = "Data quality review recommended: HR/pulse alignment difference detected."
+        alarm.innerText = tr("mission.data_quality_review_recommended")
     }else{
         alarm.className = "mission-alert mission-alert-ok"
-        alarm.innerText = "No data quality review flag detected for this session."
+        alarm.innerText = tr("mission.no_quality_flag")
     }
 }
 
 function renderList(items, emptyText){
     if(!Array.isArray(items) || items.length === 0){
-        return `<p class="mission-muted">${escapeHtml(emptyText)}</p>`
+        return `<p class="mission-muted">${escapeHtml(tr(emptyText))}</p>`
     }
 
     return `
         <ul class="mission-list">
-            ${items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+            ${items.map(item => `<li>${escapeHtml(translateMissionFinding(item))}</li>`).join("")}
         </ul>
     `
+}
+
+function translateMissionFinding(value){
+    let text = String(value || "")
+    const known = {
+        "SpO2 remained stable and within the expected range": "mission.finding_spo2_stable",
+        "Notable discrepancy between wearable heart rate and pulse oximeter pulse": "mission.finding_hr_pulse_discrepancy",
+        "SpO2 dropped below the configured low oxygenation threshold": "mission.finding_spo2_low_threshold",
+        "SpO2 was below the preferred wellness range": "mission.finding_spo2_below_range",
+        "Average HRV was below the configured recovery threshold": "mission.finding_hrv_low",
+        "Heart rate exceeded the configured high-load threshold": "mission.finding_hr_high"
+    }
+    if(known[text]){
+        return tr(known[text])
+    }
+    const mismatch = text.match(/^A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse, which may indicate sensor alignment, time alignment issues, or signal artifact\. The maximum observed difference was ([0-9.]+) bpm\.$/)
+    if(mismatch){
+        return tr("mission.finding_hr_pulse_discrepancy_detail", {
+            difference: mismatch[1]
+        })
+    }
+    const combined = text.match(/^SpO2 remained stable and within the expected range\. A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse, which may indicate sensor alignment, time alignment issues, or signal artifact\. The maximum observed difference was ([0-9.]+) bpm\.$/)
+    if(combined){
+        return `${tr("mission.finding_spo2_stable")}. ${tr("mission.finding_hr_pulse_discrepancy_detail", {
+            difference: combined[1]
+        })}`
+    }
+    const noContext = "No elevated sleep, fatigue, stress or recent activity context was flagged in the available check-in data."
+    if(text === noContext){
+        return tr("mission.finding_no_context_flags")
+    }
+    text = text.replaceAll(
+        "SpO2 remained stable and within the expected range",
+        tr("mission.finding_spo2_stable")
+    )
+    text = text.replace(
+        /Pulse, wearable HR and HRV should be interpreted as wellness trend signals: (.*?)(?:\.(?= (?:Check-in|A notable))|\.$)/g,
+        (_, details) => tr("mission.finding_pulse_hrv_summary", {
+            details: translatePhysiologyDetails(details)
+        })
+    )
+    text = text.replaceAll(noContext, tr("mission.finding_no_context_flags"))
+    text = text.replace(
+        /Check-in context may influence today’s physiology interpretation: (.*?)(?:\.(?= (?:A notable))|\.$)/g,
+        (_, details) => tr("mission.finding_context_summary", {
+            details: translateContextDetails(details)
+        })
+    )
+    text = text.replace(
+        /A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse, which may indicate sensor alignment, time alignment issues, or signal artifact\. The maximum observed difference was ([0-9.]+) bpm\./g,
+        (_, difference) => tr("mission.finding_hr_pulse_discrepancy_detail", {
+            difference
+        })
+    )
+    text = text.replaceAll(
+        "The wellness response trend is improving across the selected series.",
+        tr("mission.series_trend_improving_sentence")
+    )
+    text = text.replaceAll(
+        "The wellness response trend is lower across the selected series. Operator review is recommended.",
+        tr("mission.series_trend_lower_sentence")
+    )
+    text = text.replaceAll(
+        "The wellness response trend is stable across the selected series.",
+        tr("mission.series_trend_stable_sentence")
+    )
+    text = text.replaceAll(
+        "More analyzed sessions are needed to establish a trend.",
+        tr("mission.series_trend_more_sessions_sentence")
+    )
+    text = text.replaceAll(
+        "Data quality is trending down, so interpretation should be more cautious.",
+        tr("mission.series_quality_declining_sentence")
+    )
+    text = text.replaceAll(
+        "Interpretation should remain tied to the available data quality.",
+        tr("mission.series_interpretation_quality_sentence")
+    )
+    text = text.replaceAll(
+        "Session Data Quality reflects synchronized sample coverage, sensor availability, HR/pulse alignment and SpO2 signal plausibility. It is a data-confidence indicator, not a health assessment.",
+        tr("mission.series_data_quality_explanation")
+    )
+    text = text.replaceAll(
+        "No analyzed session series is available yet. Run session analyses before interpreting longitudinal wellness trends.",
+        tr("mission.series_no_analyzed_interpretation")
+    )
+    text = text.replaceAll(
+        "This session series has limited data confidence. Review missing samples, synchronization quality and sensor warnings before using the trend for wellness coaching.",
+        tr("mission.series_limited_confidence_interpretation")
+    )
+    return text
+}
+
+function translatePhysiologyDetails(value){
+    return String(value || "")
+        .replace(
+            /Pulse averaged ([0-9.]+) bpm \(range ([0-9.]+)-([0-9.]+) bpm\)/g,
+            (_, avg, min, max) => tr("mission.phys_pulse_avg_range", {avg, min, max})
+        )
+        .replace(
+            /wearable HR averaged ([0-9.]+) bpm \(range ([0-9.]+)-([0-9.]+) bpm\)/g,
+            (_, avg, min, max) => tr("mission.phys_hr_avg_range", {avg, min, max})
+        )
+        .replace(
+            /average HRV was ([0-9.]+) ms/g,
+            (_, avg) => tr("mission.phys_avg_hrv", {avg})
+        )
+}
+
+function translateContextDetails(value){
+    return String(value || "")
+        .replaceAll("reduced sleep quality or short sleep", tr("mission.context_poor_sleep"))
+        .replaceAll("higher recent activity load", tr("mission.context_training_load"))
+        .replaceAll("reported stress or fatigue", tr("mission.context_stress_fatigue"))
+        .replaceAll("post-session recovery feedback improved", tr("mission.context_recovery_improved"))
 }
 
 function renderAIText(data){
@@ -748,41 +884,41 @@ function renderAIText(data){
     document.getElementById("ai").innerHTML = `
         <div class="mission-analysis-grid">
             <div>
-                <span>Session</span>
+                <span>${escapeHtml(tr("mission.session"))}</span>
                 <strong>${escapeHtml(data.session_id || getSelectedSessionId() || "-")}</strong>
             </div>
             <div>
-                <span>Score</span>
+                <span>${escapeHtml(tr("mission.score"))}</span>
                 <strong>${score !== null ? `${formatNumber(score, 0)}/100` : "-"}</strong>
             </div>
             <div>
-                <span>Review level</span>
+                <span>${escapeHtml(tr("mission.review_level"))}</span>
                 <strong>${escapeHtml(reviewLabel)}</strong>
             </div>
             <div>
-                <span>Data quality</span>
+                <span>${escapeHtml(tr("mission.data_quality"))}</span>
                 <strong>${formatMetric(pick(data, ["data_quality_score"]) ?? pick(features, ["match_rate"]), "%")}</strong>
             </div>
         </div>
 
         <div class="mission-analysis-block">
-            <h3>Wellness interpretation</h3>
-            <p>${escapeHtml(data.summary || "No analysis summary available.")}</p>
+            <h3>${escapeHtml(tr("mission.wellness_interpretation"))}</h3>
+            <p>${escapeHtml(translateMissionFinding(data.summary || tr("mission.no_analysis_summary")))}</p>
         </div>
 
         <div class="mission-analysis-columns">
             <div>
-                <h3>Operator review notes</h3>
-                ${renderList(data.reasons, "No operator review notes generated from available data.")}
+                <h3>${escapeHtml(tr("mission.operator_review_notes"))}</h3>
+                ${renderList(data.reasons, "mission.no_operator_notes")}
             </div>
             <div>
-                <h3>Positive findings</h3>
-                ${renderList(data.positive_findings, "No positive findings available.")}
+                <h3>${escapeHtml(tr("mission.positive_findings"))}</h3>
+                ${renderList(data.positive_findings, "mission.no_positive_findings")}
             </div>
         </div>
 
         <p class="mission-disclaimer">
-            ${escapeHtml(data.wellness_disclaimer || data.medical_disclaimer || "Wellness insight only. Not a medical diagnosis. Interpret trends together with session data quality and operator review.")}
+            ${escapeHtml(translateMissionFinding(data.wellness_disclaimer || data.medical_disclaimer || tr("mission.wellness_disclaimer")))}
         </p>
     `
 }
@@ -810,17 +946,17 @@ function renderDashboardChart(timeline, totalSamples = null){
         if(empty){
             empty.style.display = "flex"
         }
-        setText("timelineStatus", "No data")
-        setText("chartSampleCount", "0 samples")
+        setText("timelineStatus", tr("mission.no_data"))
+        setText("chartSampleCount", tr("mission.samples_count", {count: 0}))
         return
     }
 
     if(typeof Chart === "undefined"){
         if(empty){
             empty.style.display = "flex"
-            empty.innerText = "Chart.js is not loaded."
+            empty.innerText = tr("mission.chart_not_loaded")
         }
-        setText("timelineStatus", "Chart unavailable")
+        setText("timelineStatus", tr("mission.chart_unavailable"))
         return
     }
 
@@ -852,7 +988,7 @@ function renderDashboardChart(timeline, totalSamples = null){
                     yAxisID: "oxygen"
                 },
                 {
-                    label: "Pulse",
+                    label: tr("mission.pulse"),
                     data: pulse,
                     borderColor: "#fb7185",
                     backgroundColor: "#fb718522",
@@ -863,7 +999,7 @@ function renderDashboardChart(timeline, totalSamples = null){
                     yAxisID: "rate"
                 },
                 {
-                    label: "Wearable HR",
+                    label: tr("mission.wearable_hr"),
                     data: hr,
                     borderColor: "#38bdf8",
                     backgroundColor: "#38bdf822",
@@ -952,8 +1088,11 @@ function renderDashboardChart(timeline, totalSamples = null){
 
     const originalSamples = Number(totalSamples) || timeline.length
     const sampleLabel = sampledTimeline.length === originalSamples
-        ? `${originalSamples} samples`
-        : `${sampledTimeline.length}/${originalSamples} samples`
+        ? tr("mission.samples_count", {count: originalSamples})
+        : tr("mission.samples_fraction", {
+            shown: sampledTimeline.length,
+            total: originalSamples
+        })
 
     setText("timelineStatus", sampleLabel)
     setText("chartSampleCount", sampleLabel)
@@ -1018,7 +1157,7 @@ function renderSeriesTrendChart(analyses){
             labels,
             datasets: [
                 {
-                    label: "Wellness response",
+                    label: tr("mission.wellness_response"),
                     data: wellnessScores,
                     borderColor: "#00ffcc",
                     backgroundColor: "#00ffcc22",
@@ -1028,7 +1167,7 @@ function renderSeriesTrendChart(analyses){
                     spanGaps: true
                 },
                 {
-                    label: "Data quality",
+                    label: tr("mission.data_quality"),
                     data: dataQualityScores,
                     borderColor: "#facc15",
                     backgroundColor: "#facc1522",
@@ -1038,7 +1177,7 @@ function renderSeriesTrendChart(analyses){
                     spanGaps: true
                 },
                 {
-                    label: "Sync quality",
+                    label: tr("mission.sync_quality"),
                     data: syncQuality,
                     borderColor: "#38bdf8",
                     backgroundColor: "#38bdf822",
@@ -1048,7 +1187,7 @@ function renderSeriesTrendChart(analyses){
                     spanGaps: true
                 },
                 {
-                    label: "Coverage",
+                    label: tr("mission.coverage"),
                     data: coverageScores,
                     borderColor: "#a78bfa",
                     backgroundColor: "#a78bfa22",
@@ -1109,7 +1248,7 @@ async function loadUserTrend(options = {}){
         if(trendBox){
             trendBox.innerHTML = `
                 <div class="mission-warning">
-                    Selected session has no user_id, so series analysis cannot be loaded.
+                    ${escapeHtml(tr("mission.series_no_client"))}
                 </div>
             `
         }
@@ -1118,7 +1257,7 @@ async function loadUserTrend(options = {}){
 
     if(trendBox){
         trendBox.innerHTML = `
-            <p class="mission-muted">Loading session series...</p>
+            <p class="mission-muted">${escapeHtml(tr("mission.series_loading"))}</p>
         `
     }
 
@@ -1132,7 +1271,7 @@ async function loadUserTrend(options = {}){
         if(!res.ok || data.error){
             trendBox.innerHTML = `
                 <div class="mission-warning">
-                    Trend failed: ${escapeHtml(data.error || res.status)}
+                    ${escapeHtml(tr("mission.trend_failed", {error: data.error || res.status}))}
                 </div>
             `
             return
@@ -1179,7 +1318,7 @@ async function loadUserTrend(options = {}){
                     <td>${escapeHtml(formatMetric(row.avg_spo2, "%"))}</td>
                     <td>${escapeHtml(formatMetric(row.avg_pulse, "bpm"))}</td>
                     <td>${escapeHtml(row.quality_warning_count || 0)}</td>
-                    <td>${escapeHtml(row.session_flagged || row.quality_warning_count ? "Review" : "OK")}</td>
+                    <td>${escapeHtml(row.session_flagged || row.quality_warning_count ? tr("mission.review") : "OK")}</td>
                 </tr>
             `)
             .join("")
@@ -1187,130 +1326,130 @@ async function loadUserTrend(options = {}){
         trendBox.innerHTML = `
             <div class="mission-series-summary">
                 <div>
-                    <span>Analyzed</span>
+                    <span>${escapeHtml(tr("mission.analyzed"))}</span>
                     <strong>${escapeHtml(data.records ?? 0)}</strong>
                 </div>
                 <div>
-                    <span>Trend</span>
+                    <span>${escapeHtml(tr("mission.trend"))}</span>
                     <strong>${escapeHtml(data.trend_direction || "-")}</strong>
                 </div>
                 <div>
-                    <span>Avg score</span>
+                    <span>${escapeHtml(tr("mission.avg_score"))}</span>
                     <strong>${avgScore}</strong>
                 </div>
                 <div>
-                    <span>Avg data quality</span>
+                    <span>${escapeHtml(tr("mission.avg_data_quality"))}</span>
                     <strong>${avgQuality}</strong>
                 </div>
             </div>
             <div class="mission-series-meta">
-                <span>Client ${escapeHtml(data.user_id || selected.user_id)}</span>
-                <span>Last ${escapeHtml(data.series_limit ?? limit)}</span>
-                <span>${escapeHtml(data.session_count ?? "-")} total sessions</span>
-                <span>${escapeHtml(data.flagged_session_count ?? data.anomaly_count ?? 0)} review flags</span>
+                <span>${escapeHtml(tr("mission.client_value", {client: data.user_id || selected.user_id}))}</span>
+                <span>${escapeHtml(tr("mission.last_value", {count: data.series_limit ?? limit}))}</span>
+                <span>${escapeHtml(tr("mission.total_sessions_value", {count: data.session_count ?? "-"}))}</span>
+                <span>${escapeHtml(tr("mission.review_flags_value", {count: data.flagged_session_count ?? data.anomaly_count ?? 0}))}</span>
             </div>
             <div class="mission-series-chart-panel">
                 <canvas id="seriesTrendChart"></canvas>
                 <div id="seriesTrendEmpty" class="mission-chart-empty">
-                    Load at least two analyzed sessions to render a series trend.
+                    ${escapeHtml(tr("mission.series_chart_empty"))}
                 </div>
             </div>
             <div class="mission-analysis-columns">
                 <div>
-                    <h3>First 5 vs Last 5</h3>
+                    <h3>${escapeHtml(tr("mission.first5_last5"))}</h3>
                     <div class="mission-mini-metrics">
-                        <span>Score: ${escapeHtml(formatMetric(comparison.first_avg_score, "/100", 0))} -> ${escapeHtml(formatMetric(comparison.last_avg_score, "/100", 0))}</span>
+                        <span>${escapeHtml(tr("mission.score"))}: ${escapeHtml(formatMetric(comparison.first_avg_score, "/100", 0))} -> ${escapeHtml(formatMetric(comparison.last_avg_score, "/100", 0))}</span>
                         <strong>${escapeHtml(formatDelta(comparison.score_delta))}</strong>
                     </div>
                     <div class="mission-mini-metrics">
-                        <span>Data quality: ${escapeHtml(formatMetric(comparison.first_avg_data_quality, "/100", 0))} -> ${escapeHtml(formatMetric(comparison.last_avg_data_quality, "/100", 0))}</span>
+                        <span>${escapeHtml(tr("mission.data_quality"))}: ${escapeHtml(formatMetric(comparison.first_avg_data_quality, "/100", 0))} -> ${escapeHtml(formatMetric(comparison.last_avg_data_quality, "/100", 0))}</span>
                         <strong>${escapeHtml(formatDelta(comparison.data_quality_delta))}</strong>
                     </div>
                 </div>
                 <div>
-                    <h3>Wellness-only interpretation</h3>
-                    <p>${escapeHtml(data.wellness_interpretation || "Interpret the trend together with session data quality. This is not a diagnosis.")}</p>
+                    <h3>${escapeHtml(tr("mission.wellness_only_interpretation"))}</h3>
+                    <p>${escapeHtml(translateMissionFinding(data.wellness_interpretation || tr("mission.trend_interpretation_fallback")))}</p>
                 </div>
             </div>
             <div class="mission-analysis-block">
-                <h3>Session Data Quality Engine</h3>
-                <p>${escapeHtml(qualityEngine.explanation || "Data quality describes confidence in the session data, not client health.")}</p>
+                <h3>${escapeHtml(tr("mission.data_quality_engine"))}</h3>
+                <p>${escapeHtml(translateMissionFinding(qualityEngine.explanation || tr("mission.data_quality_engine_fallback")))}</p>
                 <div class="mission-analysis-grid mission-series-detail-grid">
                     <div>
-                        <span>Latest score</span>
+                        <span>${escapeHtml(tr("mission.latest_score"))}</span>
                         <strong>${latestScore}</strong>
                     </div>
                     <div>
-                        <span>Score delta</span>
+                        <span>${escapeHtml(tr("mission.score_delta"))}</span>
                         <strong>${escapeHtml(deltaLabel)}</strong>
                     </div>
                     <div>
-                        <span>Latest data quality</span>
+                        <span>${escapeHtml(tr("mission.latest_data_quality"))}</span>
                         <strong>${latestQuality}</strong>
                 </div>
                 <div>
-                    <span>Coverage</span>
+                    <span>${escapeHtml(tr("mission.coverage"))}</span>
                     <strong>${avgCoverage}</strong>
                 </div>
                     <div>
-                        <span>Avg sync quality</span>
+                        <span>${escapeHtml(tr("mission.avg_sync_quality"))}</span>
                         <strong>${avgMatchRate}</strong>
                     </div>
                     <div>
-                        <span>Data quality trend</span>
+                        <span>${escapeHtml(tr("mission.data_quality_trend"))}</span>
                         <strong>${escapeHtml(data.data_quality_trend || "-")}</strong>
                     </div>
                     <div>
-                        <span>Missing samples</span>
+                        <span>${escapeHtml(tr("mission.missing_samples"))}</span>
                         <strong>${escapeHtml(qualityEngine.total_missing_samples ?? 0)}</strong>
                     </div>
                     <div>
-                        <span>Sensor gaps</span>
+                        <span>${escapeHtml(tr("mission.sensor_gaps"))}</span>
                         <strong>${escapeHtml(qualityEngine.sensor_gap_sessions ?? 0)}</strong>
                     </div>
                     <div>
-                        <span>HR/pulse mismatch</span>
+                        <span>${escapeHtml(tr("mission.hr_pulse_mismatch"))}</span>
                         <strong>${escapeHtml(qualityEngine.hr_pulse_mismatch_sessions ?? 0)}</strong>
                     </div>
                     <div>
-                        <span>SpO2 warnings</span>
+                        <span>${escapeHtml(tr("mission.spo2_warnings"))}</span>
                         <strong>${escapeHtml(qualityEngine.spo2_warning_sessions ?? 0)}</strong>
                     </div>
                     <div>
-                        <span>Avg SpO2</span>
+                        <span>${escapeHtml(tr("mission.avg_spo2"))}</span>
                         <strong>${avgSpo2}</strong>
                     </div>
                     <div>
-                        <span>Avg pulse</span>
+                        <span>${escapeHtml(tr("mission.avg_pulse"))}</span>
                         <strong>${avgPulse}</strong>
                     </div>
                     <div>
-                        <span>Avg HRV</span>
+                        <span>${escapeHtml(tr("mission.avg_hrv"))}</span>
                         <strong>${avgHrv}</strong>
                     </div>
                 </div>
                 <p class="mission-muted">
-                    ${escapeHtml(warningSummary || "No repeated data-quality warnings in this range.")}
+                    ${escapeHtml(warningSummary || tr("mission.no_repeated_warnings"))}
                 </p>
             </div>
             <div class="mission-series-table-wrap">
                 <table class="mission-series-table">
                     <thead>
                         <tr>
-                            <th>Session</th>
-                            <th>Score</th>
-                            <th>Quality</th>
-                            <th>Coverage</th>
-                            <th>Sync</th>
-                            <th>Missing</th>
+                            <th>${escapeHtml(tr("mission.session"))}</th>
+                            <th>${escapeHtml(tr("mission.score"))}</th>
+                            <th>${escapeHtml(tr("mission.quality"))}</th>
+                            <th>${escapeHtml(tr("mission.coverage"))}</th>
+                            <th>${escapeHtml(tr("mission.sync"))}</th>
+                            <th>${escapeHtml(tr("mission.missing"))}</th>
                             <th>SpO2</th>
-                            <th>Pulse</th>
-                            <th>Warnings</th>
-                            <th>Status</th>
+                            <th>${escapeHtml(tr("mission.pulse"))}</th>
+                            <th>${escapeHtml(tr("mission.warnings"))}</th>
+                            <th>${escapeHtml(tr("mission.status"))}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${seriesRows || `<tr><td colspan="10">No analyzed sessions in this range.</td></tr>`}
+                        ${seriesRows || `<tr><td colspan="10">${escapeHtml(tr("mission.no_analyzed_sessions_range"))}</td></tr>`}
                     </tbody>
                 </table>
             </div>
@@ -1324,7 +1463,7 @@ async function loadUserTrend(options = {}){
         console.error("loadUserTrend error:", err)
         trendBox.innerHTML = `
             <div class="mission-warning">
-                Trend could not be loaded: ${escapeHtml(err.message || err)}
+                ${escapeHtml(tr("mission.trend_load_failed", {error: err.message || err}))}
             </div>
         `
     }
@@ -1334,11 +1473,11 @@ async function generateResearchReport(){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
-        alert("Select session first")
+        alert(tr("mission.select_session_first"))
         return
     }
 
-    setText("rawOutput", `Opening PDF report for session ${sessionId}...`)
+    setText("rawOutput", tr("mission.opening_pdf_report", {session: sessionId}))
 
     window.location.href = `/report/${encodeURIComponent(sessionId)}`
 }
@@ -1348,11 +1487,11 @@ function generateSeriesReport(){
     const limit = getSelectedTrendLimit()
 
     if(!selected || !selected.user_id){
-        alert("Select a session with client assignment first")
+        alert(tr("mission.select_client_session_first"))
         return
     }
 
-    setText("rawOutput", `Opening series PDF report for client ${selected.user_id}...`)
+    setText("rawOutput", tr("mission.opening_series_report", {client: selected.user_id}))
     window.location.href = `/report/series/${encodeURIComponent(selected.user_id)}?limit=${limit}`
 }
 </script>

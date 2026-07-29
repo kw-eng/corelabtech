@@ -6,25 +6,24 @@
 
     <section class="accounts-hero">
         <div>
-            <span class="accounts-eyebrow">Account administration</span>
-            <h1>Admin Accounts</h1>
+            <span class="accounts-eyebrow">{{ t('accounts.eyebrow') }}</span>
+            <h1>{{ t('accounts.title') }}</h1>
             <p>
-                Manage CoreLabTech platform access for operators, researchers,
-                viewers and administrators.
+                {{ t('accounts.hero_text') }}
             </p>
         </div>
 
         <div class="accounts-kpi-grid">
             <div>
-                <span>Total accounts</span>
+                <span>{{ t('accounts.total_accounts') }}</span>
                 <strong id="accountsTotal">-</strong>
             </div>
             <div>
-                <span>Active</span>
+                <span>{{ t('accounts.active') }}</span>
                 <strong id="accountsActive">-</strong>
             </div>
             <div>
-                <span>Admins</span>
+                <span>{{ t('accounts.admins') }}</span>
                 <strong id="accountsAdmins">-</strong>
             </div>
         </div>
@@ -36,24 +35,24 @@
         <div class="accounts-card">
             <div class="accounts-section-header">
                 <div>
-                    <h2>Create Account</h2>
-                    <p>Add a platform user and assign the initial access role.</p>
+                    <h2>{{ t('accounts.create_account') }}</h2>
+                    <p>{{ t('accounts.create_account_help') }}</p>
                 </div>
             </div>
 
             <div class="accounts-form">
                 <div class="accounts-field">
-                    <label for="account_email">Email</label>
+                    <label for="account_email">{{ t('accounts.email') }}</label>
                     <input id="account_email" type="email" placeholder="user@corelabtech.local" autocomplete="email">
                 </div>
 
                 <div class="accounts-field">
-                    <label for="account_password">Password</label>
-                    <input id="account_password" type="password" placeholder="Temporary password" autocomplete="new-password">
+                    <label for="account_password">{{ t('accounts.password') }}</label>
+                    <input id="account_password" type="password" placeholder="{{ t('accounts.temporary_password') }}" autocomplete="new-password">
                 </div>
 
                 <div class="accounts-field">
-                    <label for="account_role">Role</label>
+                    <label for="account_role">{{ t('accounts.role') }}</label>
                     <select id="account_role">
                         <option value="viewer">viewer</option>
                         <option value="operator">operator</option>
@@ -63,7 +62,7 @@
                 </div>
 
                 <button onclick="createAccount()">
-                    Create Account
+                    {{ t('accounts.create_account') }}
                 </button>
             </div>
         </div>
@@ -71,16 +70,16 @@
         <div class="accounts-card accounts-note">
             <div class="accounts-section-header">
                 <div>
-                    <h2>Role Scope</h2>
-                    <p>Use the smallest role that supports the user's workflow.</p>
+                    <h2>{{ t('accounts.role_scope') }}</h2>
+                    <p>{{ t('accounts.role_scope_help') }}</p>
                 </div>
             </div>
 
             <div class="accounts-role-list">
-                <div><span>viewer</span><strong>Read-only access where enabled.</strong></div>
-                <div><span>operator</span><strong>Chamber workflow and telemetry capture.</strong></div>
-                <div><span>researcher</span><strong>AI Lab, QA review and research dashboards.</strong></div>
-                <div><span>admin</span><strong>Accounts, logs, debug and performance tools.</strong></div>
+                <div><span>viewer</span><strong>{{ t('accounts.viewer_scope') }}</strong></div>
+                <div><span>operator</span><strong>{{ t('accounts.operator_scope') }}</strong></div>
+                <div><span>researcher</span><strong>{{ t('accounts.researcher_scope') }}</strong></div>
+                <div><span>admin</span><strong>{{ t('accounts.admin_scope') }}</strong></div>
             </div>
         </div>
     </section>
@@ -88,22 +87,22 @@
     <section class="accounts-card">
         <div class="accounts-section-header">
             <div>
-                <h2>Accounts</h2>
-                <p>Update roles, activate or disable accounts, and reset passwords.</p>
+                <h2>{{ t('accounts.accounts') }}</h2>
+                <p>{{ t('accounts.accounts_help') }}</p>
             </div>
 
-            <button class="accounts-secondary" onclick="loadAccounts()">Refresh</button>
+            <button class="accounts-secondary" onclick="loadAccounts()">{{ t('accounts.refresh') }}</button>
         </div>
 
         <div class="accounts-table-wrap">
             <table class="accounts-table">
                 <thead>
                     <tr>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Active</th>
-                        <th>Created</th>
-                        <th>Actions</th>
+                        <th>{{ t('accounts.email') }}</th>
+                        <th>{{ t('accounts.role') }}</th>
+                        <th>{{ t('accounts.active') }}</th>
+                        <th>{{ t('accounts.created') }}</th>
+                        <th>{{ t('accounts.actions') }}</th>
                     </tr>
                 </thead>
 

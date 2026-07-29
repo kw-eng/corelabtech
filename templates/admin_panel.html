@@ -11,29 +11,28 @@
 
     <section class="admin-hero">
         <div>
-            <span class="admin-eyebrow">Administrative oversight</span>
-            <h1>Mission Admin Panel</h1>
+            <span class="admin-eyebrow">{{ t('admin.eyebrow') }}</span>
+            <h1>{{ t('admin.title') }}</h1>
             <p>
-                Operational view of saved HBOT sessions, latest AI results,
-                telemetry coverage and database diagnostics.
+                {{ t('admin.hero_text') }}
             </p>
         </div>
 
         <div class="admin-kpi-grid">
             <div>
-                <span>Total sessions</span>
+                <span>{{ t('admin.total_sessions') }}</span>
                 <strong id="kpiSessions">-</strong>
             </div>
             <div>
-                <span>Analyzed</span>
+                <span>{{ t('admin.analyzed') }}</span>
                 <strong id="kpiAnalyzed">-</strong>
             </div>
             <div>
-                <span>Flagged sessions</span>
+                <span>{{ t('admin.flagged_sessions') }}</span>
                 <strong id="kpiAnomalies">-</strong>
             </div>
             <div>
-                <span>Elevated load</span>
+                <span>{{ t('admin.elevated_load') }}</span>
                 <strong id="kpiHighRisk">-</strong>
             </div>
         </div>
@@ -41,23 +40,23 @@
 
     <section class="admin-toolbar">
         <div class="admin-field">
-            <label for="filter">Response filter</label>
+            <label for="filter">{{ t('admin.response_filter') }}</label>
             <select id="filter" onchange="renderSessions()">
-                <option value="all">All sessions</option>
-                <option value="low">Stable response</option>
-                <option value="moderate">Review context</option>
-                <option value="high">Elevated load</option>
-                <option value="anomaly">Review recommended</option>
-                <option value="missing">Without AI result</option>
-                <option value="low_quality">Low data quality</option>
-                <option value="missing_data">Missing telemetry</option>
+                <option value="all">{{ t('admin.filter_all') }}</option>
+                <option value="low">{{ t('admin.filter_stable') }}</option>
+                <option value="moderate">{{ t('admin.filter_review_context') }}</option>
+                <option value="high">{{ t('admin.filter_elevated') }}</option>
+                <option value="anomaly">{{ t('admin.filter_review_recommended') }}</option>
+                <option value="missing">{{ t('admin.filter_without_ai') }}</option>
+                <option value="low_quality">{{ t('admin.filter_low_quality') }}</option>
+                <option value="missing_data">{{ t('admin.filter_missing_telemetry') }}</option>
             </select>
         </div>
 
         <div class="admin-actions">
-            <button onclick="loadAdminData()">Refresh</button>
-            <button class="admin-danger-button" onclick="deleteSelectedAdminSessions()">Delete Selected</button>
-            <button class="ai-qa-secondary" onclick="loadDebugDB()">DB Status</button>
+            <button onclick="loadAdminData()">{{ t('admin.refresh') }}</button>
+            <button class="admin-danger-button" onclick="deleteSelectedAdminSessions()">{{ t('admin.delete_selected') }}</button>
+            <button class="ai-qa-secondary" onclick="loadDebugDB()">{{ t('admin.db_status') }}</button>
         </div>
     </section>
 
@@ -66,8 +65,8 @@
     <section class="admin-section">
         <div class="admin-section-header">
             <div>
-                <h2>Mission Sessions</h2>
-                <p>Latest saved sessions with the newest available AI result.</p>
+                <h2>{{ t('admin.mission_sessions') }}</h2>
+                <p>{{ t('admin.mission_sessions_help') }}</p>
             </div>
         </div>
 
@@ -78,16 +77,16 @@
                         <th class="admin-col-select">
                             <input type="checkbox" id="adminSelectAll" onclick="toggleAdminSessionSelection(this)">
                         </th>
-                        <th class="admin-col-date">Date</th>
-                        <th class="admin-col-session">Session</th>
-                        <th class="admin-col-client">Client</th>
-                        <th class="admin-col-score">Response</th>
-                        <th class="admin-col-status">Status</th>
-                        <th class="admin-col-review">Review</th>
-                        <th class="admin-col-metric">Avg SpO2</th>
-                        <th class="admin-col-metric">Avg Pulse</th>
-                        <th class="admin-col-timeline">Timeline</th>
-                        <th class="admin-col-action">Action</th>
+                        <th class="admin-col-date">{{ t('admin.date') }}</th>
+                        <th class="admin-col-session">{{ t('admin.session') }}</th>
+                        <th class="admin-col-client">{{ t('admin.client') }}</th>
+                        <th class="admin-col-score">{{ t('admin.response') }}</th>
+                        <th class="admin-col-status">{{ t('admin.status') }}</th>
+                        <th class="admin-col-review">{{ t('admin.review') }}</th>
+                        <th class="admin-col-metric">{{ t('admin.avg_spo2') }}</th>
+                        <th class="admin-col-metric">{{ t('admin.avg_pulse') }}</th>
+                        <th class="admin-col-timeline">{{ t('admin.timeline') }}</th>
+                        <th class="admin-col-action">{{ t('admin.action') }}</th>
                     </tr>
                 </thead>
 
@@ -100,8 +99,8 @@
         <div class="admin-section">
             <div class="admin-section-header">
                 <div>
-                    <h2>Experiment Timeline</h2>
-                    <p>Recent wellness response trend based on stored analysis output.</p>
+                    <h2>{{ t('admin.experiment_timeline') }}</h2>
+                    <p>{{ t('admin.experiment_timeline_help') }}</p>
                 </div>
             </div>
 
@@ -111,32 +110,32 @@
         <div class="admin-section">
             <div class="admin-section-header">
                 <div>
-                    <h2>Selected Session Details</h2>
-                    <p>Compact diagnostic payload for the selected session.</p>
+                    <h2>{{ t('admin.selected_details') }}</h2>
+                    <p>{{ t('admin.selected_details_help') }}</p>
                 </div>
             </div>
 
-            <pre id="details" class="qa-report">No session selected.</pre>
+            <pre id="details" class="qa-report">{{ t('admin.no_session_selected') }}</pre>
         </div>
     </section>
 
     <section class="admin-section">
         <div class="admin-section-header">
             <div>
-                <h2>Database Status</h2>
-                <p>Lightweight database counters for admin diagnostics.</p>
+                <h2>{{ t('admin.database_status') }}</h2>
+                <p>{{ t('admin.database_status_help') }}</p>
             </div>
         </div>
 
         <div id="dbStatusCards" class="admin-db-grid">
             <div class="qa-card qa-empty-state">
-                Click DB Status to load database counters.
+                {{ t('admin.db_status_empty') }}
             </div>
         </div>
 
         <details class="admin-raw-details">
-            <summary>Raw diagnostic payload</summary>
-            <pre id="dbStatus" class="qa-code">No database status loaded.</pre>
+            <summary>{{ t('admin.raw_diagnostic_payload') }}</summary>
+            <pre id="dbStatus" class="qa-code">{{ t('admin.no_database_status') }}</pre>
         </details>
     </section>
 
@@ -146,6 +145,13 @@
 
 let adminSessions = []
 let analyzedSessions = []
+
+function tr(key, params = null){
+    if(typeof window.t === "function"){
+        return window.t(key, params)
+    }
+    return key
+}
 
 function pretty(data){
     return JSON.stringify(data, null, 2)
@@ -244,13 +250,13 @@ function normalizeAnalysis(ai){
 }
 
 function anomalyText(value){
-    return value ? "Review" : "No flag"
+    return value ? tr("admin.review") : tr("admin.no_flag")
 }
 
 function responseLabel(value){
-    if(value === "High") return "Elevated load"
-    if(value === "Moderate") return "Review context"
-    if(value === "Low") return "Stable response"
+    if(value === "High") return tr("admin.filter_elevated")
+    if(value === "Moderate") return tr("admin.filter_review_context")
+    if(value === "Low") return tr("admin.filter_stable")
     return value || "-"
 }
 
@@ -291,10 +297,10 @@ function adminSessionLabel(row){
     const number = row.client_session_number || row.session_number || null
 
     if(number){
-        return `Client ${client} / Session ${number}`
+        return tr("admin.client_session_value", {client, session: number})
     }
 
-    return `Client ${client} / Session`
+    return tr("admin.client_session_empty_number", {client})
 }
 
 function setAdminStatus(message, type){
@@ -311,7 +317,7 @@ function setAdminStatus(message, type){
 
     box.innerHTML = `
         <div class="qa-step ${type || "warn"}">
-            ${message}
+            ${escapeHtml(message)}
         </div>
     `
 }
@@ -327,7 +333,7 @@ async function loadLatestAnalysis(session){
                 ...session,
                 ai: {
                     status: "missing",
-                    error: "No stored AI result"
+                    error: tr("admin.no_stored_ai")
                 },
                 score: null,
                 risk_level: "-",
@@ -366,7 +372,7 @@ async function loadLatestAnalysis(session){
 }
 
 async function loadAdminData(){
-    setAdminStatus("Loading sessions and latest AI results...", "warn")
+    setAdminStatus(tr("admin.loading_sessions"), "warn")
 
     try{
         const res = await fetch("/api/sessions", {
@@ -390,7 +396,7 @@ async function loadAdminData(){
         renderKpis()
         setAdminStatus("", "")
     }catch(err){
-        setAdminStatus(`Failed to load admin data: ${err}`, "fail")
+        setAdminStatus(tr("admin.load_failed", {error: err}), "fail")
     }
 }
 
@@ -500,7 +506,7 @@ function renderSessions(){
     if(rows.length === 0){
         tbody.innerHTML = `
             <tr>
-                <td colspan="11">No sessions found.</td>
+                <td colspan="11">${escapeHtml(tr("admin.no_sessions_found"))}</td>
             </tr>
         `
         return
@@ -540,9 +546,9 @@ function renderSessions(){
                 <td>${escapeHtml(timelineCount)}</td>
                 <td>
                     <div class="admin-row-actions">
-                        <button onclick="showDetails(decodeURIComponent('${encodedSessionId}'))">Details</button>
-                        <button class="ai-qa-secondary" onclick="runAnalysisForSession(decodeURIComponent('${encodedSessionId}'))">Analyze</button>
-                        <button class="admin-danger-button" onclick="deleteAdminSession(decodeURIComponent('${encodedSessionId}'))">Delete</button>
+                        <button onclick="showDetails(decodeURIComponent('${encodedSessionId}'))">${escapeHtml(tr("admin.details"))}</button>
+                        <button class="ai-qa-secondary" onclick="runAnalysisForSession(decodeURIComponent('${encodedSessionId}'))">${escapeHtml(tr("admin.analyze"))}</button>
+                        <button class="admin-danger-button" onclick="deleteAdminSession(decodeURIComponent('${encodedSessionId}'))">${escapeHtml(tr("admin.delete"))}</button>
                     </div>
                 </td>
             </tr>
@@ -560,8 +566,8 @@ function renderTimeline(){
 
     if(rows.length === 0){
         div.innerHTML = `
-            <div class="qa-card qa-empty-state">
-                No sessions available.
+                <div class="qa-card qa-empty-state">
+                ${escapeHtml(tr("admin.no_sessions_available"))}
             </div>
         `
         return
@@ -581,9 +587,9 @@ function renderTimeline(){
         div.innerHTML += `
             <div class="qa-step ${cls}">
                 <b>${s.created_at || s.date || "-"}</b>
-                <span>Session: ${s.session_id}</span>
-                <span>Client: ${s.user_id || "-"}</span>
-                <span>Wellness response: ${s.score ?? "-"} / 100 | Status: ${responseLabel(risk)} | Review: ${anomalyText(s.anomaly)}</span>
+                <span>${escapeHtml(tr("admin.session"))}: ${escapeHtml(s.session_id)}</span>
+                <span>${escapeHtml(tr("admin.client"))}: ${escapeHtml(s.user_id || "-")}</span>
+                <span>${escapeHtml(tr("admin.response"))}: ${escapeHtml(s.score ?? "-")} / 100 | ${escapeHtml(tr("admin.status"))}: ${escapeHtml(responseLabel(risk))} | ${escapeHtml(tr("admin.review"))}: ${escapeHtml(anomalyText(s.anomaly))}</span>
             </div>
         `
     })
@@ -614,19 +620,19 @@ async function deleteAdminSessions(sessionIds){
         : []
 
     if(sessions.length === 0){
-        setAdminStatus("Select at least one session to delete.", "warn")
+        setAdminStatus(tr("admin.select_session_delete"), "warn")
         return
     }
 
     const label = sessions.length === 1
         ? sessions[0]
-        : `${sessions.length} selected sessions`
+        : tr("admin.selected_sessions_count", {count: sessions.length})
 
-    if(!confirm(`Delete ${label}? This removes the saved session and related analysis data.`)){
+    if(!confirm(tr("admin.delete_confirm", {label}))){
         return
     }
 
-    setAdminStatus(`Deleting ${label}...`, "warn")
+    setAdminStatus(tr("admin.deleting", {label}), "warn")
 
     try{
         const res = await fetch("/api/delete_sessions", {
@@ -642,7 +648,7 @@ async function deleteAdminSessions(sessionIds){
         const data = await res.json()
 
         if(!res.ok || data.error){
-            setAdminStatus(data.error || "Delete sessions failed.", "fail")
+            setAdminStatus(data.error || tr("admin.delete_failed"), "fail")
             return
         }
 
@@ -656,15 +662,15 @@ async function deleteAdminSessions(sessionIds){
         renderSessions()
         renderTimeline()
         renderKpis()
-        document.getElementById("details").innerText = "No session selected."
-        setAdminStatus(`Deleted ${data.deleted ?? sessions.length} session(s).`, "pass")
+        document.getElementById("details").innerText = tr("admin.no_session_selected")
+        setAdminStatus(tr("admin.deleted_count", {count: data.deleted ?? sessions.length}), "pass")
     }catch(err){
-        setAdminStatus(`Delete crashed: ${err}`, "fail")
+        setAdminStatus(tr("admin.delete_crashed", {error: err}), "fail")
     }
 }
 
 async function runAnalysisForSession(sessionId){
-    setAdminStatus(`Running AI analysis for ${sessionId}...`, "warn")
+    setAdminStatus(tr("admin.running_ai_for", {session: sessionId}), "warn")
 
     try{
         const res = await fetch("/api/run_analysis", {
@@ -680,7 +686,7 @@ async function runAnalysisForSession(sessionId){
         const ai = await res.json()
 
         if(!res.ok || ai.error){
-            setAdminStatus(`AI analysis failed: ${ai.error || res.status}`, "fail")
+            setAdminStatus(tr("admin.ai_failed", {error: ai.error || res.status}), "fail")
             return
         }
 
@@ -703,9 +709,9 @@ async function runAnalysisForSession(sessionId){
         renderTimeline()
         renderKpis()
         showDetails(sessionId)
-        setAdminStatus(`AI analysis completed for ${sessionId}.`, "pass")
+        setAdminStatus(tr("admin.ai_completed", {session: sessionId}), "pass")
     }catch(err){
-        setAdminStatus(`AI analysis crashed: ${err}`, "fail")
+        setAdminStatus(tr("admin.ai_crashed", {error: err}), "fail")
     }
 }
 
@@ -716,7 +722,7 @@ async function loadDebugDB(){
         if(cards){
             cards.innerHTML = `
                 <div class="qa-card qa-empty-state">
-                    Loading database counters...
+                    ${escapeHtml(tr("admin.db_loading"))}
                 </div>
             `
         }
@@ -729,7 +735,7 @@ async function loadDebugDB(){
             if(cards){
                 cards.innerHTML = `
                     <div class="qa-card qa-empty-state">
-                        Database diagnostics are disabled in this environment.
+                        ${escapeHtml(tr("admin.db_disabled"))}
                     </div>
                 `
             }
@@ -740,38 +746,38 @@ async function loadDebugDB(){
         const tables = data.tables || {}
         const items = [
             {
-                label: "HR/HRV records",
+                label: tr("admin.db_hr_records"),
                 value: tables.fit_data ?? "-",
-                hint: "HR/HRV timeline telemetry rows"
+                hint: tr("admin.db_hr_hint")
             },
             {
-                label: "SpO2/pulse records",
+                label: tr("admin.db_spo2_records"),
                 value: tables.csv_data ?? "-",
-                hint: "Pulse oximeter CSV rows"
+                hint: tr("admin.db_spo2_hint")
             },
             {
-                label: "Full sessions",
+                label: tr("admin.db_full_sessions"),
                 value: tables.full_sessions ?? "-",
-                hint: "Saved HBOT session records"
+                hint: tr("admin.db_full_sessions_hint")
             },
             {
-                label: "Users / subjects",
+                label: tr("admin.db_users_subjects"),
                 value: tables.users ?? "-",
-                hint: "Accounts and research subjects"
+                hint: tr("admin.db_users_subjects_hint")
             },
             {
-                label: "Tests",
+                label: tr("admin.db_tests"),
                 value: tables.tests ?? "-",
-                hint: "QA and diagnostic test rows"
+                hint: tr("admin.db_tests_hint")
             }
         ]
 
         if(cards){
             cards.innerHTML = items.map(item => `
                 <div class="admin-db-card">
-                    <span>${item.label}</span>
-                    <strong>${item.value}</strong>
-                    <small>${item.hint}</small>
+                    <span>${escapeHtml(item.label)}</span>
+                    <strong>${escapeHtml(item.value)}</strong>
+                    <small>${escapeHtml(item.hint)}</small>
                 </div>
             `).join("")
         }
@@ -783,13 +789,13 @@ async function loadDebugDB(){
         if(cards){
             cards.innerHTML = `
                 <div class="qa-step fail">
-                    DB status failed: ${err}
+                    ${escapeHtml(tr("admin.db_failed", {error: err}))}
                 </div>
             `
         }
 
         document.getElementById("dbStatus").innerText =
-            "DB status failed: " + err
+            tr("admin.db_failed", {error: err})
     }
 }
 

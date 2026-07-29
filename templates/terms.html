@@ -2,51 +2,26 @@
 {% block content %}
 
 <section class="content-page">
-    <p class="page-eyebrow">CoreLabTech Wellness</p>
-    <h1>Wellness Terms</h1>
+    <p class="page-eyebrow">{{ t('public.legal.eyebrow') }}</p>
+    <h1>{{ t('public.terms.title') }}</h1>
 
-    <h2>Scope</h2>
-    <p>
-        CoreLabTech supports documentation and interpretation of wellness sessions.
-        Results are educational indicators derived from available sensor data,
-        client context and configured rule-based calculations.
-    </p>
+    <h2>{{ t('public.terms.scope_title') }}</h2>
+    <p>{{ t('public.terms.scope_text') }}</p>
 
-    <h2>No medical diagnosis</h2>
-    <p>
-        Scores, trends and reports are not diagnoses, treatment recommendations,
-        medical clearance or emergency monitoring. A wellness result must not
-        replace professional medical assessment where it is required.
-    </p>
+    <h2>{{ t('public.terms.no_diagnosis_title') }}</h2>
+    <p>{{ t('public.terms.no_diagnosis_text') }}</p>
 
-    <h2>Data quality</h2>
-    <p>
-        Operators should verify the selected client, device placement, file
-        timestamps and synchronization quality. Missing HRV, low match rate or
-        sensor disagreement reduces interpretation confidence.
-    </p>
+    <h2>{{ t('public.terms.data_quality_title') }}</h2>
+    <p>{{ t('public.terms.data_quality_text') }}</p>
 
-    <h2>Operator responsibility</h2>
-    <p>
-        The wellness provider remains responsible for session operation, informed
-        client acknowledgement, staff permissions, data retention and appropriate
-        escalation when a client reports discomfort or requests medical advice.
-    </p>
+    <h2>{{ t('public.terms.operator_title') }}</h2>
+    <p>{{ t('public.terms.operator_text') }}</p>
 
-    <h2>Chamber and protocol records</h2>
-    <p>
-        Operators must select the correct chamber, wellness protocol and pressure
-        unit. Trends for different target pressures, such as 1.3 and 1.5 ATA, are
-        kept separate. The platform does not control the chamber and does not
-        replace the manufacturer's operating instructions.
-    </p>
+    <h2>{{ t('public.terms.chamber_title') }}</h2>
+    <p>{{ t('public.terms.chamber_text') }}</p>
 
-    <h2>Accountability</h2>
-    <p>
-        Administrative actions, client exports, completed sessions and deletion
-        requests may be recorded in an audit log. Retention periods and access
-        rights are configured under the provider's approved data-governance policy.
-    </p>
+    <h2>{{ t('public.terms.accountability_title') }}</h2>
+    <p>{{ t('public.terms.accountability_text') }}</p>
 </section>
 
 {% endblock %}
