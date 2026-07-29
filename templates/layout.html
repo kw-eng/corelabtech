@@ -60,10 +60,9 @@
 
         {% if not current_user.is_authenticated %}
             <div class="nav-group nav-group-right">
-                {% if config.INTERNAL_TOOLS_ENABLED %}
-                <a href="{{ url_for('research.ai_testing_lab_public') }}">AI Testing Lab</a>
-                {% endif %}
-                <a class="nav-primary" href="{{ url_for('auth.login') }}">{{ t('nav.login') }}</a>
+                <a class="nav-primary" href="{{ url_for('auth.login') }}">
+                    {{ t('nav.login') }}
+                </a>
             </div>
         {% endif %}
 
