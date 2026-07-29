@@ -6,20 +6,16 @@
 
     <section class="about-hero">
         <div class="about-hero-copy">
-            <span class="about-eyebrow">About CoreLabTech</span>
-            <h1>HBOT Monitoring & Research</h1>
-            <p>
-                CoreLabTech is a research platform for structured observation of
-                physiological response before, during and after hyperbaric oxygen
-                therapy sessions.
-            </p>
+            <span class="about-eyebrow">{{ t('public.about.eyebrow') }}</span>
+            <h1>{{ t('public.about.title') }}</h1>
+            <p>{{ t('public.about.hero') }}</p>
 
             <div class="about-actions">
                 <a class="about-primary-action" href="{{ url_for('research.research_platform') }}">
-                    Research Platform
+                    {{ t('public.home.research_platform') }}
                 </a>
                 <a class="about-secondary-action" href="{{ url_for('main.technology') }}">
-                    Technology
+                    {{ t('nav.technology') }}
                 </a>
             </div>
         </div>
@@ -27,38 +23,35 @@
         <div class="about-hero-media">
             <img
                 src="{{ url_for('static', filename='img/chamber.jpeg') }}"
-                alt="Hyperbaric oxygen chamber with control unit"
+                alt="{{ t('public.about.alt_chamber') }}"
             >
         </div>
     </section>
 
     <section class="about-status-grid">
         <div>
-            <span>Session phases</span>
-            <strong>Check-in / Session / Recovery</strong>
+            <span>{{ t('public.about.session_phases') }}</span>
+            <strong>{{ t('public.about.session_phases_value') }}</strong>
         </div>
         <div>
-            <span>Wearable input</span>
+            <span>{{ t('public.about.wearable_input') }}</span>
             <strong>HR & HRV Timeline</strong>
         </div>
         <div>
-            <span>Oximeter input</span>
+            <span>{{ t('public.about.oximeter_input') }}</span>
             <strong>SpO2 & Pulse Timeline</strong>
         </div>
         <div>
-            <span>Analysis output</span>
-            <strong>Wellness response + data quality</strong>
+            <span>{{ t('public.about.analysis_output') }}</span>
+            <strong>{{ t('public.about.analysis_output_value') }}</strong>
         </div>
     </section>
 
     <section class="about-section">
         <div class="about-section-heading">
             <div>
-                <h2>What We Monitor</h2>
-                <p>
-                    The platform focuses on research-grade signals that help evaluate
-                    oxygenation, cardiovascular response and recovery patterns.
-                </p>
+                <h2>{{ t('public.about.what_monitor') }}</h2>
+                <p>{{ t('public.about.what_monitor_text') }}</p>
             </div>
         </div>
 
@@ -66,19 +59,19 @@
             <article class="about-card">
                 <img src="{{ url_for('static', filename='img/heart.png') }}" alt="">
                 <h3>SpO2</h3>
-                <p>Blood oxygen saturation before, during and after chamber exposure.</p>
+                <p>{{ t('public.about.spo2_text') }}</p>
             </article>
 
             <article class="about-card">
                 <img src="{{ url_for('static', filename='img/heart.png') }}" alt="">
-                <h3>Pulse & Heart Rate</h3>
-                <p>Pulse from the SpO2/pulse timeline and heart rate from the HR/HRV timeline.</p>
+                <h3>{{ t('public.about.pulse_hr') }}</h3>
+                <p>{{ t('public.about.pulse_hr_text') }}</p>
             </article>
 
             <article class="about-card">
                 <img src="{{ url_for('static', filename='img/garm_puls.svg') }}" alt="">
                 <h3>HRV</h3>
-                <p>Heart rate variability from RR intervals for autonomic response review.</p>
+                <p>{{ t('public.about.hrv_text') }}</p>
             </article>
         </div>
     </section>
@@ -87,50 +80,45 @@
         <div class="about-photo-card">
             <img
                 src="{{ url_for('static', filename='img/panel.jpeg') }}"
-                alt="HBOT chamber control panel"
+                alt="{{ t('public.about.alt_panel') }}"
             >
         </div>
 
         <div class="about-panel">
-            <span class="about-eyebrow">Controlled research workflow</span>
-            <h2>From chamber telemetry to session report</h2>
-            <p>
-                CoreLabTech combines chamber context, wearable data and pulse oximeter
-                measurements into one synchronized session record. This makes it easier
-                to review sensor quality, compare check-in and recovery response, and inspect the
-                synchronized session timeline.
-            </p>
+            <span class="about-eyebrow">{{ t('public.about.workflow_eyebrow') }}</span>
+            <h2>{{ t('public.about.report_title') }}</h2>
+            <p>{{ t('public.about.report_text') }}</p>
         </div>
     </section>
 
     <section class="about-section">
         <div class="about-section-heading">
             <div>
-                <h2>HBOT Session Flow</h2>
-                <p>Each stage preserves context for later analysis and report generation.</p>
+                <h2>{{ t('public.about.flow_title') }}</h2>
+                <p>{{ t('public.about.flow_text') }}</p>
             </div>
         </div>
 
         <div class="about-flow">
             <div>
                 <span>Check-in</span>
-                <strong>Baseline Check</strong>
-                <p>Record SpO2 and pulse before entering the chamber.</p>
+                <strong>{{ t('public.about.baseline_check') }}</strong>
+                <p>{{ t('public.about.baseline_text') }}</p>
             </div>
             <div>
                 <span>Session</span>
-                <strong>Chamber Monitoring</strong>
-                <p>Collect HR/HRV and SpO2/pulse timelines during the session.</p>
+                <strong>{{ t('public.about.chamber_monitoring') }}</strong>
+                <p>{{ t('public.about.chamber_text') }}</p>
             </div>
             <div>
                 <span>Recovery</span>
-                <strong>Recovery Check</strong>
-                <p>Compare post-session values with baseline response.</p>
+                <strong>{{ t('public.about.recovery_check') }}</strong>
+                <p>{{ t('public.about.recovery_text') }}</p>
             </div>
             <div>
                 <span>AI</span>
-                <strong>Wellness Analysis</strong>
-                <p>Generate score, session flags, findings and wellness report output.</p>
+                <strong>{{ t('public.about.wellness_analysis') }}</strong>
+                <p>{{ t('public.about.ai_text') }}</p>
             </div>
         </div>
     </section>
@@ -138,38 +126,32 @@
     <section class="about-section">
         <div class="about-section-heading">
             <div>
-                <h2>Why It Matters</h2>
-                <p>
-                    The goal is not diagnosis. The goal is clean, inspectable data that
-                    supports repeatable research review.
-                </p>
+                <h2>{{ t('public.about.why_title') }}</h2>
+                <p>{{ t('public.about.why_text') }}</p>
             </div>
         </div>
 
         <div class="about-card-grid">
             <article class="about-card">
-                <h3>Objective Data</h3>
-                <p>Structured signals reduce reliance on subjective notes after a session.</p>
+                <h3>{{ t('public.about.objective_data') }}</h3>
+                <p>{{ t('public.about.objective_text') }}</p>
             </article>
 
             <article class="about-card">
-                <h3>Recovery Insight</h3>
-                <p>Check-in to recovery comparison helps show how oxygenation and pulse changed.</p>
+                <h3>{{ t('public.about.recovery_insight') }}</h3>
+                <p>{{ t('public.about.recovery_insight_text') }}</p>
             </article>
 
             <article class="about-card">
-                <h3>Safety Review Layer</h3>
-                <p>Low SpO2, elevated pulse/HR or low HRV are highlighted for review.</p>
+                <h3>{{ t('public.about.safety_layer') }}</h3>
+                <p>{{ t('public.about.safety_layer_text') }}</p>
             </article>
         </div>
     </section>
 
     <section class="about-note">
-        <strong>Important note</strong>
-        <p>
-            CoreLabTech is a wellness monitoring platform. AI scores and session
-            flags are not a medical diagnosis and should not replace clinical evaluation.
-        </p>
+        <strong>{{ t('public.about.important_note') }}</strong>
+        <p>{{ t('public.about.note_text') }}</p>
     </section>
 
 </div>

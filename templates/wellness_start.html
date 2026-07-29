@@ -2,43 +2,39 @@
 {% block content %}
 
 <section class="content-page">
-    <p class="page-eyebrow">Operator onboarding</p>
-    <h1>Run a Consistent Wellness Session</h1>
-    <p>
-        Use the same client, sensor setup and timing approach across repeat
-        sessions. Consistency improves synchronization quality and makes the
-        personal baseline more useful.
-    </p>
+    <p class="page-eyebrow">{{ t('public.wellness.eyebrow') }}</p>
+    <h1>{{ t('public.wellness.title') }}</h1>
+    <p>{{ t('public.wellness.intro') }}</p>
 
     <div class="onboarding-grid">
         <article>
-            <strong>1. Select the client</strong>
-            <p>Create or select the correct client and confirm the wellness acknowledgement.</p>
+            <strong>{{ t('public.wellness.step1') }}</strong>
+            <p>{{ t('public.wellness.step1_text') }}</p>
         </article>
         <article>
-            <strong>2. Record Check-in context</strong>
-            <p>Add SpO2, pulse, sleep, stress, recent training load, fatigue and session goal.</p>
+            <strong>{{ t('public.wellness.step2') }}</strong>
+            <p>{{ t('public.wellness.step2_text') }}</p>
         </article>
         <article>
-            <strong>3. Upload session signals</strong>
-            <p>Upload HR/HRV FIT and SpO2/pulse CSV files, then review timestamp synchronization.</p>
+            <strong>{{ t('public.wellness.step3') }}</strong>
+            <p>{{ t('public.wellness.step3_text') }}</p>
         </article>
         <article>
-            <strong>4. Complete Recovery</strong>
-            <p>Record physiology and perceived energy, relaxation, fatigue and discomfort.</p>
+            <strong>{{ t('public.wellness.step4') }}</strong>
+            <p>{{ t('public.wellness.step4_text') }}</p>
         </article>
         <article>
-            <strong>5. Review the insight</strong>
-            <p>Read Wellness Response, Data Quality and Baseline Confidence separately.</p>
+            <strong>{{ t('public.wellness.step5') }}</strong>
+            <p>{{ t('public.wellness.step5_text') }}</p>
         </article>
         <article>
-            <strong>6. Build the baseline</strong>
-            <p>Use 5 sessions for an early trend and 14 quality sessions for a stronger baseline.</p>
+            <strong>{{ t('public.wellness.step6') }}</strong>
+            <p>{{ t('public.wellness.step6_text') }}</p>
         </article>
     </div>
 
     {% if current_user.is_authenticated and current_user.role in ["operator", "researcher", "admin"] %}
-        <p><a class="button-link" href="{{ url_for('research.chamber_testing') }}">Open Physiology Session</a></p>
+        <p><a class="button-link" href="{{ url_for('research.chamber_testing') }}">{{ t('public.wellness.open_session') }}</a></p>
     {% endif %}
 </section>
 

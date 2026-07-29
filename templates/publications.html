@@ -5,29 +5,22 @@
 <section class="publications-page">
     <div class="publications-hero">
         <div>
-            <span class="page-eyebrow">Research &amp; AI Testing Lab</span>
-            <h1>CoreLabTech Research</h1>
-            <p>
-                The research layer documents how physiological session data moves
-                through synchronization, analysis, AI-assisted review and quality
-                validation before it becomes a wellness report.
-            </p>
+            <span class="page-eyebrow">{{ t('public.publications.eyebrow') }}</span>
+            <h1>{{ t('public.publications.title') }}</h1>
+            <p>{{ t('public.publications.hero') }}</p>
         </div>
 
         <div class="publications-status">
-            <span>CoreLabTech files</span>
+            <span>{{ t('public.publications.files') }}</span>
             <strong>{{ papers|length }}</strong>
         </div>
     </div>
 
     <section class="research-lab-flow-card">
         <div>
-            <span class="publication-type">Validation pipeline</span>
-            <h2>Research &amp; AI Testing Lab</h2>
-            <p>
-                This is the internal R&amp;D and quality layer behind the commercial
-                wellness workflow.
-            </p>
+            <span class="publication-type">{{ t('public.publications.pipeline') }}</span>
+            <h2>{{ t('public.publications.eyebrow') }}</h2>
+            <p>{{ t('public.publications.pipeline_text') }}</p>
         </div>
 
         <div class="research-lab-flow">
@@ -41,107 +34,81 @@
 
     <section class="external-reference-section">
         <div class="publications-section-heading">
-            <span class="publication-type">External references</span>
-            <h2>Research &amp; Safety Context</h2>
-            <p>
-                External references are provided for scientific and safety context
-                only. These resources are not CoreLabTech publications and do not
-                imply affiliation, endorsement, sponsorship or validation of
-                CoreLabTech by PubMed, DAN or DAN Europe.
-            </p>
+            <span class="publication-type">{{ t('public.publications.external') }}</span>
+            <h2>{{ t('public.publications.context_title') }}</h2>
+            <p>{{ t('public.publications.context_text') }}</p>
         </div>
 
         <div class="research-reference-grid">
-        <article class="research-reference-card">
-            <span class="publication-type">Scientific background</span>
-            <h2>HBOT and Physiology</h2>
-            <p>
-                External literature search for hyperbaric oxygen therapy,
-                oxygenation and physiology monitoring.
-            </p>
-            <a href="https://pubmed.ncbi.nlm.nih.gov/?term=hyperbaric+oxygen+therapy+physiology" target="_blank" rel="noopener">
-                Search PubMed
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.science_background') }}</span>
+                <h2>{{ t('public.publications.hbot_title') }}</h2>
+                <p>{{ t('public.publications.hbot_text') }}</p>
+                <a href="https://pubmed.ncbi.nlm.nih.gov/?term=hyperbaric+oxygen+therapy+physiology" target="_blank" rel="noopener">
+                    {{ t('public.publications.search_pubmed') }}
+                </a>
+            </article>
 
-        <article class="research-reference-card">
-            <span class="publication-type">Scientific background</span>
-            <h2>HRV and Recovery</h2>
-            <p>
-                External literature search for heart-rate variability, recovery
-                and autonomic response.
-            </p>
-            <a href="https://pubmed.ncbi.nlm.nih.gov/?term=heart+rate+variability+recovery+physiology" target="_blank" rel="noopener">
-                Search PubMed
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.science_background') }}</span>
+                <h2>{{ t('public.publications.hrv_title') }}</h2>
+                <p>{{ t('public.publications.hrv_text') }}</p>
+                <a href="https://pubmed.ncbi.nlm.nih.gov/?term=heart+rate+variability+recovery+physiology" target="_blank" rel="noopener">
+                    {{ t('public.publications.search_pubmed') }}
+                </a>
+            </article>
 
-        <article class="research-reference-card">
-            <span class="publication-type">Scientific background</span>
-            <h2>Pulse Oximetry Data</h2>
-            <p>
-                External literature search for pulse oximetry, SpO2 measurement
-                and signal quality.
-            </p>
-            <a href="https://pubmed.ncbi.nlm.nih.gov/?term=pulse+oximetry+SpO2+signal+quality" target="_blank" rel="noopener">
-                Search PubMed
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.science_background') }}</span>
+                <h2>{{ t('public.publications.oximetry_title') }}</h2>
+                <p>{{ t('public.publications.oximetry_text') }}</p>
+                <a href="https://pubmed.ncbi.nlm.nih.gov/?term=pulse+oximetry+SpO2+signal+quality" target="_blank" rel="noopener">
+                    {{ t('public.publications.search_pubmed') }}
+                </a>
+            </article>
 
-        <article class="research-reference-card">
-            <span class="publication-type">Safety background</span>
-            <h2>DAN Research &amp; Reports</h2>
-            <p>
-                External reference hub for diving medicine, physiology, incident
-                learning and safety-oriented research reports.
-            </p>
-            <a href="https://dan.org/research-reports/" target="_blank" rel="noopener">
-                Open DAN
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.safety_background') }}</span>
+                <h2>{{ t('public.publications.dan_title') }}</h2>
+                <p>{{ t('public.publications.dan_text') }}</p>
+                <a href="https://dan.org/research-reports/" target="_blank" rel="noopener">
+                    {{ t('public.publications.open_dan') }}
+                </a>
+            </article>
 
-        <article class="research-reference-card">
-            <span class="publication-type">Safety background</span>
-            <h2>DAN Publication Library</h2>
-            <p>
-                External publication library with DAN articles, annual reports,
-                workshop proceedings and safety materials.
-            </p>
-            <a href="https://dan.org/research-reports/publication-library/" target="_blank" rel="noopener">
-                Open Library
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.safety_background') }}</span>
+                <h2>{{ t('public.publications.dan_library_title') }}</h2>
+                <p>{{ t('public.publications.dan_library_text') }}</p>
+                <a href="https://dan.org/research-reports/publication-library/" target="_blank" rel="noopener">
+                    {{ t('public.publications.open_library') }}
+                </a>
+            </article>
 
-        <article class="research-reference-card">
-            <span class="publication-type">Safety background</span>
-            <h2>DAN Europe Research</h2>
-            <p>
-                External DAN Europe research page focused on diving medicine,
-                physiology and hyperbaric exposure context.
-            </p>
-            <a href="https://www.daneurope.org/en/diving-medical-research" target="_blank" rel="noopener">
-                Open DAN Europe
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.safety_background') }}</span>
+                <h2>{{ t('public.publications.dan_europe_title') }}</h2>
+                <p>{{ t('public.publications.dan_europe_text') }}</p>
+                <a href="https://www.daneurope.org/en/diving-medical-research" target="_blank" rel="noopener">
+                    {{ t('public.publications.open_dan_europe') }}
+                </a>
+            </article>
 
-        <article class="research-reference-card">
-            <span class="publication-type">Safety background</span>
-            <h2>DAN Europe Publications</h2>
-            <p>
-                External list of selected scientific publications on diving
-                medicine and physiology.
-            </p>
-            <a href="https://www.daneurope.org/publications" target="_blank" rel="noopener">
-                Open Publications
-            </a>
-        </article>
+            <article class="research-reference-card">
+                <span class="publication-type">{{ t('public.publications.safety_background') }}</span>
+                <h2>{{ t('public.publications.dan_europe_publications_title') }}</h2>
+                <p>{{ t('public.publications.dan_europe_publications_text') }}</p>
+                <a href="https://www.daneurope.org/publications" target="_blank" rel="noopener">
+                    {{ t('public.publications.open_publications') }}
+                </a>
+            </article>
         </div>
     </section>
 
     {% if papers %}
         <section class="publications-section-heading">
-            <span class="publication-type">CoreLabTech publications</span>
-            <h2>Uploaded Research Files</h2>
+            <span class="publication-type">{{ t('public.publications.core_publications') }}</span>
+            <h2>{{ t('public.publications.uploaded_files') }}</h2>
         </section>
 
         <div class="publication-grid">
@@ -156,7 +123,7 @@
                     <div class="publication-meta">
                         <span>{{ paper.size_kb }} KB</span>
                         <a href="{{ url_for('pub.download_publication', filename=paper.filename) }}">
-                            Download
+                            {{ t('public.publications.download') }}
                         </a>
                     </div>
                 </article>
@@ -164,13 +131,9 @@
         </div>
     {% else %}
         <section class="publications-empty">
-            <span>CoreLabTech publications</span>
-            <h2>No CoreLabTech outcome publications yet</h2>
-            <p>
-                Do not list external papers as CoreLabTech publications. Add
-                platform-generated reports, white papers or validation notes here
-                after they are prepared for public release.
-            </p>
+            <span>{{ t('public.publications.core_publications') }}</span>
+            <h2>{{ t('public.publications.none_title') }}</h2>
+            <p>{{ t('public.publications.none_text') }}</p>
         </section>
     {% endif %}
 </section>

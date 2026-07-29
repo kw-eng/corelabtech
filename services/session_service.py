@@ -25,6 +25,8 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     KeepTogether,
     PageBreak,
@@ -34,6 +36,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from services.i18n_service import DEFAULT_LOCALE, catalog_for, normalize_locale
 
 SESSION_CLIENT_TABLES = (
     "tests",
@@ -49,6 +52,16 @@ SESSION_CLIENT_TABLES = (
     "hrv_intervals",
 )
 PRESSURE_OPERATIONAL_TOLERANCE_ATA = 0.05
+REPORT_FONT_NAME = "CoreLabTechUnicode"
+REPORT_FONT_REGISTERED = False
+REPORT_FONT_CANDIDATES = (
+    Path("static/fonts/NotoSans-Regular.ttf"),
+    Path("static/fonts/DejaVuSans.ttf"),
+    Path("C:/Windows/Fonts/arial.ttf"),
+    Path("C:/Windows/Fonts/segoeui.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
+)
 
 
 @dataclass(frozen=True)
@@ -704,12 +717,74 @@ def delete_research_sessions(
         connection.close()
 
 
+def register_report_font() -> str:
+    """Register a Unicode font for PDF output when one is available."""
+
+    global REPORT_FONT_REGISTERED
+
+    if REPORT_FONT_REGISTERED:
+        return REPORT_FONT_NAME
+
+    for candidate in REPORT_FONT_CANDIDATES:
+        if candidate.exists():
+            try:
+                pdfmetrics.registerFont(
+                    TTFont(REPORT_FONT_NAME, str(candidate))
+                )
+                REPORT_FONT_REGISTERED = True
+                return REPORT_FONT_NAME
+            except Exception:
+                continue
+
+    return "Helvetica"
+
+
+def make_report_styles():
+    """Create ReportLab styles with a Unicode-capable base font."""
+
+    font_name = register_report_font()
+    styles = getSampleStyleSheet()
+
+    for style_name in (
+        "Normal",
+        "BodyText",
+        "Title",
+        "Heading1",
+        "Heading2",
+    ):
+        if style_name in styles:
+            styles[style_name].fontName = font_name
+
+    return styles
+
+
+def report_catalog(locale: str | None) -> dict[str, str]:
+    """Return report translations for one locale with English fallback."""
+
+    return catalog_for(normalize_locale(locale or DEFAULT_LOCALE))
+
+
+def report_text(catalog: dict[str, str], key: str, **params: Any) -> str:
+    """Translate one report label with optional format params."""
+
+    text = catalog.get(key) or catalog_for(DEFAULT_LOCALE).get(key) or key
+
+    if params:
+        try:
+            return text.format(**params)
+        except (KeyError, ValueError):
+            return text
+
+    return text
+
+
 def generate_session_report(
     *,
     session_id: str,
     requesting_user_id: str | None,
     requesting_role: str,
     requesting_organization_id: int | None = None,
+    locale: str | None = None,
 ) -> Path:
     """Build a PDF report for one authorized session."""
 
@@ -733,6 +808,7 @@ def generate_session_report(
         path=path,
         session=session,
         report_data=report_data,
+        locale=locale,
     )
 
     return path
@@ -960,10 +1036,12 @@ def build_pdf_report(
     path: Path,
     session: dict[str, Any],
     report_data: dict[str, Any],
+    locale: str | None = None,
 ) -> None:
     """Render a concise, client-facing wellness session report."""
 
-    styles = getSampleStyleSheet()
+    catalog = report_catalog(locale)
+    styles = make_report_styles()
     styles.add(
         ParagraphStyle(
             name="BrandTitle",
@@ -1043,7 +1121,7 @@ def build_pdf_report(
         pagesize=A4,
         title=f"CoreLabTech wellness report {session['session_id']}",
         author="CoreLabTech",
-        subject="Wellness session report",
+        subject=report_text(catalog, "report.wellness_session"),
         leftMargin=17 * mm,
         rightMargin=17 * mm,
         topMargin=14 * mm,
@@ -1083,24 +1161,25 @@ def build_pdf_report(
             session=session,
             report_data=report_data,
             styles=styles,
+            catalog=catalog,
         ),
         Spacer(1, 12),
         make_metric_strip(
             [
                 (
-                    "WELLNESS RESPONSE",
+                    report_text(catalog, "report.metric_wellness_response"),
                     format_score(analysis.get("overall_score")),
                 ),
                 (
-                    "DATA QUALITY",
+                    report_text(catalog, "report.metric_data_quality"),
                     format_score(analysis.get("data_quality_score")),
                 ),
                 (
-                    "SYNC QUALITY",
+                    report_text(catalog, "report.metric_sync_quality"),
                     format_percent(features.get("match_rate")),
                 ),
                 (
-                    "SPO2 MINIMUM",
+                    report_text(catalog, "report.metric_spo2_minimum"),
                     format_measurement(analysis.get("hypoxia_score"), "%", 1),
                 ),
             ],
@@ -1109,11 +1188,17 @@ def build_pdf_report(
         Spacer(1, 8),
         KeepTogether(
             [
-                Paragraph("Session Overview", styles["ReportSection"]),
+                Paragraph(
+                    report_text(catalog, "report.session_overview"),
+                    styles["ReportSection"],
+                ),
                 make_table(
                     [
                         ("Client", subject.get("user_id")),
-                        ("Client session", f"Session {client_session_number}"),
+                        (
+                            report_text(catalog, "report.client_session"),
+                            f"Session {client_session_number}",
+                        ),
                         ("Date", format_report_datetime(session.get("created_at"))),
                         ("Program", f"{program_name} - {program_progress}"),
                         ("Protocol", session.get("protocol_name")),
@@ -1144,7 +1229,7 @@ def build_pdf_report(
                             ),
                         ),
                         (
-                            "Session status",
+                            report_text(catalog, "report.session_status"),
                             format_report_status(
                                 session.get("execution_status")
                                 or session.get("status")
@@ -1162,7 +1247,10 @@ def build_pdf_report(
                 KeepTogether(
                     [
                         Paragraph(
-                            "Wellness Interpretation",
+                            report_text(
+                                catalog,
+                                "report.wellness_interpretation",
+                            ),
                             styles["ReportSection"],
                         ),
                         Spacer(1, 2),
@@ -1175,7 +1263,7 @@ def build_pdf_report(
                 KeepTogether(
                     [
                         Paragraph(
-                            "Operator Review",
+                            report_text(catalog, "report.operator_review"),
                             styles["ReportSection"],
                         ),
                         Spacer(1, 2),
@@ -1190,9 +1278,12 @@ def build_pdf_report(
     else:
         story.extend(
             [
-                Paragraph("Wellness Interpretation", styles["ReportSection"]),
                 Paragraph(
-                    "No wellness analysis is available for this session yet.",
+                    report_text(catalog, "report.wellness_interpretation"),
+                    styles["ReportSection"],
+                ),
+                Paragraph(
+                    report_text(catalog, "report.no_analysis"),
                     styles["BodyText"],
                 ),
             ]
@@ -1201,7 +1292,10 @@ def build_pdf_report(
     story.append(
         KeepTogether(
             [
-                Paragraph("Session Data Quality", styles["ReportSection"]),
+                Paragraph(
+                    report_text(catalog, "report.session_data_quality"),
+                    styles["ReportSection"],
+                ),
                 make_table(
                     [
                         (
@@ -1243,8 +1337,7 @@ def build_pdf_report(
                 ),
                 Spacer(1, 5),
                 Paragraph(
-                    "Interpretation confidence depends on signal coverage, "
-                    "synchronization quality and operator review.",
+                    report_text(catalog, "report.confidence_note"),
                     styles["NoticeText"],
                 ),
             ]
@@ -1254,11 +1347,17 @@ def build_pdf_report(
     story.extend(
         [
             PageBreak(),
-            make_page_header("Session Details", styles),
+            make_page_header(
+                report_text(catalog, "report.session_details"),
+                styles,
+            ),
             Spacer(1, 6),
             KeepTogether(
                 [
-                    Paragraph("Session Timeline", styles["ReportSection"]),
+                    Paragraph(
+                        report_text(catalog, "report.session_timeline"),
+                        styles["ReportSection"],
+                    ),
                     make_table(
                         [
                             (
@@ -1386,7 +1485,10 @@ def build_pdf_report(
             ),
             KeepTogether(
                 [
-                    Paragraph("Session Environment", styles["ReportSection"]),
+                    Paragraph(
+                        report_text(catalog, "report.session_environment"),
+                        styles["ReportSection"],
+                    ),
                     make_table(
                         [
                             (
@@ -1438,7 +1540,10 @@ def build_pdf_report(
             ),
             KeepTogether(
                 [
-                    Paragraph("Data Sources", styles["ReportSection"]),
+                    Paragraph(
+                        report_text(catalog, "report.data_sources"),
+                        styles["ReportSection"],
+                    ),
                     make_table(
                         [
                             (
@@ -1459,7 +1564,10 @@ def build_pdf_report(
             ),
             KeepTogether(
                 [
-                    Paragraph("Personal Baseline", styles["ReportSection"]),
+                    Paragraph(
+                        report_text(catalog, "report.personal_baseline"),
+                        styles["ReportSection"],
+                    ),
                     make_table(
                         [
                             (
@@ -1510,9 +1618,7 @@ def build_pdf_report(
             ),
             Spacer(1, 4),
             Paragraph(
-                "<b>Wellness notice:</b> Educational wellness insights only. "
-                "Review together with session context, sensor quality and "
-                "operator judgment.",
+                "<b>" + escape_text(report_text(catalog, "report.wellness_notice")) + "</b>",
                 styles["NoticeText"],
             ),
         ]
@@ -1520,8 +1626,16 @@ def build_pdf_report(
 
     doc.build(
         story,
-        onFirstPage=draw_report_footer,
-        onLaterPages=draw_report_footer,
+        onFirstPage=lambda canvas, doc: draw_report_footer(
+            canvas,
+            doc,
+            catalog=catalog,
+        ),
+        onLaterPages=lambda canvas, doc: draw_report_footer(
+            canvas,
+            doc,
+            catalog=catalog,
+        ),
     )
 
 
@@ -1529,10 +1643,12 @@ def build_series_pdf_report(
     *,
     path: Path,
     series_data: dict[str, Any],
+    locale: str | None = None,
 ) -> None:
     """Render a concise wellness series report for one client."""
 
-    styles = getSampleStyleSheet()
+    catalog = report_catalog(locale)
+    styles = make_report_styles()
     styles.add(
         ParagraphStyle(
             name="BrandTitle",
@@ -1612,7 +1728,7 @@ def build_series_pdf_report(
         pagesize=A4,
         title=f"CoreLabTech wellness series report {series_data.get('user_id')}",
         author="CoreLabTech",
-        subject="Wellness session series report",
+        subject=report_text(catalog, "report.wellness_series"),
         leftMargin=17 * mm,
         rightMargin=17 * mm,
         topMargin=14 * mm,
@@ -1641,12 +1757,18 @@ def build_series_pdf_report(
     header = Table(
         [
             [
-                Paragraph("CoreLabTech", styles["BrandTitle"]),
-                Paragraph("Wellness Series Report", styles["ReportTitle"]),
+                Paragraph(
+                    report_text(catalog, "report.corelabtech"),
+                    styles["BrandTitle"],
+                ),
+                Paragraph(
+                    report_text(catalog, "report.wellness_series"),
+                    styles["ReportTitle"],
+                ),
             ],
             [
                 Paragraph(
-                    "Wellness Physiology &amp; Research Platform",
+                    report_text(catalog, "report.platform"),
                     styles["BrandSubtitle"],
                 ),
                 Paragraph(
@@ -1684,11 +1806,20 @@ def build_series_pdf_report(
         Spacer(1, 12),
         make_metric_strip(
             [
-                ("ANALYZED", series_data.get("records", 0)),
-                ("TREND", str(series_data.get("trend_direction") or "-").title()),
-                ("AVG SCORE", format_score(series_data.get("avg_score"))),
                 (
-                    "DATA QUALITY",
+                    report_text(catalog, "report.metric_analyzed"),
+                    series_data.get("records", 0),
+                ),
+                (
+                    report_text(catalog, "report.metric_trend"),
+                    str(series_data.get("trend_direction") or "-").title(),
+                ),
+                (
+                    report_text(catalog, "report.metric_avg_score"),
+                    format_score(series_data.get("avg_score")),
+                ),
+                (
+                    report_text(catalog, "report.metric_data_quality"),
                     format_score(series_data.get("avg_data_quality")),
                 ),
             ],
@@ -1697,7 +1828,10 @@ def build_series_pdf_report(
         Spacer(1, 8),
         KeepTogether(
             [
-                Paragraph("Series Overview", styles["ReportSection"]),
+                Paragraph(
+                    report_text(catalog, "report.series_overview"),
+                    styles["ReportSection"],
+                ),
                 make_table(
                     [
                         ("Client", series_data.get("user_id")),
@@ -1720,7 +1854,10 @@ def build_series_pdf_report(
         ),
         KeepTogether(
             [
-                Paragraph("Wellness Series Interpretation", styles["ReportSection"]),
+                Paragraph(
+                    report_text(catalog, "report.series_interpretation"),
+                    styles["ReportSection"],
+                ),
                 Paragraph(
                     escape_text(
                         series_data.get("wellness_interpretation")
@@ -1732,7 +1869,10 @@ def build_series_pdf_report(
         ),
         KeepTogether(
             [
-                Paragraph("First 5 vs Last 5", styles["ReportSection"]),
+                Paragraph(
+                    report_text(catalog, "report.first_last"),
+                    styles["ReportSection"],
+                ),
                 make_table(
                     [
                         (
@@ -1757,7 +1897,10 @@ def build_series_pdf_report(
         ),
         KeepTogether(
             [
-                Paragraph("Data Quality Engine", styles["ReportSection"]),
+                Paragraph(
+                    report_text(catalog, "report.data_quality_engine"),
+                    styles["ReportSection"],
+                ),
                 make_table(
                     [
                         ("Average coverage", format_percent(series_data.get("avg_coverage"))),
@@ -1786,22 +1929,31 @@ def build_series_pdf_report(
             ]
         ),
         PageBreak(),
-        make_page_header("Series Session Table", styles),
+        make_page_header(
+            report_text(catalog, "report.series_table"),
+            styles,
+        ),
         Spacer(1, 6),
-        make_series_session_table(analyses, styles),
+        make_series_session_table(analyses, styles, catalog=catalog),
         Spacer(1, 8),
         Paragraph(
-            "<b>Wellness notice:</b> Educational wellness insights only. "
-            "Series trends are not diagnoses and should be reviewed together "
-            "with data quality and operator context.",
+            "<b>" + escape_text(report_text(catalog, "report.series_notice")) + "</b>",
             styles["NoticeText"],
         ),
     ]
 
     doc.build(
         story,
-        onFirstPage=draw_report_footer,
-        onLaterPages=draw_report_footer,
+        onFirstPage=lambda canvas, doc: draw_report_footer(
+            canvas,
+            doc,
+            catalog=catalog,
+        ),
+        onLaterPages=lambda canvas, doc: draw_report_footer(
+            canvas,
+            doc,
+            catalog=catalog,
+        ),
     )
 
 
@@ -1810,6 +1962,7 @@ def make_report_header(
     session: dict[str, Any],
     report_data: dict[str, Any],
     styles,
+    catalog: dict[str, str],
 ) -> Table:
     """Create a light, restrained report header."""
 
@@ -1819,15 +1972,18 @@ def make_report_header(
     header = Table(
         [
             [
-                Paragraph("CoreLabTech", styles["BrandTitle"]),
                 Paragraph(
-                    "Wellness Session Report",
+                    report_text(catalog, "report.corelabtech"),
+                    styles["BrandTitle"],
+                ),
+                Paragraph(
+                    report_text(catalog, "report.wellness_session"),
                     styles["ReportTitle"],
                 ),
             ],
             [
                 Paragraph(
-                    "Wellness Physiology &amp; Research Platform",
+                    report_text(catalog, "report.platform"),
                     styles["BrandSubtitle"],
                 ),
                 Paragraph(
@@ -1925,6 +2081,7 @@ def make_comparison_table(rows: list[tuple[str, Any, Any]]) -> Table:
     """Create a check-in versus recovery comparison table."""
 
     body_style = getSampleStyleSheet()["BodyText"]
+    body_style.fontName = register_report_font()
     header_style = ParagraphStyle(
         "ComparisonHeader",
         parent=body_style,
@@ -1967,12 +2124,15 @@ def make_comparison_table(rows: list[tuple[str, Any, Any]]) -> Table:
 def make_series_session_table(
     analyses: list[dict[str, Any]],
     styles,
+    *,
+    catalog: dict[str, str],
 ) -> Table:
     """Create a compact table of analyzed sessions for the series report."""
 
     body_style = ParagraphStyle(
         "SeriesTableBody",
         parent=getSampleStyleSheet()["BodyText"],
+        fontName=register_report_font(),
         fontSize=7.4,
         leading=9,
     )
@@ -1985,14 +2145,14 @@ def make_series_session_table(
     )
     rows = [
         [
-            Paragraph("SESSION", header_style),
-            Paragraph("DATE", header_style),
-            Paragraph("SCORE", header_style),
-            Paragraph("QUALITY", header_style),
-            Paragraph("SYNC", header_style),
+            Paragraph(report_text(catalog, "report.table_session"), header_style),
+            Paragraph(report_text(catalog, "report.table_date"), header_style),
+            Paragraph(report_text(catalog, "report.table_score"), header_style),
+            Paragraph(report_text(catalog, "report.table_quality"), header_style),
+            Paragraph(report_text(catalog, "report.table_sync"), header_style),
             Paragraph("SPO2", header_style),
-            Paragraph("PULSE", header_style),
-            Paragraph("REVIEW", header_style),
+            Paragraph(report_text(catalog, "report.table_pulse"), header_style),
+            Paragraph(report_text(catalog, "report.table_review"), header_style),
         ]
     ]
 
@@ -2007,7 +2167,12 @@ def make_series_session_table(
                 Paragraph(escape_text(format_measurement(row.get("avg_spo2"), "%", 1)), body_style),
                 Paragraph(escape_text(format_measurement(row.get("avg_pulse"), " bpm", 0)), body_style),
                 Paragraph(
-                    "Review" if row.get("session_flagged") or row.get("quality_warning_count") else "OK",
+                    (
+                        report_text(catalog, "report.review_required")
+                        if row.get("session_flagged")
+                        or row.get("quality_warning_count")
+                        else report_text(catalog, "report.review_ok")
+                    ),
                     body_style,
                 ),
             ]
@@ -2023,7 +2188,10 @@ def make_series_session_table(
                 Paragraph("-", body_style),
                 Paragraph("-", body_style),
                 Paragraph("-", body_style),
-                Paragraph("No analyzed sessions", body_style),
+                Paragraph(
+                    report_text(catalog, "report.no_analyzed_sessions"),
+                    body_style,
+                ),
             ]
         )
 
@@ -2048,7 +2216,7 @@ def make_series_session_table(
     return table
 
 
-def draw_report_footer(canvas, doc) -> None:
+def draw_report_footer(canvas, doc, *, catalog: dict[str, str]) -> None:
     """Draw a consistent footer on each generated report page."""
 
     canvas.saveState()
@@ -2056,12 +2224,12 @@ def draw_report_footer(canvas, doc) -> None:
     canvas.setStrokeColor(colors.HexColor("#c9ced6"))
     canvas.setLineWidth(0.25)
     canvas.line(17 * mm, 14 * mm, width - 17 * mm, 14 * mm)
-    canvas.setFont("Helvetica", 7)
+    canvas.setFont(register_report_font(), 7)
     canvas.setFillColor(colors.HexColor("#4f6475"))
     canvas.drawString(
         17 * mm,
         9 * mm,
-        "CoreLabTech - Wellness insight only, not a medical diagnosis.",
+        report_text(catalog, "report.footer_notice"),
     )
     canvas.drawRightString(
         width - 17 * mm,
@@ -2075,6 +2243,7 @@ def make_table(rows: list[tuple[str, Any]]) -> Table:
     """Create a consistently styled two-column report table."""
 
     body_style = getSampleStyleSheet()["BodyText"]
+    body_style.fontName = register_report_font()
     table = Table(
         [
             [

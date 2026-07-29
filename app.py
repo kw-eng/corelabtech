@@ -18,6 +18,15 @@ from security.limiter import limiter
 from security.headers import configure_security_headers
 from security.csrf import csrf
 from services.logger_service import access_logger, app_logger, error_logger
+from services.i18n_service import (
+    LOCALE_COOKIE_NAME,
+    SUPPORTED_LOCALES,
+    catalog_for,
+    current_locale,
+    locale_from_request,
+    normalize_locale,
+    translate,
+)
 
 # =========================
 # BLUEPRINTS
@@ -146,6 +155,8 @@ def start_request_timer():
     """Capture request start time for access logging."""
 
     g.request_started_at = time.time()
+    g.locale = locale_from_request(request)
+    g.persist_locale = bool(request.args.get("lang"))
 
 
 @app.after_request
@@ -166,6 +177,45 @@ def log_request(response):
         duration_ms,
     )
 
+    if getattr(g, "persist_locale", False):
+        response.set_cookie(
+            LOCALE_COOKIE_NAME,
+            current_locale(),
+            max_age=60 * 60 * 24 * 365,
+            samesite="Lax",
+            secure=IS_PRODUCTION,
+        )
+
+    return response
+
+
+@app.context_processor
+def inject_i18n():
+    """Expose translation helpers and frontend catalog to templates."""
+
+    locale = current_locale()
+    return {
+        "t": translate,
+        "current_locale": locale,
+        "supported_locales": SUPPORTED_LOCALES,
+        "i18n_catalog": catalog_for(locale),
+    }
+
+
+@app.route("/set-language/<locale>")
+def set_language(locale: str):
+    """Persist a preferred interface language and return to the current page."""
+
+    selected_locale = normalize_locale(locale)
+    next_url = request.args.get("next") or request.referrer or url_for("main.home")
+    response = redirect(next_url)
+    response.set_cookie(
+        LOCALE_COOKIE_NAME,
+        selected_locale,
+        max_age=60 * 60 * 24 * 365,
+        samesite="Lax",
+        secure=IS_PRODUCTION,
+    )
     return response
 # =========================
 # LOGIN MANAGER

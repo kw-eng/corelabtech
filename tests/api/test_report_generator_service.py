@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import services.report_generator as report_generator
+from services.session_service import build_series_pdf_report
 
 
 class ReportGeneratorServiceTests(unittest.TestCase):
@@ -16,7 +17,7 @@ class ReportGeneratorServiceTests(unittest.TestCase):
                 report_generator,
                 "generate_session_report",
                 return_value=report_path,
-            ), patch.object(
+            ) as generate_session_report, patch.object(
                 report_generator,
                 "get_research_session",
                 return_value={
@@ -29,8 +30,14 @@ class ReportGeneratorServiceTests(unittest.TestCase):
                     requesting_user_id="OPERATOR_1",
                     requesting_role="operator",
                     requesting_organization_id=1,
+                    locale="pl",
                 )
 
+        generate_session_report.assert_called_once()
+        self.assertEqual(
+            generate_session_report.call_args.kwargs["locale"],
+            "pl",
+        )
         self.assertEqual(export.path, report_path)
         self.assertEqual(export.download_name, "corelabtech_SESSION_1_report.pdf")
         self.assertEqual(export.audit_action, "report.export")
@@ -44,9 +51,11 @@ class ReportGeneratorServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             reports_dir = Path(tmp_dir)
             created_paths = []
+            received_locales = []
 
-            def fake_build_series_pdf_report(*, path, series_data):
+            def fake_build_series_pdf_report(*, path, series_data, locale=None):
                 created_paths.append(Path(path))
+                received_locales.append(locale)
                 Path(path).write_bytes(b"%PDF-1.4\n% series\n")
 
             with patch.object(
@@ -77,9 +86,11 @@ class ReportGeneratorServiceTests(unittest.TestCase):
                     requesting_role="operator",
                     requesting_organization_id=1,
                     trend_limit=10,
+                    locale="pl",
                 )
 
         self.assertEqual(len(created_paths), 1)
+        self.assertEqual(received_locales, ["pl"])
         self.assertEqual(export.path, created_paths[0])
         self.assertEqual(
             export.download_name,
@@ -107,6 +118,64 @@ class ReportGeneratorServiceTests(unittest.TestCase):
                     requesting_organization_id=1,
                     trend_limit=10,
                 )
+
+    def test_series_pdf_report_renders_with_polish_locale(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "series_pl.pdf"
+
+            build_series_pdf_report(
+                path=path,
+                locale="pl",
+                series_data={
+                    "user_id": "CLIENT_1",
+                    "series_limit": 10,
+                    "records": 1,
+                    "session_count": 1,
+                    "avg_score": 90,
+                    "avg_data_quality": 81,
+                    "avg_coverage": 91,
+                    "avg_match_rate": 90,
+                    "latest_score": 90,
+                    "trend_direction": "stable",
+                    "wellness_interpretation": (
+                        "Trend wellness stabilny. Wymagana ocena operatora."
+                    ),
+                    "first_last_comparison": {
+                        "first_avg_score": 90,
+                        "last_avg_score": 91,
+                        "score_delta": 1,
+                        "first_avg_data_quality": 80,
+                        "last_avg_data_quality": 82,
+                        "data_quality_delta": 2,
+                    },
+                    "data_quality_engine": {
+                        "total_missing_samples": 0,
+                        "sensor_gap_sessions": 0,
+                        "hr_pulse_mismatch_sessions": 0,
+                        "spo2_warning_sessions": 0,
+                        "warning_counts": {},
+                        "explanation": (
+                            "Jakość danych opisuje zaufanie do synchronizacji."
+                        ),
+                    },
+                    "analyses": [
+                        {
+                            "session_id": "SESSION_1",
+                            "created_at": "2026-07-29T08:00:00",
+                            "overall_score": 90,
+                            "data_quality_score": 81,
+                            "match_rate": 90,
+                            "avg_spo2": 98,
+                            "avg_pulse": 58,
+                            "session_flagged": False,
+                            "quality_warning_count": 0,
+                        }
+                    ],
+                },
+            )
+
+            self.assertTrue(path.exists())
+            self.assertGreater(path.stat().st_size, 1000)
 
 
 if __name__ == "__main__":

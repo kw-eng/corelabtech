@@ -16,6 +16,13 @@ async function parseAdminJson(res, label) {
     }
 }
 
+function accountsT(key, params = null) {
+    if (typeof window.t === "function") {
+        return window.t(key, params)
+    }
+    return key
+}
+
 function setAccountsStatus(message, type = "info") {
     const box = document.getElementById("accountsStatus")
 
@@ -69,7 +76,7 @@ function renderAccounts(accounts) {
     if (!Array.isArray(accounts)) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5">Invalid response</td>
+                <td colspan="5">${accountsT("accounts.invalid_response")}</td>
             </tr>
         `
         return
@@ -78,7 +85,7 @@ function renderAccounts(accounts) {
     if (accounts.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5">No accounts found.</td>
+                <td colspan="5">${accountsT("accounts.no_accounts_found")}</td>
             </tr>
         `
         updateAccountKpis([])
@@ -86,7 +93,9 @@ function renderAccounts(accounts) {
     }
 
     accounts.forEach(account => {
-        const activeLabel = account.is_active ? "Active" : "Disabled"
+        const activeLabel = account.is_active
+            ? accountsT("accounts.active")
+            : accountsT("accounts.disabled")
 
         tbody.innerHTML += `
             <tr>
@@ -121,7 +130,7 @@ function renderAccounts(accounts) {
                         class="accounts-secondary"
                         onclick="resetPassword('${account.email}')"
                     >
-                        Reset Password
+                        ${accountsT("accounts.reset_password")}
                     </button>
                 </td>
             </tr>
@@ -132,7 +141,7 @@ function renderAccounts(accounts) {
 }
 
 async function loadAccounts() {
-    setAccountsStatus("Loading accounts...", "info")
+    setAccountsStatus(accountsT("accounts.loading_accounts"), "info")
 
     try {
         const res = await fetch("/api/admin/accounts", {
@@ -141,7 +150,7 @@ async function loadAccounts() {
         const accounts = await parseAdminJson(res, "LOAD ACCOUNTS")
 
         if (!res.ok || accounts.error) {
-            setAccountsStatus(accounts.error || "Loading accounts failed.", "error")
+            setAccountsStatus(accounts.error || accountsT("accounts.loading_failed"), "error")
             renderAccounts([])
             return
         }
@@ -150,7 +159,7 @@ async function loadAccounts() {
         setAccountsStatus("", "")
     } catch (err) {
         console.error("loadAccounts error", err)
-        setAccountsStatus(`Loading accounts crashed: ${err}`, "error")
+        setAccountsStatus(accountsT("accounts.loading_crashed", {error: err}), "error")
     }
 }
 
@@ -160,16 +169,16 @@ async function createAccount() {
     const role = document.getElementById("account_role").value
 
     if (!email) {
-        setAccountsStatus("Enter an email address.", "error")
+        setAccountsStatus(accountsT("accounts.enter_email"), "error")
         return
     }
 
     if (!password) {
-        setAccountsStatus("Enter a temporary password.", "error")
+        setAccountsStatus(accountsT("accounts.enter_password"), "error")
         return
     }
 
-    setAccountsStatus("Creating account...", "info")
+    setAccountsStatus(accountsT("accounts.creating_account"), "info")
 
     const res = await fetch("/api/admin/accounts", {
         method: "POST",
@@ -186,7 +195,7 @@ async function createAccount() {
     const data = await parseAdminJson(res, "CREATE ACCOUNT")
 
     if (!res.ok || data.error) {
-        setAccountsStatus(data.error || "Create account failed.", "error")
+        setAccountsStatus(data.error || accountsT("accounts.create_failed"), "error")
         return
     }
 
@@ -194,18 +203,18 @@ async function createAccount() {
     document.getElementById("account_password").value = ""
     document.getElementById("account_role").value = "viewer"
 
-    setAccountsStatus("Account created.", "success")
+    setAccountsStatus(accountsT("accounts.account_created"), "success")
     await loadAccounts()
 }
 
 async function resetPassword(email) {
-    const password = prompt(`New password for ${email}`)
+    const password = prompt(accountsT("accounts.new_password_for", {email}))
 
     if (!password) {
         return
     }
 
-    setAccountsStatus(`Updating password for ${email}...`, "info")
+    setAccountsStatus(accountsT("accounts.updating_password", {email}), "info")
 
     const res = await fetch("/api/admin/accounts/reset_password", {
         method: "POST",
@@ -221,15 +230,15 @@ async function resetPassword(email) {
     const data = await parseAdminJson(res, "RESET PASSWORD")
 
     if (!res.ok || data.error) {
-        setAccountsStatus(data.error || "Reset failed.", "error")
+        setAccountsStatus(data.error || accountsT("accounts.reset_failed"), "error")
         return
     }
 
-    setAccountsStatus("Password updated.", "success")
+    setAccountsStatus(accountsT("accounts.password_updated"), "success")
 }
 
 async function updateRole(email, role) {
-    setAccountsStatus(`Updating role for ${email}...`, "info")
+    setAccountsStatus(accountsT("accounts.updating_role", {email}), "info")
 
     const res = await fetch("/api/admin/accounts/update_role", {
         method: "POST",
@@ -245,17 +254,17 @@ async function updateRole(email, role) {
     const data = await parseAdminJson(res, "UPDATE ROLE")
 
     if (!res.ok || data.error) {
-        setAccountsStatus(data.error || "Update role failed.", "error")
+        setAccountsStatus(data.error || accountsT("accounts.update_role_failed"), "error")
         await loadAccounts()
         return
     }
 
-    setAccountsStatus("Role updated.", "success")
+    setAccountsStatus(accountsT("accounts.role_updated"), "success")
     await loadAccounts()
 }
 
 async function toggleActive(email, active) {
-    setAccountsStatus(`Updating account status for ${email}...`, "info")
+    setAccountsStatus(accountsT("accounts.updating_status", {email}), "info")
 
     const res = await fetch("/api/admin/accounts/toggle_active", {
         method: "POST",
@@ -271,12 +280,12 @@ async function toggleActive(email, active) {
     const data = await parseAdminJson(res, "TOGGLE ACTIVE")
 
     if (!res.ok || data.error) {
-        setAccountsStatus(data.error || "Update failed.", "error")
+        setAccountsStatus(data.error || accountsT("accounts.update_failed"), "error")
         await loadAccounts()
         return
     }
 
-    setAccountsStatus("Account status updated.", "success")
+    setAccountsStatus(accountsT("accounts.status_updated"), "success")
     await loadAccounts()
 }
 

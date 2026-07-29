@@ -2,51 +2,24 @@
 {% block content %}
 
 <section class="content-page">
-    <p class="page-eyebrow">CoreLabTech Wellness</p>
-    <h1>Privacy Notice</h1>
-    <p>
-        CoreLabTech processes client profile information, session check-ins,
-        uploaded physiology timelines, calculated wellness metrics and generated
-        reports for the purpose of delivering wellness session insights.
-    </p>
+    <p class="page-eyebrow">{{ t('public.legal.eyebrow') }}</p>
+    <h1>{{ t('public.privacy.title') }}</h1>
+    <p>{{ t('public.privacy.intro') }}</p>
 
-    <h2>Data handled by the platform</h2>
-    <p>
-        Data may include client identifiers, age, sex, weight, session notes,
-        sleep and recovery context, heart rate, HRV, SpO2, pulse, device metadata,
-        timestamps, signal-quality information and check-in/session/recovery responses.
-    </p>
+    <h2>{{ t('public.privacy.data_title') }}</h2>
+    <p>{{ t('public.privacy.data_text') }}</p>
 
-    <h2>Purpose and access</h2>
-    <p>
-        Data is used to operate sessions, synchronize compatible files, calculate
-        personal trends and generate client reports. Access should be limited to
-        authorized staff of the wellness provider and the client where applicable.
-    </p>
+    <h2>{{ t('public.privacy.purpose_title') }}</h2>
+    <p>{{ t('public.privacy.purpose_text') }}</p>
 
-    <h2>Retention and client rights</h2>
-    <p>
-        The wellness provider defines and documents the applicable retention
-        period. Authorized staff can export a client's records in a portable
-        archive and submit a controlled deletion. Exports and deletions are
-        recorded in the operational audit log. Data should not be retained longer
-        than required for the agreed wellness service or an applicable legal duty.
-    </p>
+    <h2>{{ t('public.privacy.retention_title') }}</h2>
+    <p>{{ t('public.privacy.retention_text') }}</p>
 
-    <h2>Processor relationship</h2>
-    <p>
-        For business customers, the wellness provider will normally determine the
-        purposes of client-data processing and CoreLabTech will process data under
-        the documented service and data-processing agreement. The final allocation
-        of roles must be confirmed for each deployment.
-    </p>
+    <h2>{{ t('public.privacy.processor_title') }}</h2>
+    <p>{{ t('public.privacy.processor_text') }}</p>
 
-    <h2>Important notice</h2>
-    <p>
-        CoreLabTech provides wellness and educational insights. It is not intended
-        to diagnose, treat, cure or prevent disease. This template should be
-        reviewed for the provider's jurisdiction and business model before launch.
-    </p>
+    <h2>{{ t('public.privacy.notice_title') }}</h2>
+    <p>{{ t('public.privacy.notice_text') }}</p>
 </section>
 
 {% endblock %}

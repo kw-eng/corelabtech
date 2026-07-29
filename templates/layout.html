@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ current_locale }}">
 
 <head>
     <meta charset="UTF-8">
@@ -10,6 +10,21 @@
         rel="stylesheet"
         href="{{ url_for('static', filename='css/style.css') }}?v=ai-testing-public-20260724"
     >
+
+    <script>
+        window.CORELABTECH_LOCALE = {{ current_locale|tojson }};
+        window.CORELABTECH_I18N = {{ i18n_catalog|tojson }};
+        window.t = function(key, params){
+            const catalog = window.CORELABTECH_I18N || {};
+            let text = catalog[key] || key;
+            if(params){
+                Object.keys(params).forEach(function(name){
+                    text = text.replaceAll("{" + name + "}", params[name]);
+                });
+            }
+            return text;
+        };
+    </script>
 
     {% block styles %}{% endblock %}
 </head>
@@ -32,15 +47,15 @@
 
     </div>
 
-    <nav class="main-nav" aria-label="Primary navigation">
+    <nav class="main-nav" aria-label="{{ t('nav.primary') }}">
 
         <div class="nav-group">
-            <a href="{{ url_for('main.home') }}">Home</a>
-            <a href="{{ url_for('main.about') }}">About</a>
-            <a href="{{ url_for('main.technology') }}">Technology</a>
-            <a href="{{ url_for('main.wellness_start') }}">Wellness Start</a>
-            <a href="{{ url_for('pub.publications') }}">Research</a>
-            <a href="{{ url_for('main.contact') }}">Contact</a>
+            <a href="{{ url_for('main.home') }}">{{ t('nav.home') }}</a>
+            <a href="{{ url_for('main.about') }}">{{ t('nav.about') }}</a>
+            <a href="{{ url_for('main.technology') }}">{{ t('nav.technology') }}</a>
+            <a href="{{ url_for('main.wellness_start') }}">{{ t('nav.wellness_start') }}</a>
+            <a href="{{ url_for('pub.publications') }}">{{ t('nav.research') }}</a>
+            <a href="{{ url_for('main.contact') }}">{{ t('nav.contact') }}</a>
         </div>
 
         {% if not current_user.is_authenticated %}
@@ -48,55 +63,66 @@
                 {% if config.INTERNAL_TOOLS_ENABLED %}
                 <a href="{{ url_for('research.ai_testing_lab_public') }}">AI Testing Lab</a>
                 {% endif %}
-                <a class="nav-primary" href="{{ url_for('auth.login') }}">Login</a>
+                <a class="nav-primary" href="{{ url_for('auth.login') }}">{{ t('nav.login') }}</a>
             </div>
         {% endif %}
 
         {% if current_user.is_authenticated %}
             <div class="nav-group nav-dropdown">
-                <button type="button">Wellness</button>
+                <button type="button">{{ t('nav.wellness') }}</button>
                 <div class="nav-menu">
                     {% if current_user.role in ["operator", "researcher", "admin"] %}
-                        <a href="{{ url_for('research.operator_dashboard') }}">Operator Dashboard</a>
-                        <a href="{{ url_for('research.chamber_testing') }}">New Session</a>
+                        <a href="{{ url_for('research.operator_dashboard') }}">{{ t('nav.operator_dashboard') }}</a>
+                        <a href="{{ url_for('research.chamber_testing') }}">{{ t('nav.new_session') }}</a>
                     {% endif %}
-                    <a href="{{ url_for('research.research_dashboard') }}">Session Reports</a>
-                    <a href="{{ url_for('ai.ai_lab') }}">Physiology Insights</a>
+                    <a href="{{ url_for('research.research_dashboard') }}">{{ t('nav.session_reports') }}</a>
+                    <a href="{{ url_for('ai.ai_lab') }}">{{ t('nav.physiology_insights') }}</a>
                 </div>
             </div>
 
             {% if config.INTERNAL_TOOLS_ENABLED and current_user.role in ["researcher", "admin"] %}
                 <div class="nav-group nav-dropdown">
-                    <button type="button">AI & QA</button>
+                    <button type="button">{{ t('nav.ai_qa') }}</button>
                     <div class="nav-menu">
-                        <a href="{{ url_for('ai.ai_lab') }}">AI Lab</a>
-                        <a href="{{ url_for('ai_qa.ai_qa_lab') }}">AI QA Lab</a>
-                        <a href="{{ url_for('qa.qa_lab') }}">Software QA Lab</a>
+                        <a href="{{ url_for('ai.ai_lab') }}">{{ t('nav.ai_lab') }}</a>
+                        <a href="{{ url_for('ai_qa.ai_qa_lab') }}">{{ t('nav.ai_qa_lab') }}</a>
+                        <a href="{{ url_for('qa.qa_lab') }}">{{ t('nav.software_qa_lab') }}</a>
                     </div>
                 </div>
             {% endif %}
 
             {% if current_user.role == "admin" %}
                 <div class="nav-group nav-dropdown">
-                    <button type="button">Management</button>
+                    <button type="button">{{ t('nav.management') }}</button>
                     <div class="nav-menu">
                         {% if config.INTERNAL_TOOLS_ENABLED %}
-                        <a href="{{ url_for('research.performance_tests') }}">Performance Tests</a>
-                        <a href="{{ url_for('research.admin_panel') }}">Mission Logs</a>
+                        <a href="{{ url_for('research.performance_tests') }}">{{ t('nav.performance_tests') }}</a>
+                        <a href="{{ url_for('research.admin_panel') }}">{{ t('nav.mission_logs') }}</a>
                         {% endif %}
                         {% if config.DEBUG_ROUTES_ENABLED %}
-                        <a href="{{ url_for('research.debug_db') }}">DB Debug</a>
+                        <a href="{{ url_for('research.debug_db') }}">{{ t('nav.db_debug') }}</a>
                         {% endif %}
-                        <a href="{{ url_for('research.admin_accounts') }}">Accounts</a>
+                        <a href="{{ url_for('research.admin_accounts') }}">{{ t('nav.accounts') }}</a>
                     </div>
                 </div>
             {% endif %}
 
             <div class="nav-group nav-group-right nav-account">
-                <a href="{{ url_for('auth.profile') }}">Profile</a>
-                <a class="nav-danger" href="{{ url_for('auth.logout') }}">Logout</a>
+                <a href="{{ url_for('auth.profile') }}">{{ t('nav.profile') }}</a>
+                <a class="nav-danger" href="{{ url_for('auth.logout') }}">{{ t('nav.logout') }}</a>
             </div>
         {% endif %}
+
+        <div class="nav-group nav-language" aria-label="Language">
+            <a
+                class="{{ 'active' if current_locale == 'en' else '' }}"
+                href="{{ url_for('set_language', locale='en', next=request.full_path) }}"
+            >EN</a>
+            <a
+                class="{{ 'active' if current_locale == 'pl' else '' }}"
+                href="{{ url_for('set_language', locale='pl', next=request.full_path) }}"
+            >PL</a>
+        </div>
 
     </nav>
 
@@ -114,15 +140,15 @@
 </main>
 
 <footer>
-    <p>&copy; 2026 CoreLabTech. Wellness Physiology &amp; Research Platform.</p>
+    <p>&copy; 2026 {{ t('footer.brand') }}</p>
     <p>
-        <a href="{{ url_for('main.privacy') }}">Privacy Notice</a>
+        <a href="{{ url_for('main.privacy') }}">{{ t('footer.privacy') }}</a>
         ·
-        <a href="{{ url_for('main.terms') }}">Wellness Terms</a>
+        <a href="{{ url_for('main.terms') }}">{{ t('footer.terms') }}</a>
         ·
-        <a href="{{ url_for('main.wellness_start') }}">Operator Onboarding</a>
+        <a href="{{ url_for('main.wellness_start') }}">{{ t('footer.operator_onboarding') }}</a>
     </p>
-    <p class="brand-disclaimer">FIT/wearable compatibility does not imply affiliation, endorsement or sponsorship by any device manufacturer, including Garmin.</p>
+    <p class="brand-disclaimer">{{ t('footer.compatibility') }}</p>
 </footer>
 
 </body>

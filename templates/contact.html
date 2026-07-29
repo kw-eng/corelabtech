@@ -6,92 +6,72 @@
 
     <section class="contact-hero">
         <div>
-            <span class="contact-eyebrow">Contact CoreLabTech</span>
-            <h1>Research, QA and HBOT monitoring inquiries</h1>
-            <p>
-                Use this page for research collaboration, HBOT session workflow questions,
-                telemetry integration issues and CoreLabTech software QA topics.
-            </p>
+            <span class="contact-eyebrow">{{ t('public.contact.eyebrow') }}</span>
+            <h1>{{ t('public.contact.title') }}</h1>
+            <p>{{ t('public.contact.hero') }}</p>
 
             <div class="contact-actions">
                 <a class="contact-primary-action" href="mailto:contact@corelabtech.pl">
-                    Email CoreLabTech
+                    {{ t('public.contact.email') }}
                 </a>
                 <a class="contact-secondary-action" href="{{ url_for('research.research_platform') }}">
-                    Open Platform
+                    {{ t('public.common.open_platform') }}
                 </a>
             </div>
         </div>
 
         <aside class="contact-direct-card">
-            <span>Primary contact</span>
+            <span>{{ t('public.contact.primary') }}</span>
             <a href="mailto:contact@corelabtech.pl">contact@corelabtech.pl</a>
-            <p>
-                For faster review, include the session ID, device type and a short
-                description of the issue or research question.
-            </p>
+            <p>{{ t('public.contact.include_note') }}</p>
         </aside>
     </section>
 
     <section class="contact-grid">
         <article class="contact-card">
-            <span>Research</span>
-            <h2>HBOT Session Review</h2>
-            <p>
-                Questions about session structure, Check-in/Session/Recovery workflow,
-                research reports and longitudinal observations.
-            </p>
+            <span>{{ t('public.common.research') }}</span>
+            <h2>{{ t('public.contact.research_card') }}</h2>
+            <p>{{ t('public.contact.research_text') }}</p>
         </article>
 
         <article class="contact-card">
-            <span>Telemetry</span>
-            <h2>Session Timeline Data</h2>
-            <p>
-                Support for HR/HRV files from compatible wearables, SpO2/pulse data from pulse oximeters,
-                merge quality and synchronized timelines.
-            </p>
+            <span>{{ t('public.common.telemetry') }}</span>
+            <h2>{{ t('public.contact.telemetry_card') }}</h2>
+            <p>{{ t('public.contact.telemetry_text') }}</p>
         </article>
 
         <article class="contact-card">
-            <span>Software QA</span>
-            <h2>Platform Validation</h2>
-            <p>
-                Issues related to AI analysis output, charts, reports, endpoint behavior
-                or automated QA workflows.
-            </p>
+            <span>{{ t('public.common.software_qa') }}</span>
+            <h2>{{ t('public.contact.qa_card') }}</h2>
+            <p>{{ t('public.contact.qa_text') }}</p>
         </article>
     </section>
 
     <section class="contact-panel">
         <div>
-            <h2>What To Include</h2>
-            <p>
-                A concise report helps reproduce and resolve issues quickly.
-            </p>
+            <h2>{{ t('public.contact.include_title') }}</h2>
+            <p>{{ t('public.contact.include_intro') }}</p>
         </div>
 
         <div class="contact-checklist">
             <div>
-                <strong>Session context</strong>
-                <span>Session ID, client ID and stage: Check-in, Session or Recovery.</span>
+                <strong>{{ t('public.contact.context') }}</strong>
+                <span>{{ t('public.contact.context_text') }}</span>
             </div>
             <div>
-                <strong>Source files</strong>
-                <span>HR/HRV filename, SpO2/pulse filename and approximate session time.</span>
+                <strong>{{ t('public.contact.files') }}</strong>
+                <span>{{ t('public.contact.files_text') }}</span>
             </div>
             <div>
-                <strong>Observed result</strong>
-                <span>What you expected, what happened, and which page showed the issue.</span>
+                <strong>{{ t('public.contact.result') }}</strong>
+                <span>{{ t('public.contact.result_text') }}</span>
             </div>
         </div>
     </section>
 
     <section class="contact-note">
-        <strong>Wellness-only platform</strong>
-        <p>
-            CoreLabTech analysis output is intended for wellness and monitoring review.
-            It is not a medical diagnosis or clinical decision system.
-        </p>
+        <strong>{{ t('public.contact.wellness_only') }}</strong>
+        <p>{{ t('public.contact.wellness_only_text') }}</p>
     </section>
 
 </div>

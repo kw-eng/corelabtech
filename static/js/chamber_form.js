@@ -22,6 +22,14 @@ const TABLE_RENDER_CHUNK_SIZE = 100
 const FIT_UPLOAD_TIMEOUT_MS = 120000
 const GENERATED_SESSION_SUFFIX_PATTERN = /_\d{10,}$/
 
+function i18n(key, params = null) {
+    if (typeof window !== "undefined" && typeof window.t === "function") {
+        return window.t(key, params)
+    }
+
+    return key
+}
+
 async function parseJsonResponse(res, label) {
     const text = await res.text()
 
@@ -189,7 +197,7 @@ function hasContextValues(context) {
 
 function contextPreview(context) {
     if (!hasContextValues(context)) {
-        return "No check-in context added"
+        return i18n("chamber.no_checkin_context")
     }
 
     return Object.entries(context)
@@ -356,7 +364,7 @@ function updateProgress() {
     document.getElementById(
         "progressText"
     ).innerHTML =
-        "Progress: " + progress + "%"
+        i18n("chamber.progress", {progress})
 }
 
 // ========================================
@@ -428,15 +436,19 @@ function updateDurationPreview() {
     const values = [compression, exposure, decompression]
 
     if (values.some(value => !Number.isFinite(value) || value < 0)) {
-        setText("duration_preview", "Enter valid phase durations.")
+        setText("duration_preview", i18n("chamber.enter_valid_durations"))
         return
     }
 
     const total = compression + exposure + decompression
     setText(
         "duration_preview",
-        `${compression} min compression · ${exposure} min at target pressure · ` +
-        `${decompression} min decompression · ${total} min total`
+        i18n("chamber.duration_preview", {
+            compression,
+            exposure,
+            decompression,
+            total
+        })
     )
 
     const protocol = getSelectedProtocol()
@@ -480,7 +492,10 @@ async function loadCommercialContext() {
                 const option = document.createElement("option")
                 option.value = program.program_id
                 option.textContent =
-                    `${program.name} | ${program.total_sessions} sessions`
+                    i18n("chamber.program_sessions", {
+                        name: program.name,
+                        total: program.total_sessions
+                    })
                 select.appendChild(option)
             })
         }
@@ -511,12 +526,12 @@ async function loadClientPrograms(preferredEnrollmentId = null) {
     select.replaceChildren()
     const empty = document.createElement("option")
     empty.value = ""
-    empty.textContent = "Single session / no package"
+    empty.textContent = i18n("session.single_no_package")
     select.appendChild(empty)
     state.enrollments = []
 
     if (!clientId) {
-        setText("program_progress", "No active program selected.")
+        setText("program_progress", i18n("session.no_active_program"))
         return
     }
 
@@ -540,7 +555,7 @@ async function loadClientPrograms(preferredEnrollmentId = null) {
             option.dataset.protocolId = enrollment.protocol_id || ""
             const statusLabel =
                 enrollment.status === "paused"
-                    ? "Paused | "
+                    ? i18n("session.paused_prefix")
                     : ""
             option.textContent =
                 `${statusLabel}${enrollment.program_name} | ` +
@@ -569,25 +584,33 @@ function renderProgramProgress() {
     renderProgramManagementControls(enrollment)
 
     if (!enrollment) {
-        setText("program_progress", "Single session, outside a package.")
+        setText("program_progress", i18n("session.single_outside_package"))
         return
     }
 
     if (enrollment.status === "paused") {
         setText(
             "program_progress",
-            `${enrollment.program_name}: paused at ` +
-            `${enrollment.completed_sessions}/${enrollment.total_sessions}. ` +
-            "Resume it before assigning new sessions."
+            i18n("chamber.program_paused", {
+                name: enrollment.program_name,
+                completed: enrollment.completed_sessions,
+                total: enrollment.total_sessions
+            }) + " " +
+            i18n("session.resume_before_assigning")
         )
         return
     }
 
     setText(
         "program_progress",
-        `${enrollment.program_name}: ${enrollment.completed_sessions}/` +
-        `${enrollment.total_sessions} completed, ` +
-        `${enrollment.remaining_sessions} remaining`
+        `${enrollment.program_name}: ` + i18n(
+            "session.completed_remaining",
+            {
+                completed: enrollment.completed_sessions,
+                total: enrollment.total_sessions,
+                remaining: enrollment.remaining_sessions
+            }
+        )
     )
     if (enrollment.protocol_id) {
         document.getElementById("protocol_id").value = enrollment.protocol_id
@@ -617,7 +640,7 @@ async function enrollSelectedClient() {
         document.getElementById("program_catalog")?.value
     )
     if (!clientId || !programId) {
-        alert("Select a client and program")
+        alert(i18n("chamber.select_client_program_alert"))
         return
     }
     const response = await fetch("/api/client-programs", {
@@ -629,9 +652,9 @@ async function enrollSelectedClient() {
             program_id: programId
         })
     })
-    const data = await parseJsonResponse(response, "ENROLL CLIENT")
+    const data = await parseJsonResponse(response, "ASSIGN PACKAGE")
     if (!response.ok) {
-        alert(data.error || "Client enrollment failed")
+        alert(data.error || i18n("chamber.enrollment_failed"))
         return
     }
     await loadClientPrograms(data.enrollment_id)
@@ -646,13 +669,15 @@ async function updateSelectedProgramStatus(status) {
     )
 
     if (!enrollment) {
-        alert("Select a client program first")
+        alert(i18n("chamber.select_program_first"))
         return
     }
 
     if (
         status === "cancelled" &&
-        !confirm(`Cancel ${enrollment.program_name} for this client?`)
+        !confirm(i18n("chamber.cancel_program_confirm", {
+            name: enrollment.program_name
+        }))
     ) {
         return
     }
@@ -663,10 +688,10 @@ async function updateSelectedProgramStatus(status) {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({status})
     })
-    const data = await parseJsonResponse(response, "UPDATE CLIENT PROGRAM")
+    const data = await parseJsonResponse(response, "UPDATE CLIENT PACKAGE")
 
     if (!response.ok || data.error) {
-        alert(data.error || "Program update failed")
+        alert(data.error || i18n("chamber.program_update_failed"))
         return
     }
 
@@ -695,23 +720,23 @@ function addSessionSegment(phase = "exposure", duration = "") {
     row.className = "segment-row"
     row.innerHTML = `
         <select class="segment-phase">
-            <option value="compression">Compression</option>
-            <option value="exposure">Exposure</option>
-            <option value="air_break">Air break</option>
-            <option value="decompression">Decompression</option>
-            <option value="recovery">Recovery</option>
-            <option value="other">Other</option>
+            <option value="compression">${escapeHtml(i18n("chamber.segment_compression"))}</option>
+            <option value="exposure">${escapeHtml(i18n("chamber.segment_exposure"))}</option>
+            <option value="air_break">${escapeHtml(i18n("chamber.segment_air_break"))}</option>
+            <option value="decompression">${escapeHtml(i18n("chamber.segment_decompression"))}</option>
+            <option value="recovery">${escapeHtml(i18n("chamber.segment_recovery"))}</option>
+            <option value="other">${escapeHtml(i18n("chamber.segment_other"))}</option>
         </select>
         <input class="segment-duration" type="number" min="0" max="360"
-            step="1" value="${Number(duration) || 0}" aria-label="Duration min">
+            step="1" value="${Number(duration) || 0}" aria-label="${escapeHtml(i18n("chamber.segment_duration_min"))}">
         <input class="segment-target-ata" type="number" min="1" max="3"
             step="0.01" value="${getSelectedProtocol()?.target_ata || ""}"
-            aria-label="Target ATA">
+            aria-label="${escapeHtml(i18n("chamber.segment_target_ata"))}">
         <input class="segment-actual-ata" type="number" min="1" max="3"
-            step="0.01" placeholder="Actual ATA" aria-label="Actual ATA">
-        <input class="segment-note" placeholder="Segment note"
-            aria-label="Segment note">
-        <button type="button" class="danger-btn" title="Remove segment">×</button>
+            step="0.01" placeholder="${escapeHtml(i18n("chamber.segment_actual_ata"))}" aria-label="${escapeHtml(i18n("chamber.segment_actual_ata"))}">
+        <input class="segment-note" placeholder="${escapeHtml(i18n("chamber.segment_note"))}"
+            aria-label="${escapeHtml(i18n("chamber.segment_note"))}">
+        <button type="button" class="danger-btn" title="${escapeHtml(i18n("chamber.remove_segment"))}">×</button>
     `
     row.querySelector(".segment-phase").value = phase
     row.querySelector("button").onclick = () => {
@@ -744,7 +769,7 @@ function updateSegmentsTotal() {
         (sum, segment) => sum + (segment.actual_duration_min || 0),
         0
     )
-    setText("segments_total", `${total} min total across detailed segments`)
+    setText("segments_total", i18n("chamber.total_segments", {total}))
 }
 
 function applyProtocolTimingDefaults() {
@@ -754,7 +779,7 @@ function applyProtocolTimingDefaults() {
     if (!protocol) {
         if (preview) {
             preview.textContent =
-                "Select a protocol to view its planned phase timing."
+                i18n("chamber.select_protocol_timing")
         }
         return
     }
@@ -779,10 +804,12 @@ function applyProtocolTimingDefaults() {
     document.getElementById("during_decompression_min").value = decompression
 
     if (preview) {
-        preview.textContent =
-            `Planned: ${compression} min compression · ` +
-            `${exposure} min at target pressure · ` +
-            `${decompression} min decompression · ${total} min total`
+        preview.textContent = i18n("chamber.plan_preview", {
+            compression,
+            exposure,
+            decompression,
+            total
+        })
     }
     updateDurationPreview()
 }
@@ -809,15 +836,16 @@ function updatePressurePreview() {
     if (!preview) return
 
     if (!selectedProtocol) {
-        preview.textContent = "Select a wellness protocol."
+        preview.textContent = i18n("chamber.select_protocol")
         return
     }
 
     const targetAta = Number(selectedProtocol.target_ata)
 
     if (actualAta === null) {
-        preview.textContent =
-            `Target: ${targetAta.toFixed(2)} ATA. Enter recorded pressure.`
+        preview.textContent = i18n("chamber.pressure_target_enter", {
+            target: targetAta.toFixed(2)
+        })
         return
     }
 
@@ -825,10 +853,11 @@ function updatePressurePreview() {
     const differenceLabel =
         `${difference >= 0 ? "+" : ""}${difference.toFixed(3)} ATA`
 
-    preview.textContent =
-        `Target: ${targetAta.toFixed(2)} ATA | ` +
-        `Recorded: ${actualAta.toFixed(3)} ATA | ` +
-        `Difference: ${differenceLabel}`
+    preview.textContent = i18n("chamber.pressure_preview", {
+        target: targetAta.toFixed(2),
+        recorded: actualAta.toFixed(3),
+        difference: differenceLabel
+    })
 }
 
 async function loadSessionConfiguration() {
@@ -872,19 +901,19 @@ async function loadSessionConfiguration() {
         protocolSelect.replaceChildren()
         const placeholder = document.createElement("option")
         placeholder.value = ""
-        placeholder.textContent = "Select protocol"
+        placeholder.textContent = i18n("chamber.select_protocol")
         protocolSelect.appendChild(placeholder)
 
         protocols.forEach(protocol => {
             const option = document.createElement("option")
             option.value = protocol.protocol_id
             option.textContent =
-                `${protocol.name} · ${protocol.planned_duration_min || "-"} min`
+                i18n("chamber.protocol_option", {
+                    name: protocol.name,
+                    minutes: protocol.planned_duration_min || "-"
+                })
             protocolSelect.appendChild(option)
-            option.textContent =
-                `${protocol.name} | ${protocol.planned_duration_min || "-"} min total`
         })
-
         const preferredProtocol = protocols.find(
             protocol => protocol.code === "WELLNESS_1_5"
         )
@@ -925,7 +954,7 @@ async function loadSessionConfiguration() {
         updatePressurePreview()
     } catch (error) {
         console.error("Session configuration load failed:", error)
-        setText("ata_preview", "Chamber/protocol configuration unavailable.")
+        setText("ata_preview", i18n("chamber.config_unavailable"))
     }
 }
 
@@ -961,13 +990,17 @@ function initOxygenPreview() {
             values.push(`${lpm.toFixed(1)} L/min`)
         }
         if (Number.isFinite(oxygenPercent) && oxygenPercent > 0) {
-            values.push(`${oxygenPercent.toFixed(1)}% O2 in mask`)
+            values.push(i18n("chamber.mask_o2_value", {
+                value: oxygenPercent.toFixed(1)
+            }))
         }
 
         document.getElementById("oxygen_preview").innerText =
             values.length
-                ? `Recorded: ${values.join(" | ")}`
-                : "Enter concentrator flow; Mask O2 is estimated from 2-10 L/min = 87-96% O2."
+                ? i18n("chamber.recorded_values", {
+                    values: values.join(" | ")
+                })
+                : i18n("chamber.oxygen_preview_empty")
     }
 
     oxygen.addEventListener("input", renderRecordedOxygen)
@@ -1012,7 +1045,7 @@ function go(phase) {
         phase === "during" &&
         !state.pre?.saved
     ) {
-        alert("Save Check-in first")
+        alert(i18n("chamber.save_check_in_first"))
         return
     }
 
@@ -1020,7 +1053,7 @@ function go(phase) {
         phase === "post" &&
         !state.during?.saved
     ) {
-        alert("Save Session first")
+        alert(i18n("chamber.save_session_first"))
         return
     }
 
@@ -1056,7 +1089,7 @@ async function createSubject() {
         )
 
     if (!subjectId) {
-        alert("Enter Client ID")
+        alert(i18n("chamber.enter_client_id"))
         return
     }
 
@@ -1096,11 +1129,11 @@ async function createSubject() {
 
     if (!res.ok || data.error) {
 
-        alert(data.error || "Create client failed")
+        alert(data.error || i18n("chamber.create_client_failed"))
         return
     }
 
-    alert("Client created")
+    alert(i18n("chamber.client_created"))
 
     await loadSubjects()
 }
@@ -1117,11 +1150,14 @@ async function deleteSubject() {
         subjectSelect.options[subjectSelect.selectedIndex]?.text || subjectId
 
     if (!subjectId) {
-        alert("No client selected")
+        alert(i18n("chamber.no_client_selected"))
         return
     }
 
-    if (!confirm(`Are you sure you want to delete this client and all related sessions?\n\nClient: ${subjectLabel}\nID: ${subjectId}`)) {
+    if (!confirm(i18n("chamber.delete_client_confirm", {
+        client: subjectLabel,
+        id: subjectId
+    }))) {
         return
     }
 
@@ -1152,16 +1188,16 @@ async function deleteSubject() {
             data = JSON.parse(text)
         } catch (e) {
             console.error("Delete subject non-JSON response:", text)
-            alert("Delete subject returned HTML. Check CSRF/auth/route.")
+            alert(i18n("chamber.backend_html_response"))
             return
         }
 
         if (!res.ok || data.error) {
-            alert(data.error || "Delete client failed")
+            alert(data.error || i18n("chamber.delete_client_failed"))
             return
         }
 
-        alert("Client deleted")
+        alert(i18n("chamber.client_deleted"))
 
         loadSubjects()
 
@@ -1173,7 +1209,7 @@ async function deleteSubject() {
 
         console.error("deleteSubject crash:", err)
 
-        alert("Delete subject crashed - check console and Flask logs")
+        alert(i18n("chamber.delete_client_crashed"))
     }
 }
 
@@ -1313,7 +1349,7 @@ async function savePRE() {
 
     if (!spo2 || !pulse) {
 
-        alert("Fill Check-in data")
+        alert(i18n("chamber.fill_check_in"))
         return
     }
 
@@ -1375,7 +1411,7 @@ async function savePRE() {
 
             alert(
                 data.error ||
-                "Check-in save failed"
+                i18n("chamber.check_in_save_failed")
             )
 
             return
@@ -1393,7 +1429,7 @@ async function savePRE() {
 
             <div class="success-box">
 
-                <b>Check-in saved</b>
+                <b>${escapeHtml(i18n("chamber.check_in_saved"))}</b>
 
                 <br><br>
 
@@ -1428,7 +1464,7 @@ async function savePRE() {
 
         })
 
-        alert("Check-in saved successfully")
+        alert(i18n("chamber.check_in_saved_success"))
 
     } catch (err) {
 
@@ -1436,7 +1472,7 @@ async function savePRE() {
 
         state.pre = null
 
-        alert("Server error during Check-in save")
+        alert(i18n("chamber.check_in_server_error"))
     }
 }
 
@@ -1457,7 +1493,7 @@ async function uploadFIT() {
 
     if (!input.files.length) {
 
-        alert("Select HR/HRV timeline file")
+        alert(i18n("chamber.select_hr_file"))
         return
     }
 
@@ -1467,7 +1503,7 @@ async function uploadFIT() {
 
     if (!sessionId) {
 
-        alert("Generate session first")
+        alert(i18n("chamber.generate_session_first"))
         return
     }
 
@@ -1493,7 +1529,7 @@ async function uploadFIT() {
         if (status) {
             status.innerHTML = `
                 <div class="success-box">
-                    Uploading and parsing HR/HRV timeline...
+                    ${escapeHtml(i18n("chamber.uploading_hr"))}
                 </div>
             `
         }
@@ -1533,13 +1569,13 @@ async function uploadFIT() {
 
             alert(
                 data.error ||
-                "HR/HRV timeline upload failed"
+                i18n("chamber.hr_upload_failed")
             )
 
             if (status) {
                 status.innerHTML = `
                     <div class="error-box">
-                        ${data.error || "HR/HRV timeline upload failed"}
+                        ${escapeHtml(data.error || i18n("chamber.hr_upload_failed"))}
                     </div>
                 `
             }
@@ -1550,30 +1586,23 @@ async function uploadFIT() {
         if (status) {
             const fitStatusMessage =
                 duplicateImport
-                    ? "HR/HRV timeline already imported"
-                    : "HR/HRV timeline uploaded"
+                    ? i18n("chamber.hr_timeline_already_imported")
+                    : i18n("chamber.hr_timeline_uploaded")
 
             status.innerHTML = `
 
             <div class="success-box">
 
-                HR/HRV timeline uploaded
+                ${escapeHtml(fitStatusMessage)}
 
                 <br>
 
-                Records:
-                ${data.records_saved || data.records || 0}
+                ${escapeHtml(i18n("chamber.records_count", {
+                    count: data.records_saved || data.records || 0
+                }))}
 
             </div>
             `
-
-            const fitStatusBox =
-                status.querySelector(".success-box")
-
-            if (fitStatusBox && fitStatusBox.firstChild) {
-                fitStatusBox.firstChild.textContent =
-                    `\n\n                ${fitStatusMessage}\n\n                `
-            }
         }
 
         await loadFITTable(sessionId, data.import_id)
@@ -1590,8 +1619,8 @@ async function uploadFIT() {
 
         const message =
             err.name === "AbortError"
-                ? "HR/HRV timeline upload timed out"
-                : "HR/HRV timeline upload server error"
+                ? i18n("chamber.hr_upload_timeout")
+                : i18n("chamber.hr_upload_server_error")
 
         if (status) {
             status.innerHTML = `
@@ -1615,7 +1644,7 @@ function exportClient() {
     const clientId = getSelectedSubjectId()
 
     if (!clientId) {
-        alert("Select a client first")
+        alert(i18n("chamber.select_client_first"))
         return
     }
 
@@ -1642,7 +1671,7 @@ async function loadFITTable(session, importId = null) {
     tbody.innerHTML = `
         <tr>
             <td colspan="4">
-                Loading HR/HRV preview...
+                ${escapeHtml(i18n("chamber.hr_preview_loading"))}
             </td>
         </tr>
     `
@@ -1668,12 +1697,12 @@ let data = await parseJsonResponse(res, "LOAD HR/HRV TIMELINE")
     if (!Array.isArray(data)) {
 
         console.error(data)
-        setText("fitTableStatus", "HR/HRV table error: invalid API response")
+        setText("fitTableStatus", i18n("chamber.hr_table_invalid_response"))
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="4">
-                    Invalid HR/HRV data
+                    ${escapeHtml(i18n("chamber.hr_data_invalid"))}
                 </td>
             </tr>
         `
@@ -1682,12 +1711,12 @@ let data = await parseJsonResponse(res, "LOAD HR/HRV TIMELINE")
     }
 
     if (data.length === 0) {
-        setText("fitTableStatus", "HR/HRV table: 0 records")
+        setText("fitTableStatus", i18n("chamber.hr_table_records", {count: 0}))
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="4">
-                    No HR/HRV records
+                    ${escapeHtml(i18n("chamber.hr_no_records"))}
                 </td>
             </tr>
         `
@@ -1697,7 +1726,7 @@ let data = await parseJsonResponse(res, "LOAD HR/HRV TIMELINE")
 
     setText(
         "fitTableStatus",
-        `HR/HRV table: rendering ${data.length} records...`
+        i18n("chamber.hr_table_rendering", {count: data.length})
     )
 
     await renderTableRowsChunked(
@@ -1714,15 +1743,15 @@ let data = await parseJsonResponse(res, "LOAD HR/HRV TIMELINE")
     setText(
         "fitTableStatus",
         data.length >= TABLE_PREVIEW_LIMIT
-            ? `HR/HRV table: first ${data.length} records loaded`
-            : `HR/HRV table: ${data.length} records loaded`
+            ? i18n("chamber.hr_table_first_loaded", {count: data.length})
+            : i18n("chamber.hr_table_loaded", {count: data.length})
     )
 
     } catch (err) {
         console.error("loadFITTable failed", err)
         setText(
             "fitTableStatus",
-            `HR/HRV table error: ${err.message || err}`
+            i18n("chamber.hr_table_error", {error: err.message || err})
         )
     }
 }
@@ -1738,7 +1767,7 @@ async function uploadCSV() {
 
     if (!input.files.length) {
 
-        alert("Select SpO2/pulse timeline file")
+        alert(i18n("chamber.select_spo2_file"))
         return
     }
 
@@ -1781,7 +1810,7 @@ let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
 
             alert(
                 data.error ||
-                "SpO2/pulse timeline upload failed"
+                i18n("chamber.spo2_upload_failed")
             )
 
             return
@@ -1793,12 +1822,17 @@ let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
 
             <div class="success-box">
 
-                SpO2/pulse timeline uploaded
+                ${escapeHtml(
+                    duplicateImport
+                        ? i18n("chamber.spo2_timeline_already_imported")
+                        : i18n("chamber.spo2_timeline_uploaded")
+                )}
 
                 <br>
 
-                Records:
-                ${data.records_saved || data.records || 0}
+                ${escapeHtml(i18n("chamber.records_count", {
+                    count: data.records_saved || data.records || 0
+                }))}
 
             </div>
         `
@@ -1815,7 +1849,7 @@ let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
 
         console.error(err)
 
-        alert("SpO2/pulse timeline upload server error")
+        alert(i18n("chamber.spo2_upload_server_error"))
     }
 }
 
@@ -1836,7 +1870,7 @@ async function loadCSVTable(session, importId = null) {
     tbody.innerHTML = `
         <tr>
             <td colspan="3">
-                Loading SpO2/pulse preview...
+                ${escapeHtml(i18n("chamber.spo2_preview_loading"))}
             </td>
         </tr>
     `
@@ -1860,12 +1894,12 @@ let res = await fetch(
 let data = await parseJsonResponse(res, "LOAD SPO2/PULSE TIMELINE")
 
     if (!Array.isArray(data)) {
-        setText("csvTableStatus", "SpO2/pulse table error: invalid API response")
+        setText("csvTableStatus", i18n("chamber.spo2_table_invalid_response"))
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="3">
-                    Invalid SpO2/pulse data
+                    ${escapeHtml(i18n("chamber.spo2_data_invalid"))}
                 </td>
             </tr>
         `
@@ -1874,12 +1908,12 @@ let data = await parseJsonResponse(res, "LOAD SPO2/PULSE TIMELINE")
     }
 
     if (data.length === 0) {
-        setText("csvTableStatus", "SpO2/pulse table: 0 records")
+        setText("csvTableStatus", i18n("chamber.spo2_table_records", {count: 0}))
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="3">
-                    No SpO2/pulse records
+                    ${escapeHtml(i18n("chamber.spo2_no_records"))}
                 </td>
             </tr>
         `
@@ -1889,7 +1923,7 @@ let data = await parseJsonResponse(res, "LOAD SPO2/PULSE TIMELINE")
 
     setText(
         "csvTableStatus",
-        `SpO2/pulse table: rendering ${data.length} records...`
+        i18n("chamber.spo2_table_rendering", {count: data.length})
     )
 
     await renderTableRowsChunked(
@@ -1904,14 +1938,14 @@ let data = await parseJsonResponse(res, "LOAD SPO2/PULSE TIMELINE")
 
     setText(
         "csvTableStatus",
-        `SpO2/pulse table: ${data.length} records loaded`
+        i18n("chamber.spo2_table_loaded", {count: data.length})
     )
 
     } catch (err) {
         console.error("loadCSVTable failed", err)
         setText(
             "csvTableStatus",
-            `SpO2/pulse table error: ${err.message || err}`
+            i18n("chamber.spo2_table_error", {error: err.message || err})
         )
     }
 }
@@ -1929,7 +1963,7 @@ async function mergeDuring() {
     console.log("MERGE SESSION ID:", sessionId)
 
     if (!sessionId) {
-        alert("No session_id")
+        alert(i18n("chamber.no_session_id"))
         return []
     }
 
@@ -1951,13 +1985,13 @@ async function mergeDuring() {
         const data = await parseJsonResponse(res, "MERGE DURING")
 
         if (data.error && data.raw) {
-            alert("Backend returned HTML/non-JSON response")
+            alert(i18n("chamber.backend_html_response"))
             return []
 }
 
         if (!res.ok || data.error) {
             console.error("Merge backend error:", data)
-            alert(data.error || "Merge failed")
+            alert(data.error || i18n("chamber.merge_failed"))
             return []
         }
 
@@ -1983,7 +2017,7 @@ async function mergeDuring() {
                     Mode: ${data.mode || "-"}<br>
                     HR/HRV samples: ${data.fit_samples ?? "-"}<br>
                     SpO2/pulse samples: ${data.csv_samples ?? "-"}<br>
-                    Merged samples: ${merged.length}<br>
+                    ${escapeHtml(i18n("chamber.merged_samples", {count: merged.length}))}<br>
                     Matched: ${data.matched_records ?? "-"}
                     (${data.match_rate ?? "-"}%)<br>
                     HR/HRV time offset: ${data.fit_time_offset_hours ?? 0}h
@@ -1998,7 +2032,7 @@ async function mergeDuring() {
     } catch (err) {
 
         console.error("mergeDuring crash:", err)
-        alert("Merge crashed - check Flask terminal and browser console")
+        alert(i18n("chamber.merge_crashed"))
         return []
     }
 }
@@ -2121,17 +2155,17 @@ async function saveDURING() {
         optionalNumberInput("during_oxygen_percent")
 
     if (!selectedChamber || !selectedProtocol) {
-        alert("Select chamber and protocol")
+        alert(i18n("chamber.select_chamber_protocol"))
         return
     }
 
     if (selectedEnrollment && selectedEnrollment.status !== "active") {
-        alert("Resume the selected program before assigning this session to it.")
+        alert(i18n("chamber.resume_program_before_session"))
         return
     }
 
     if (!Number.isFinite(pressure) || pressure <= 0) {
-        alert("Enter recorded pressure")
+        alert(i18n("chamber.enter_recorded_pressure"))
         return
     }
 
@@ -2145,7 +2179,7 @@ async function saveDURING() {
         effectiveTotalDurationMin > 360 ||
         effectiveTotalDurationMin < 1
     ) {
-        alert("Enter valid session phase durations")
+        alert(i18n("chamber.enter_valid_durations"))
         return
     }
 
@@ -2153,7 +2187,7 @@ async function saveDURING() {
         ["modified", "interrupted"].includes(executionStatus) &&
         !deviationReason
     ) {
-        alert("Enter the reason for a modified or interrupted session")
+        alert(i18n("chamber.enter_deviation_reason"))
         return
     }
 
@@ -2161,7 +2195,7 @@ async function saveDURING() {
     const targetAta = Number(selectedProtocol.target_ata)
 
     if (ata === null || ata < 1 || ata > 3) {
-        alert("Recorded pressure does not produce a valid ATA value")
+        alert(i18n("chamber.invalid_pressure_ata"))
         return
     }
 
@@ -2169,7 +2203,7 @@ async function saveDURING() {
         ata >
         Number(selectedChamber.max_ata) + PRESSURE_OPERATIONAL_TOLERANCE_ATA
     ) {
-        alert("Recorded ATA exceeds the selected chamber maximum")
+        alert(i18n("chamber.pressure_exceeds_chamber"))
         return
     }
 
@@ -2202,7 +2236,7 @@ async function saveDURING() {
         csv && csv.length > 0
 
     if (!hasFIT && !hasCSV) {
-        alert("Upload HR/HRV or SpO2/pulse timeline first")
+        alert(i18n("chamber.upload_timeline_first"))
         return
     }
 
@@ -2210,7 +2244,7 @@ async function saveDURING() {
         await mergeDuring()
 
     if (!merged || merged.length === 0) {
-        alert("Merge failed or no merged data")
+        alert(i18n("chamber.merge_empty"))
         return
     }
 
@@ -2295,29 +2329,29 @@ async function saveDURING() {
     await parseJsonResponse(saveRes, "SAVE DURING")
 
     if (!saveRes.ok || saveData.error) {
-        alert(saveData.error || "Session save failed")
+        alert(saveData.error || i18n("chamber.session_save_failed"))
         return
     }
 
     document.getElementById("preview_during").innerHTML = `
         <div class="warning-box">
-            <b>Session saved</b><br><br>
+            <b>${escapeHtml(i18n("chamber.session_saved"))}</b><br><br>
 
-            Chamber: ${escapeHtml(selectedChamber.name)}<br>
-            Protocol: ${escapeHtml(selectedProtocol.name)}<br>
-            Target ATA: ${targetAta.toFixed(2)}<br>
-            Recorded ATA: ${ata.toFixed(3)}<br>
-            Difference: ${(ata - targetAta).toFixed(3)} ATA<br>
-            Session time: ${effectiveTotalDurationMin} min total
+            ${escapeHtml(i18n("chamber.preview_chamber"))}: ${escapeHtml(selectedChamber.name)}<br>
+            ${escapeHtml(i18n("chamber.preview_protocol"))}: ${escapeHtml(selectedProtocol.name)}<br>
+            ${escapeHtml(i18n("chamber.preview_target_ata"))}: ${targetAta.toFixed(2)}<br>
+            ${escapeHtml(i18n("chamber.preview_recorded_ata"))}: ${ata.toFixed(3)}<br>
+            ${escapeHtml(i18n("chamber.preview_difference"))}: ${(ata - targetAta).toFixed(3)} ATA<br>
+            ${escapeHtml(i18n("chamber.preview_session_time"))}: ${escapeHtml(i18n("chamber.minutes_total", {minutes: effectiveTotalDurationMin}))}
             (${compressionTimeMin} / ${exposureTimeMin} / ${decompressionTimeMin} min)<br>
-            Execution: ${escapeHtml(executionStatus)}<br>
-            Deviation reason: ${escapeHtml(deviationReason || "-")}<br>
-            Temp: ${temp}°C<br>
-            O2: ${oxygenPercent || "-"}%<br><br>
+            ${escapeHtml(i18n("chamber.preview_execution"))}: ${escapeHtml(executionStatus)}<br>
+            ${escapeHtml(i18n("chamber.preview_deviation_reason"))}: ${escapeHtml(deviationReason || "-")}<br>
+            ${escapeHtml(i18n("chamber.preview_temp"))}: ${temp}°C<br>
+            ${escapeHtml(i18n("chamber.preview_o2"))}: ${oxygenPercent || "-"}%<br><br>
 
-            HR/HRV Samples: ${hasFIT ? fit.length : 0}<br>
-            SpO2/pulse Samples: ${hasCSV ? csv.length : 0}<br>
-            Merged Samples: ${merged.length}
+            ${escapeHtml(i18n("chamber.preview_hr_samples"))}: ${hasFIT ? fit.length : 0}<br>
+            ${escapeHtml(i18n("chamber.preview_spo2_samples"))}: ${hasCSV ? csv.length : 0}<br>
+            ${escapeHtml(i18n("chamber.preview_merged_samples"))}: ${merged.length}
         </div>
     `
 
@@ -2351,7 +2385,7 @@ async function saveDURING() {
         go("post")
     })
 
-    alert("Session saved")
+    alert(i18n("chamber.session_saved"))
 }
 
 // ========================================
@@ -2376,7 +2410,7 @@ async function savePOST() {
 
     if (!spo2 || !pulse) {
 
-        alert("Fill Recovery data")
+        alert(i18n("session.fill_recovery_data"))
         return
     }
 
@@ -2430,7 +2464,7 @@ async function savePOST() {
 
     if (!res.ok || data.error) {
         console.error("POST save error:", data)
-        alert(data.error || "Recovery save failed")
+        alert(data.error || i18n("session.recovery_save_failed"))
         return []
     }
 
@@ -2441,7 +2475,7 @@ async function savePOST() {
 
         <div class="success-box">
 
-            Recovery saved
+            ${i18n("session.recovery_saved")}
 
             <br><br>
 
@@ -2469,7 +2503,7 @@ async function savePOST() {
 
     // await saveFullSession()
 
-    alert("Recovery saved")
+    alert(i18n("session.recovery_saved"))
 }
 
 // ========================================
@@ -2483,7 +2517,7 @@ async function saveFullSession() {
         !state.during ||
         !state.post
     ) {
-        alert("Complete all phases")
+        alert(i18n("session.complete_all_phases"))
         return
     }
 
@@ -2491,7 +2525,7 @@ async function saveFullSession() {
         document.getElementById("wellness_consent")
 
     if (!wellnessConsent?.checked) {
-        alert("Confirm the wellness-only client acknowledgement before saving")
+        alert(i18n("chamber.confirm_wellness_consent"))
         return
     }
 
@@ -2538,7 +2572,7 @@ async function saveFullSession() {
             data = JSON.parse(text)
         } catch (e) {
             console.error("Save full session non-JSON:", text)
-            alert("Save full session returned HTML. Check Flask logs.")
+            alert(i18n("chamber.save_full_html_response"))
             return
         }
 
@@ -2547,12 +2581,14 @@ async function saveFullSession() {
         console.log("SAVE FULL RESPONSE:", data)
 
         if (!res.ok || data.error) {
-            alert(data.error || "Save failed")
+            alert(data.error || i18n("chamber.save_failed"))
             return
         }
 
         if (data.saved_count !== 1) {
-            alert("Backend did not confirm save. saved_count=" + data.saved_count)
+            alert(i18n("chamber.backend_save_not_confirmed", {
+                count: data.saved_count
+            }))
             return
         }
 
@@ -2573,13 +2609,13 @@ async function saveFullSession() {
             console.error("AI after save failed:", aiErr)
         }
 
-        alert("Full session saved")
+        alert(i18n("chamber.full_session_saved"))
 
     } catch (err) {
 
         console.error("saveFullSession error:", err)
 
-        alert("Network/server error")
+        alert(i18n("chamber.network_server_error"))
     }
 }
 
@@ -2617,7 +2653,7 @@ async function loadSessions() {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="4">No saved sessions</td>
+                <td colspan="4">${escapeHtml(i18n("chamber.no_saved_sessions"))}</td>
             </tr>
         `
 
@@ -2641,7 +2677,7 @@ async function loadSessions() {
 
                 <td>
                     <button onclick="runAnalysis('${s.session_id}')">
-                        Analyze
+                        ${escapeHtml(i18n("chamber.analyze"))}
                     </button>
                 </td>
             </tr>
@@ -2670,7 +2706,7 @@ async function deleteSessions() {
 
     if (sessions.length === 0) {
 
-        alert("No sessions selected")
+        alert(i18n("chamber.no_sessions_selected"))
         return
     }
 
@@ -2690,7 +2726,7 @@ const res = await fetch("/api/delete_sessions", {
 const data = await parseJsonResponse(res, "DELETE SESSIONS")
 
 if (!res.ok || data.error) {
-    alert(data.error || "Delete sessions failed")
+    alert(data.error || i18n("chamber.delete_sessions_failed"))
     return
 }
 
@@ -2720,28 +2756,29 @@ async function runAnalysis(sessionId) {
         const data = await parseJsonResponse(res, "RUN ANALYSIS")
 
         if (data.error && data.raw) {
-        alert("AI analysis returned HTML/non-JSON response")
+        alert(i18n("chamber.ai_html_response"))
         return
 }
 
         console.log("AI RESPONSE:", data)
 
         if (!res.ok || data.error) {
-            alert(data.error || "AI analysis failed")
+            alert(data.error || i18n("chamber.ai_failed"))
             return
         }
 
         const sessionFlagText =
             data.anomaly
-                ? "Review recommended"
-                : "No session quality flag"
+                ? i18n("analysis.review_recommended")
+                : i18n("analysis.no_session_quality_flag")
 
         const aiSummary =
             document.getElementById("ai-summary")
 
         if (aiSummary) {
             aiSummary.innerHTML =
-                "<b>Summary:</b> " + escapeHtml(data.summary || "-")
+                `<b>${escapeHtml(i18n("analysis.summary"))}:</b> ` +
+                escapeHtml(translateAnalysisText(data.summary || "-"))
         }
 
         const aiScore =
@@ -2749,7 +2786,7 @@ async function runAnalysis(sessionId) {
 
         if (aiScore) {
             aiScore.innerHTML =
-                "<b>Wellness response:</b> " +
+                `<b>${escapeHtml(i18n("analysis.wellness_response"))}:</b> ` +
                 escapeHtml(data.score ?? "-") +
                 " / 100"
         }
@@ -2759,9 +2796,9 @@ async function runAnalysis(sessionId) {
 
         if (aiAnomaly) {
             aiAnomaly.innerHTML =
-                "<b>Data quality:</b> " +
+                `<b>${escapeHtml(i18n("analysis.data_quality"))}:</b> ` +
                 escapeHtml(data.data_quality_score ?? "-") +
-                " / 100 · <b>Session review:</b> " +
+                ` / 100 · <b>${escapeHtml(i18n("analysis.session_review"))}:</b> ` +
                 escapeHtml(sessionFlagText)
         }
 
@@ -2771,7 +2808,7 @@ async function runAnalysis(sessionId) {
     } catch (err) {
 
         console.error("runAnalysis crash:", err)
-        alert("AI analysis crashed")
+        alert(i18n("chamber.ai_crashed"))
     }
 }
 
@@ -2854,7 +2891,7 @@ async function updateLatestSessionInsight(data) {
 
 function formatMetric(value, unit = "") {
     if (value === undefined || value === null || value === "") {
-        return `<span class="muted-value">Not available</span>`
+        return `<span class="muted-value">${escapeHtml(i18n("analysis.not_available"))}</span>`
     }
 
     const suffix = unit ? ` <span class="metric-unit">${unit}</span>` : ""
@@ -2864,7 +2901,7 @@ function formatMetric(value, unit = "") {
 
 function formatScore(value) {
     if (value === undefined || value === null || value === "") {
-        return `<span class="muted-value">Pending</span>`
+        return `<span class="muted-value">${escapeHtml(i18n("analysis.pending"))}</span>`
     }
 
     return `${escapeHtml(value)}<span class="metric-unit">/100</span>`
@@ -2875,12 +2912,15 @@ function riskClass(label) {
 
     if (
         normalized.includes("high") ||
-        normalized.includes("elevated")
+        normalized.includes("elevated") ||
+        normalized.includes("obciąż")
     ) return "status-high"
     if (
         normalized.includes("moderate") ||
         normalized.includes("quality") ||
-        normalized.includes("review")
+        normalized.includes("review") ||
+        normalized.includes("jako") ||
+        normalized.includes("przegl")
     ) return "status-moderate"
 
     return "status-low"
@@ -2892,13 +2932,13 @@ function renderFindingList(items, fallback, className = "") {
         : []
 
     if (!cleanItems.length) {
-        return `<div class="empty-state">${escapeHtml(fallback)}</div>`
+        return `<div class="empty-state">${escapeHtml(translateAnalysisText(fallback))}</div>`
     }
 
     return `
         <ul class="ai-finding-list ${className}">
             ${cleanItems
-                .map(item => `<li>${escapeHtml(item)}</li>`)
+                .map(item => `<li>${escapeHtml(translateAnalysisText(item))}</li>`)
                 .join("")}
         </ul>
     `
@@ -2907,10 +2947,148 @@ function renderFindingList(items, fallback, className = "") {
 function renderMetricRows(rows) {
     return rows.map(row => `
         <div class="metric-row">
-            <span>${escapeHtml(row.label)}</span>
+            <span>${escapeHtml(translateAnalysisText(row.label))}</span>
             <strong>${formatMetric(row.value, row.unit)}</strong>
         </div>
     `).join("")
+}
+
+function translateAnalysisText(value) {
+    let text = String(value ?? "")
+    const exactKeys = {
+        "Wellness Response": "analysis.score_type_wellness_response",
+        "Wellness response": "analysis.wellness_response",
+        "Stable response": "analysis.stable_response",
+        "Review recommended": "analysis.review_recommended",
+        "No session quality flag": "analysis.no_session_quality_flag",
+        "Elevated load": "analysis.elevated_load",
+        "Review data quality": "analysis.review_data_quality",
+        "Recovery trend": "analysis.recovery_trend",
+        "SpO2 remained stable and within the expected range": "analysis.spo2_stable_expected",
+        "Notable discrepancy between wearable heart rate and pulse oximeter pulse": "analysis.hr_pulse_discrepancy",
+        "SpO2 dropped below the configured low oxygenation threshold": "analysis.spo2_low_threshold",
+        "SpO2 was below the preferred wellness range": "analysis.spo2_below_preferred",
+        "Average HRV was below the configured recovery threshold": "analysis.hrv_below_threshold",
+        "Heart rate exceeded the configured high-load threshold": "analysis.hr_high_load_threshold",
+        "No significant deviations detected.": "analysis.no_significant_deviations",
+        "No critical rule-based finding was detected.": "analysis.no_critical_rule_finding",
+        "No rule-based warning detected.": "analysis.no_rule_warning",
+        "No additional positive findings.": "analysis.no_positive_findings",
+        "Wellness-only score. Not a medical diagnosis.": "analysis.wellness_only_not_diagnosis",
+        "Wellness and educational insight only. Not intended to diagnose, treat, cure, or prevent disease.": "analysis.wellness_educational_disclaimer",
+        "Average SpO2": "analysis.avg_spo2",
+        "Minimum SpO2": "analysis.min_spo2",
+        "Maximum SpO2": "analysis.max_spo2",
+        "Average pulse": "analysis.avg_pulse",
+        "Pulse range": "analysis.pulse_range",
+        "Average HR": "analysis.avg_hr",
+        "HR range": "analysis.hr_range",
+        "Average HRV": "analysis.avg_hrv",
+        "HR/HRV samples": "analysis.hr_hrv_samples",
+        "SpO2/pulse samples": "analysis.spo2_pulse_samples",
+        "Merged samples": "analysis.merged_samples",
+        "SpO2/pulse artifacts ignored": "analysis.spo2_artifacts_ignored",
+        "Review context": "analysis.review_context",
+        "Elevated load indicators": "analysis.elevated_load_indicators",
+        "SpO2 warning": "analysis.spo2_warning",
+        "HRV warning": "analysis.hrv_warning",
+        "Data quality": "analysis.data_quality",
+        "Baseline confidence": "analysis.baseline_confidence",
+        "Unique sessions (30d)": "analysis.unique_sessions_30d",
+        "Strong baseline": "analysis.strong_baseline",
+        "Early trend": "analysis.early_trend",
+        "Collecting data": "analysis.collecting_data"
+    }
+
+    if (exactKeys[text]) {
+        return i18n(exactKeys[text])
+    }
+
+    const mismatchSummary = text.match(
+        /^(.+?)\. A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse, which may indicate sensor alignment, time alignment issues, or signal artifact\. The maximum observed difference was ([0-9.]+) bpm\.$/
+    )
+    if (mismatchSummary) {
+        return `${translateAnalysisText(mismatchSummary[1])}. ${i18n("analysis.hr_pulse_discrepancy_detail", {
+            difference: mismatchSummary[2]
+        })}`
+    }
+
+    const mismatchOnly = text.match(
+        /^A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse, which may indicate sensor alignment, time alignment issues, or signal artifact\. The maximum observed difference was ([0-9.]+) bpm\.$/
+    )
+    if (mismatchOnly) {
+        return i18n("analysis.hr_pulse_discrepancy_detail", {
+            difference: mismatchOnly[1]
+        })
+    }
+
+    const noContext =
+        "No elevated sleep, fatigue, stress or recent activity context was flagged in the available check-in data."
+    if (text === noContext) {
+        return i18n("analysis.no_context_flags")
+    }
+
+    text = text.replaceAll(
+        "SpO2 remained stable and within the expected range",
+        i18n("analysis.spo2_stable_expected")
+    )
+    text = text.replace(
+        /Pulse, wearable HR and HRV should be interpreted as wellness trend signals: (.*?)(?:\.(?= (?:Check-in|A notable))|\.$)/g,
+        (_, details) => i18n("analysis.pulse_hrv_summary", {
+            details: translateAnalysisPhysiologyDetails(details)
+        })
+    )
+    text = text.replaceAll(noContext, i18n("analysis.no_context_flags"))
+    text = text.replace(
+        /Check-in context may influence today’s physiology interpretation: (.*?)(?:\.(?= (?:A notable))|\.$)/g,
+        (_, details) => i18n("analysis.context_summary", {
+            details: translateAnalysisContextDetails(details)
+        })
+    )
+    text = text.replace(
+        /A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse, which may indicate sensor alignment, time alignment issues, or signal artifact\. The maximum observed difference was ([0-9.]+) bpm\./g,
+        (_, difference) => i18n("analysis.hr_pulse_discrepancy_detail", {
+            difference
+        })
+    )
+
+    return text
+}
+
+function translateAnalysisPhysiologyDetails(value) {
+    return String(value || "")
+        .replace(
+            /Pulse averaged ([0-9.]+) bpm \(range ([0-9.]+)-([0-9.]+) bpm\)/g,
+            (_, avg, min, max) => i18n("analysis.phys_pulse_avg_range", {avg, min, max})
+        )
+        .replace(
+            /wearable HR averaged ([0-9.]+) bpm \(range ([0-9.]+)-([0-9.]+) bpm\)/g,
+            (_, avg, min, max) => i18n("analysis.phys_hr_avg_range", {avg, min, max})
+        )
+        .replace(
+            /average HRV was ([0-9.]+) ms/g,
+            (_, avg) => i18n("analysis.phys_avg_hrv", {avg})
+        )
+}
+
+function translateAnalysisContextDetails(value) {
+    return String(value || "")
+        .replaceAll(
+            "reduced sleep quality or short sleep",
+            i18n("analysis.context_poor_sleep")
+        )
+        .replaceAll(
+            "higher recent activity load",
+            i18n("analysis.context_training_load")
+        )
+        .replaceAll(
+            "reported stress or fatigue",
+            i18n("analysis.context_stress_fatigue")
+        )
+        .replaceAll(
+            "post-session recovery feedback improved",
+            i18n("analysis.context_recovery_improved")
+        )
 }
 
 function pickMetric(features, ...keys) {
@@ -2952,17 +3130,17 @@ function renderAIVisualization(data) {
 
     const riskLabel =
         data.wellness_status === "elevated_load"
-            ? "Elevated load"
+            ? i18n("analysis.elevated_load")
             : data.wellness_status === "data_quality_warning"
-                ? "Review data quality"
+                ? i18n("analysis.review_data_quality")
                 : data.wellness_status === "recovery_trend"
-                    ? "Recovery trend"
-                    : "Stable response"
+                    ? i18n("analysis.recovery_trend")
+                    : i18n("analysis.stable_response")
 
     const anomalyLabel =
         data.anomaly
-            ? "Review recommended"
-            : "No session quality flag"
+            ? i18n("analysis.review_recommended")
+            : i18n("analysis.no_session_quality_flag")
 
     const warnings =
         Array.isArray(data.reasons)
@@ -2975,14 +3153,18 @@ function renderAIVisualization(data) {
             : []
 
     const disclaimer =
-        data.medical_disclaimer ||
-        "Wellness-only score. Not a medical diagnosis."
+        translateAnalysisText(
+            data.medical_disclaimer ||
+            "Wellness-only score. Not a medical diagnosis."
+        )
 
     const keyFinding =
-        data.summary ||
-        warnings[0] ||
-        positiveFindings[0] ||
-        "No critical rule-based finding was detected."
+        translateAnalysisText(
+            data.summary ||
+            warnings[0] ||
+            positiveFindings[0] ||
+            "No critical rule-based finding was detected."
+        )
 
     const dataQualityScore =
         features.data_quality_score ??
@@ -3193,8 +3375,8 @@ function renderAIVisualization(data) {
         <section class="ai-report">
             <div class="ai-report-header">
                 <div>
-                    <h3>Wellness Session Summary</h3>
-                    <p>${escapeHtml(data.score_type || "Wellness response")}</p>
+                    <h3>${escapeHtml(i18n("analysis.session_summary_title"))}</h3>
+                    <p>${escapeHtml(translateAnalysisText(data.score_type || "Wellness response"))}</p>
                 </div>
                 <span class="status-badge ${riskClass(riskLabel)}">
                     ${escapeHtml(riskLabel)}
@@ -3203,31 +3385,31 @@ function renderAIVisualization(data) {
 
             <div class="ai-kpi-grid">
                 <div class="ai-kpi-card">
-                    <span>Wellness response</span>
+                    <span>${escapeHtml(i18n("analysis.wellness_response"))}</span>
                     <strong>${formatScore(scoreValue)}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Session review</span>
+                    <span>${escapeHtml(i18n("analysis.session_review"))}</span>
                     <strong>${escapeHtml(anomalyLabel)}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Data quality</span>
+                    <span>${escapeHtml(i18n("analysis.data_quality"))}</span>
                     <strong>${formatMetric(dataQualityScore, "/100")}</strong>
                 </div>
                 <div class="ai-kpi-card">
-                    <span>Timeline samples</span>
+                    <span>${escapeHtml(i18n("analysis.timeline_samples"))}</span>
                     <strong>${formatMetric(timeline.length)}</strong>
                 </div>
             </div>
 
             <div class="ai-summary-grid">
                 <div class="ai-summary-card ai-summary-card-wide">
-                    <h4>Key Finding</h4>
+                    <h4>${escapeHtml(i18n("analysis.key_finding"))}</h4>
                     <p>${escapeHtml(keyFinding)}</p>
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Warnings</h4>
+                    <h4>${escapeHtml(i18n("analysis.warnings"))}</h4>
                     ${renderFindingList(
                         warnings,
                         "No rule-based warning detected.",
@@ -3236,7 +3418,7 @@ function renderAIVisualization(data) {
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Positive Findings</h4>
+                    <h4>${escapeHtml(i18n("analysis.positive_findings"))}</h4>
                     ${renderFindingList(
                         positiveFindings,
                         "No additional positive findings."
@@ -3244,7 +3426,7 @@ function renderAIVisualization(data) {
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Signal Quality</h4>
+                    <h4>${escapeHtml(i18n("analysis.signal_quality"))}</h4>
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
@@ -3280,7 +3462,7 @@ function renderAIVisualization(data) {
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Physiology Metrics</h4>
+                    <h4>${escapeHtml(i18n("analysis.physiology_metrics"))}</h4>
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
@@ -3390,7 +3572,7 @@ function renderAIVisualization(data) {
                 </div>
 
                 <div class="ai-summary-card">
-                    <h4>Rule Reference</h4>
+                    <h4>${escapeHtml(i18n("analysis.rule_reference"))}</h4>
                     <div class="metric-list">
                         ${renderMetricRows([
                             {
@@ -3403,15 +3585,15 @@ function renderAIVisualization(data) {
                             },
                             {
                                 label: "Elevated load indicators",
-                                value: "below 70"
+                                value: i18n("analysis.below_70")
                             },
                             {
                                 label: "SpO2 warning",
-                                value: "below 94%"
+                                value: i18n("analysis.below_94_percent")
                             },
                             {
                                 label: "HRV warning",
-                                value: "below 30 ms"
+                                value: i18n("analysis.below_30_ms")
                             }
                         ])}
                     </div>
@@ -3422,7 +3604,7 @@ function renderAIVisualization(data) {
         </section>
 
         <div class="panel chart-box ai-chart-box">
-            <h3>AI Timeline</h3>
+            <h3>${escapeHtml(i18n("analysis.ai_timeline"))}</h3>
             <canvas id="aiTimelineChart"></canvas>
             <div id="aiTimelineStatus"></div>
         </div>

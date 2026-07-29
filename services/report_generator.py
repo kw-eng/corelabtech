@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from auth.access_policy import can_access_client_record
+from services.i18n_service import current_locale
 from services.series_service import get_user_series_trends
 from services.session_service import (
     build_series_pdf_report,
@@ -45,6 +46,7 @@ def generate_report_for_session(
     requesting_user_id: str | None,
     requesting_role: str,
     requesting_organization_id: int | None = None,
+    locale: str | None = None,
 ) -> ReportExport:
     """Generate a single-session PDF and return export metadata."""
 
@@ -53,6 +55,7 @@ def generate_report_for_session(
         requesting_user_id=requesting_user_id,
         requesting_role=requesting_role,
         requesting_organization_id=requesting_organization_id,
+        locale=locale or current_locale(),
     )
     session = get_research_session(
         session_id=session_id,
@@ -89,6 +92,7 @@ def generate_series_report_for_client(
     requesting_organization_id: int | None = None,
     protocol_id: int | None = None,
     trend_limit: int = 25,
+    locale: str | None = None,
 ) -> ReportExport:
     """Generate a PDF report for a client's longitudinal session series."""
 
@@ -115,6 +119,7 @@ def generate_series_report_for_client(
     build_series_pdf_report(
         path=path,
         series_data=series_data,
+        locale=locale or current_locale(),
     )
 
     return ReportExport(

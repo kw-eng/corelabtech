@@ -396,6 +396,8 @@ def analyze_measurements(
         positive_findings=positive_findings,
         sensor_mismatch=sensor_mismatch,
         max_difference=max_difference,
+        features=features,
+        context_features=context_features,
     )
 
     recommendations = build_recommendations(
@@ -640,15 +642,27 @@ def build_research_summary(
     positive_findings: list[str],
     sensor_mismatch: bool,
     max_difference: float | None,
+    features: dict[str, Any] | None = None,
+    context_features: dict[str, Any] | None = None,
 ) -> str:
     """Build a readable research summary instead of a raw rule list."""
 
+    features = features or {}
+    context_features = context_features or {}
     sentences = []
 
     if positive_findings:
         sentences.append(
             ". ".join(positive_findings) + "."
         )
+
+    physiology_sentence = build_physiology_summary_sentence(features)
+    if physiology_sentence:
+        sentences.append(physiology_sentence)
+
+    context_sentence = build_context_summary_sentence(context_features)
+    if context_sentence:
+        sentences.append(context_sentence)
 
     if sensor_mismatch:
         detail = (
@@ -679,6 +693,92 @@ def build_research_summary(
         )
 
     return " ".join(sentences)
+
+
+def build_physiology_summary_sentence(features: dict[str, Any]) -> str:
+    """Summarize pulse, HR and HRV without turning them into diagnosis."""
+
+    parts = []
+    avg_pulse = features.get("avg_pulse")
+    min_pulse = features.get("min_pulse")
+    max_pulse = features.get("max_pulse")
+    avg_hr = features.get("avg_heart_rate")
+    min_hr = features.get("min_heart_rate")
+    max_hr = features.get("max_heart_rate")
+    avg_hrv = features.get("avg_hrv")
+
+    if avg_pulse is not None:
+        pulse_text = f"Pulse averaged {format_summary_number(avg_pulse, 0)} bpm"
+        if min_pulse is not None and max_pulse is not None:
+            pulse_text += (
+                f" (range {format_summary_number(min_pulse, 0)}-"
+                f"{format_summary_number(max_pulse, 0)} bpm)"
+            )
+        parts.append(pulse_text)
+
+    if avg_hr is not None:
+        hr_text = f"wearable HR averaged {format_summary_number(avg_hr, 0)} bpm"
+        if min_hr is not None and max_hr is not None:
+            hr_text += (
+                f" (range {format_summary_number(min_hr, 0)}-"
+                f"{format_summary_number(max_hr, 0)} bpm)"
+            )
+        parts.append(hr_text)
+
+    if avg_hrv is not None:
+        parts.append(
+            f"average HRV was {format_summary_number(avg_hrv, 1)} ms"
+        )
+
+    if not parts:
+        return ""
+
+    return (
+        "Pulse, wearable HR and HRV should be interpreted as wellness trend "
+        f"signals: {'; '.join(parts)}."
+    )
+
+
+def build_context_summary_sentence(context_features: dict[str, Any]) -> str:
+    """Connect check-in context to interpretation without overstating causality."""
+
+    notes = []
+
+    if context_features.get("poor_sleep"):
+        notes.append("reduced sleep quality or short sleep")
+
+    if context_features.get("high_training_load"):
+        notes.append("higher recent activity load")
+
+    if context_features.get("high_stress_or_fatigue"):
+        notes.append("reported stress or fatigue")
+
+    if context_features.get("recovery_improved"):
+        notes.append("post-session recovery feedback improved")
+
+    if not notes:
+        return (
+            "No elevated sleep, fatigue, stress or recent activity context was "
+            "flagged in the available check-in data."
+        )
+
+    return (
+        "Check-in context may influence today’s physiology interpretation: "
+        + ", ".join(notes)
+        + "."
+    )
+
+
+def format_summary_number(value: Any, digits: int = 1) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    if digits == 0:
+        return str(int(round(numeric)))
+
+    return f"{numeric:.{digits}f}".rstrip("0").rstrip(".")
 
 
 def build_recommendations(
