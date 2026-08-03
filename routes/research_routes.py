@@ -27,6 +27,11 @@ from werkzeug.security import generate_password_hash
 
 from auth.decorators import role_required
 from auth.access_policy import can_access_client_record
+from core.telemetry.device_catalog import (
+    DEVICE_COMPATIBILITY_VERSION,
+    device_catalog,
+    device_compatibility_matrix,
+)
 from database_postgres import db
 
 from repositories.analysis_repository import (
@@ -35,6 +40,7 @@ from repositories.analysis_repository import (
 )
 
 from repositories.data_repository import (
+    list_session_data_sources,
     load_csv,
     load_fit,
 )
@@ -45,6 +51,10 @@ from repositories.merge_repository import (
 )
 from repositories.wellness_repository import (
     get_wellness_summary,
+)
+from repositories.recovery_repository import (
+    create_recovery_follow_up,
+    normalize_recovery_follow_up_payload,
 )
 
 from security.csrf import csrf
@@ -57,16 +67,20 @@ from security.upload_validation import (
 
 from services.analysis_service import (
     AnalysisInputMissingError,
+    get_analysis_model_manifest,
     run_session_analysis,
 )
 from services.audit_service import record_audit_event
+from services.llm_observability import list_llm_observability
 from services.client_data_service import build_client_export
 
 from services.data_ingestion import (
     DataIngestionError,
     DuplicateImportError,
     import_csv_file,
+    import_external_telemetry_file,
     import_fit_file,
+    preview_telemetry_file,
 )
 
 from services.data_merge import (
@@ -86,6 +100,8 @@ from services.report_generator import (
     generate_series_report_for_client,
 )
 from services.series_service import get_user_series_trends
+from services.trend_narration import build_trend_ai_view
+from services.research_summary import build_research_summary
 from services.traceability_service import get_session_traceability
 
 
@@ -444,7 +460,8 @@ def performance_tests():
 @role_required("admin")
 def admin_panel():
     return render_template(
-        "admin_panel.html"
+        "admin_panel.html",
+        analysis_model=get_analysis_model_manifest(),
     )
 
 
@@ -460,6 +477,20 @@ def admin_accounts():
 # =========================================================
 # CHAMBERS / PROTOCOLS
 # =========================================================
+
+@research_bp.route("/api/device-catalog", methods=["GET"])
+@login_required
+@role_required("viewer", "operator", "researcher", "admin")
+@limiter.limit(PERF_LIMIT)
+def telemetry_device_catalog():
+    """Return declared device classes and the versioned compatibility matrix."""
+
+    return jsonify({
+        "version": "device-catalog-v2",
+        "compatibility_version": DEVICE_COMPATIBILITY_VERSION,
+        "devices": device_catalog(),
+        "compatibility": device_compatibility_matrix(),
+    })
 
 @research_bp.route("/api/chambers", methods=["GET"])
 @login_required
@@ -1078,6 +1109,17 @@ def audit_log():
         connection.close()
 
 
+@research_bp.route("/api/admin/llm-observability", methods=["GET"])
+@login_required
+@role_required("admin")
+@limiter.limit("30 per minute")
+def llm_observability():
+    """Return aggregated optional-LLM reliability and usage metadata."""
+
+    hours = parse_preview_limit(request.args.get("hours"), default=24, maximum=720)
+    return jsonify({"status": "ok", "hours": hours, "events": list_llm_observability(hours=hours)})
+
+
 # =========================================================
 # SUBJECTS
 # =========================================================
@@ -1489,6 +1531,10 @@ def upload_fit():
             filename=filename,
             session_id=session_id,
             user_id=user_id,
+            source_timezone=clean_value(
+                request.form.get("source_timezone")
+            ) or "UTC",
+            device_model=clean_value(request.form.get("device_model")) or None,
         )
 
         payload = result.to_dict()
@@ -1589,6 +1635,9 @@ def upload_csv():
             filename=filename,
             session_id=session_id,
             user_id=user_id,
+            source_timezone=clean_value(
+                request.form.get("source_timezone")
+            ) or None,
         )
 
         payload = result.to_dict()
@@ -1617,6 +1666,152 @@ def upload_csv():
         traceback.print_exc()
         return error_response(str(exc), 500)
 
+    finally:
+        remove_temp_file(temp_path)
+
+
+# =========================================================
+# EXTERNAL TELEMETRY UPLOADS
+# =========================================================
+
+@csrf.exempt
+@research_bp.route("/api/telemetry/preflight", methods=["POST"])
+@login_required
+@role_required("admin", "researcher", "operator")
+@limiter.limit(UPLOAD_LIMIT)
+def preflight_telemetry_upload():
+    """Validate and summarize a telemetry file before it is persisted."""
+
+    file = request.files.get("file")
+    import_type = clean_value(request.form.get("import_type")).lower()
+    supported = {
+        "fit": ({"fit"}, 100 * 1024 * 1024),
+        "csv": ({"csv"}, 20 * 1024 * 1024),
+        "polar_csv": ({"csv"}, 100 * 1024 * 1024),
+        "apple_health_xml": ({"xml"}, 100 * 1024 * 1024),
+        "health_connect_json": ({"json"}, 100 * 1024 * 1024),
+    }
+    if import_type not in supported:
+        return error_response("unsupported telemetry import_type", 400)
+    if not file:
+        return error_response("missing file", 400)
+    extensions, max_size = supported[import_type]
+    if not validate_extension(file.filename, extensions):
+        return error_response("invalid file extension", 400)
+    if not validate_file_size(file, max_size):
+        return error_response("file too large", 400)
+
+    filename = safe_upload_filename(file.filename.lower())
+    temp_path = create_temp_path(filename)
+    try:
+        file.save(temp_path)
+        preview = preview_telemetry_file(
+            path=temp_path,
+            import_type=import_type,
+            source_timezone=clean_value(request.form.get("source_timezone")) or None,
+            device_model=clean_value(request.form.get("device_model")) or None,
+        )
+        return jsonify(preview)
+    except DataIngestionError as exc:
+        return error_response(str(exc), 400)
+    except Exception as exc:
+        return error_response(f"telemetry preflight failed: {exc}", 400)
+    finally:
+        remove_temp_file(temp_path)
+
+
+@research_bp.route("/api/sessions/<session_id>/data-sources")
+@login_required
+@role_required("viewer", "operator", "researcher", "admin")
+@limiter.limit(PERF_LIMIT)
+def session_data_sources(session_id: str):
+    """Show the auditable telemetry sources already imported for a session."""
+
+    user_id = clean_value(request.args.get("client_id"))
+    if not user_id:
+        return error_response("missing client_id", 400)
+    if not can_access_client_record(
+        requesting_role=current_user.role,
+        requesting_user_id=current_user.user_id,
+        client_id=user_id,
+        requesting_organization_id=current_user.organization_id,
+    ):
+        return error_response("forbidden", 403)
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        sources = list_session_data_sources(
+            cursor, session_id=session_id, user_id=user_id
+        )
+    finally:
+        cursor.close()
+        connection.close()
+    return jsonify({"status": "ok", "session_id": session_id, "sources": sources})
+
+@csrf.exempt
+@research_bp.route("/upload_telemetry", methods=["POST"])
+@login_required
+@role_required("admin", "researcher", "operator")
+@limiter.limit(UPLOAD_LIMIT)
+def upload_external_telemetry():
+    """Import supported Polar, Apple Health, or Health Connect exports."""
+
+    file = request.files.get("file")
+    session_id = clean_value(request.form.get("session_id"))
+    user_id = clean_value(
+        request.form.get("client_id") or request.form.get("user_id")
+    ) or None
+    import_type = clean_value(request.form.get("import_type")).lower()
+    supported = {
+        "polar_csv": {"csv"},
+        "apple_health_xml": {"xml"},
+        "health_connect_json": {"json"},
+    }
+    if import_type not in supported:
+        return error_response("unsupported telemetry import_type", 400)
+    validation_error = validate_upload_request(
+        file=file,
+        session_id=session_id,
+        allowed_extensions=supported[import_type],
+        max_size=100 * 1024 * 1024,
+    )
+    if validation_error:
+        return validation_error
+
+    filename = safe_upload_filename(file.filename.lower())
+    temp_path = create_temp_path(filename)
+    try:
+        file.save(temp_path)
+        result = import_external_telemetry_file(
+            path=temp_path,
+            filename=filename,
+            session_id=session_id,
+            user_id=user_id,
+            import_type=import_type,
+            source_timezone=clean_value(request.form.get("source_timezone")) or None,
+            device_model=clean_value(request.form.get("device_model")) or None,
+        )
+        payload = result.to_dict()
+        return jsonify({
+            "status": "telemetry_saved",
+            "records": payload.get("records_saved", 0),
+            "client_id": payload.get("user_id"),
+            **payload,
+        }), 201
+    except DuplicateImportError as exc:
+        return jsonify({
+            "status": "duplicate",
+            "error": str(exc),
+            "import_type": exc.import_type,
+            "import_id": exc.import_id,
+            "records": exc.records_saved,
+            "records_saved": exc.records_saved,
+        }), 409
+    except DataIngestionError as exc:
+        return error_response(str(exc), 400)
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
     finally:
         remove_temp_file(temp_path)
 
@@ -1747,7 +1942,19 @@ def fit_timeseries(session_id):
                 for row in rows
             ],
             "pulse": [
-                row.get("pulse") or row.get("heart_rate")
+                row.get("pulse_rate_bpm") or row.get("pulse")
+                for row in rows
+            ],
+            "heart_rate": [
+                row.get("heart_rate_bpm") or row.get("heart_rate")
+                for row in rows
+            ],
+            "provenance": [
+                {
+                    "device_type": row.get("device_type"),
+                    "measurement_method": row.get("measurement_method"),
+                    "signal_quality": row.get("signal_quality"),
+                }
                 for row in rows
             ],
             "spo2": [
@@ -1936,6 +2143,82 @@ def save_phase():
     except Exception as exc:
         traceback.print_exc()
         return error_response(str(exc), 500)
+
+
+@csrf.exempt
+@research_bp.route(
+    "/api/sessions/<session_id>/recovery-follow-up",
+    methods=["POST"],
+)
+@login_required
+@role_required("viewer", "operator", "researcher", "admin")
+@limiter.limit("30 per hour")
+def save_recovery_follow_up(session_id: str):
+    """Save voluntary post-session wellness context and refresh the report."""
+
+    try:
+        payload = normalize_recovery_follow_up_payload(
+            request.get_json(silent=True) or {}
+        )
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM full_sessions
+            WHERE session_id = %s
+            LIMIT 1
+            """,
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return error_response("session not found", 404)
+
+        client_id = row[0]
+        if not can_access_client_record(
+            requesting_role=getattr(current_user, "role", "viewer"),
+            requesting_user_id=current_user_id(),
+            client_id=client_id,
+            requesting_organization_id=getattr(current_user, "organization_id", None),
+        ):
+            return error_response("forbidden", 403)
+
+        follow_up_id = create_recovery_follow_up(
+            cursor,
+            session_id=session_id,
+            user_id=client_id,
+            payload=payload,
+        )
+        connection.commit()
+    except Exception as exc:
+        connection.rollback()
+        return error_response(str(exc), 500)
+    finally:
+        cursor.close()
+        connection.close()
+
+    try:
+        analysis = run_session_analysis(
+            session_id=session_id,
+            user_id=client_id,
+        ).to_dict()
+        recovery_coach = analysis.get("recovery_coach")
+    except AnalysisInputMissingError:
+        recovery_coach = {
+            "status": "follow_up_recorded_analysis_pending",
+            "summary": "Follow-up zapisany. Analiza sesji nie jest jeszcze dostepna.",
+        }
+
+    return jsonify({
+        "status": "saved",
+        "follow_up_id": follow_up_id,
+        "recovery_coach": recovery_coach,
+    }), 201
 
 
 @csrf.exempt
@@ -2254,6 +2537,7 @@ def run_analysis():
     "/api/analysis/<session_id>/latest",
 )
 @login_required
+@role_required("viewer", "operator", "researcher", "admin")
 @limiter.limit(PERF_LIMIT)
 def latest_analysis(session_id: str):
     """Return the newest analysis result for a session."""
@@ -2272,6 +2556,14 @@ def latest_analysis(session_id: str):
                 "AI result not found",
                 404,
             )
+
+        if not can_access_client_record(
+            requesting_role=getattr(current_user, "role", "viewer"),
+            requesting_user_id=current_user_id(),
+            client_id=result.get("user_id"),
+            requesting_organization_id=getattr(current_user, "organization_id", None),
+        ):
+            return error_response("forbidden", 403)
 
         timeline_sample = request.args.get(
             "timeline_sample",
@@ -2305,6 +2597,79 @@ def latest_analysis(session_id: str):
             **result,
         })
 
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route(
+    "/api/analysis/<session_id>/operator-report",
+)
+@login_required
+@role_required("operator", "researcher", "admin")
+@limiter.limit(PERF_LIMIT)
+def operator_report(session_id: str):
+    """Return the constrained operational report without wellness narration."""
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        result = get_latest_ai_result(cursor, session_id=session_id)
+        if not result:
+            return error_response("AI result not found", 404)
+        if not can_access_client_record(
+            requesting_role=current_user.role,
+            requesting_user_id=current_user_id(),
+            client_id=result.get("user_id"),
+            requesting_organization_id=current_user.organization_id,
+        ):
+            return error_response("forbidden", 403)
+        report = (result.get("result") or {}).get("operator_report")
+        if not report:
+            return error_response("operator report not found", 404)
+        return jsonify({
+            "status": "ok",
+            "session_id": session_id,
+            "operator_report": report,
+        })
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@research_bp.route(
+    "/api/analysis/<session_id>/research-summary",
+)
+@login_required
+@role_required("researcher", "admin")
+@limiter.limit("60 per hour")
+def research_summary(session_id: str):
+    """Return a reproducible research view for one authorized session."""
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        result = get_latest_ai_result(cursor, session_id=session_id)
+        if not result:
+            return error_response("AI result not found", 404)
+        if not can_access_client_record(
+            requesting_role=current_user.role,
+            requesting_user_id=current_user_id(),
+            client_id=result.get("user_id"),
+            requesting_organization_id=current_user.organization_id,
+        ):
+            return error_response("forbidden", 403)
+        analysis = result.get("result") or {}
+        research_input = {
+            **analysis,
+            "model_name": analysis.get("model_name") or result.get("model_name"),
+            "model_version": analysis.get("model_version") or result.get("model_version"),
+        }
+        return jsonify({
+            "status": "ok",
+            "session_id": session_id,
+            "research_summary": build_research_summary(research_input),
+        })
     finally:
         cursor.close()
         connection.close()
@@ -2346,12 +2711,52 @@ def user_trends(user_id: str):
             default=25,
             maximum=100,
         )
-        return jsonify(get_user_series_trends(
+        series = get_user_series_trends(
             user_id=subject_id,
             protocol_id=protocol_id,
             trend_limit=trend_limit,
-        ))
+        )
+        return jsonify({
+            **series,
+            "trend_ai": build_trend_ai_view(series),
+        })
 
+    except Exception as exc:
+        traceback.print_exc()
+        return error_response(str(exc), 500)
+
+
+@csrf.exempt
+@research_bp.route(
+    "/api/user_trends/<user_id>/narration",
+    methods=["POST"],
+)
+@login_required
+@role_required("viewer", "operator", "researcher", "admin")
+@limiter.limit("10 per hour")
+def user_trend_narration(user_id: str):
+    """Generate an explicitly requested LLM narration over verified trend facts."""
+
+    subject_id = clean_value(user_id)
+    if not subject_id:
+        return error_response("missing user_id", 400)
+    if not can_access_client_record(
+        requesting_role=current_user.role,
+        requesting_user_id=get_current_user_id(),
+        client_id=subject_id,
+        requesting_organization_id=current_user.organization_id,
+    ):
+        return error_response("forbidden", 403)
+    try:
+        series = get_user_series_trends(
+            user_id=subject_id,
+            protocol_id=parse_optional_int(request.args.get("protocol_id")),
+            trend_limit=parse_preview_limit(request.args.get("limit"), default=25, maximum=100),
+        )
+        return jsonify({
+            "status": "ok",
+            "trend_ai": build_trend_ai_view(series, allow_llm=True),
+        })
     except Exception as exc:
         traceback.print_exc()
         return error_response(str(exc), 500)
@@ -3018,6 +3423,7 @@ def delete_subject_related_rows(
 
     tables = (
         "consent_records",
+        "recovery_follow_ups",
         "daily_baselines",
         "session_features",
         "hrv_intervals",
@@ -3029,6 +3435,7 @@ def delete_subject_related_rows(
         "csv_data",
         "tests",
         "full_sessions",
+        "client_programs",
         "fit_imports",
         "csv_imports",
     )
@@ -3037,10 +3444,10 @@ def delete_subject_related_rows(
         if not table_exists(cursor, table):
             continue
 
-        if table in {"daily_baselines", "consent_records"}:
+        if table in {"daily_baselines", "consent_records", "client_programs"}:
             owner_column = (
                 "client_id"
-                if table == "consent_records"
+                if table in {"consent_records", "client_programs"}
                 else "user_id"
             )
             cursor.execute(

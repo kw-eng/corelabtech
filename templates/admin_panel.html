@@ -62,6 +62,72 @@
 
     <div id="adminStatus" class="admin-status"></div>
 
+    <section class="admin-section admin-model-section">
+        <div class="admin-section-header">
+            <div>
+                <h2>Active Analysis Model</h2>
+                <p>Versioned admin audit view for the wellness rules and telemetry safeguards.</p>
+            </div>
+        </div>
+
+        <dl class="admin-model-meta">
+            <div>
+                <dt>Model</dt>
+                <dd>{{ analysis_model.name }}</dd>
+            </div>
+            <div>
+                <dt>Rules version</dt>
+                <dd>{{ analysis_model.version }}</dd>
+            </div>
+            <div>
+                <dt>HRV version</dt>
+                <dd>{{ analysis_model.hrv_algorithm_version }}</dd>
+            </div>
+            <div>
+                <dt>Mode</dt>
+                <dd>{{ analysis_model.mode }}</dd>
+            </div>
+        </dl>
+
+        <div class="admin-model-grid">
+            {% for layer in analysis_model.layers %}
+            <article>
+                <h3>{{ layer.title }}</h3>
+                <ul>
+                    {% for item in layer.items %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            {% endfor %}
+        </div>
+
+        <div class="admin-model-guardrails">
+            <h3>Guardrails</h3>
+            <ul>
+                {% for item in analysis_model.guardrails %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <details class="admin-model-prompt">
+            <summary>LLM Narration Prompt</summary>
+            <p>{{ analysis_model.llm_narration.summary }}</p>
+            <dl class="admin-model-meta">
+                <div>
+                    <dt>Narration version</dt>
+                    <dd>{{ analysis_model.llm_narration.version }}</dd>
+                </div>
+                <div>
+                    <dt>Fact sheet version</dt>
+                    <dd>{{ analysis_model.llm_narration.fact_sheet_version }}</dd>
+                </div>
+            </dl>
+            <pre class="qa-code">{{ analysis_model.llm_narration.instructions }}</pre>
+        </details>
+    </section>
+
     <section class="admin-section">
         <div class="admin-section-header">
             <div>

@@ -1316,6 +1316,81 @@ MISSION CONTROL
     line-height:1.55;
 }
 
+.mission-recovery-card{
+    padding:22px;
+}
+
+.mission-recovery-form{
+    align-items:end;
+    display:grid;
+    gap:12px;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+
+.mission-recovery-form label{
+    color:#b6c5d6;
+    display:grid;
+    font-size:13px;
+    gap:6px;
+}
+
+.mission-recovery-form select,
+.mission-recovery-form input{
+    background:#07111f;
+    border:1px solid #24445f;
+    border-radius:6px;
+    color:#f8fafc;
+    min-height:40px;
+    padding:8px 10px;
+}
+
+.mission-recovery-action button{
+    background:#00ffcc;
+    border:1px solid #00ffcc;
+    border-radius:6px;
+    color:#001014;
+    cursor:pointer;
+    font-weight:700;
+    min-height:40px;
+    padding:8px 14px;
+    width:100%;
+}
+
+.mission-recovery-action button:hover{
+    background:#9af7e7;
+    border-color:#9af7e7;
+}
+
+.mission-recovery-output{
+    color:#b6c5d6;
+    display:grid;
+    gap:5px;
+    line-height:1.5;
+    margin-top:16px;
+    min-height:24px;
+}
+
+.mission-recovery-output strong{
+    color:#f8fafc;
+}
+
+.mission-recovery-windows{
+    display:grid;
+    gap:8px;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+
+.mission-recovery-window{
+    border-left:2px solid #00c8a5;
+    display:grid;
+    gap:3px;
+    padding:7px 10px;
+}
+
+.mission-recovery-window strong{
+    color:#9af7e7;
+}
+
 .mission-analysis-grid{
     display:grid;
     gap:10px;
@@ -1356,6 +1431,83 @@ MISSION CONTROL
 
 .mission-analysis-block p{
     margin:0;
+}
+
+.mission-summary-heading{
+    align-items:center;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    justify-content:space-between;
+}
+
+.mission-summary-heading span,
+.mission-summary-meta,
+.mission-comparison-window p,
+.mission-comparison-metric small{
+    color:#94a3b8;
+    font-size:12px;
+}
+
+.mission-summary-content{
+    white-space:pre-line;
+}
+
+.mission-trend-ai{
+    margin-top:14px;
+}
+
+.mission-data-sources{ margin-top:16px; }
+.mission-data-sources h3{ color:#00ffcc; font-size:14px; margin:0 0 8px; }
+.mission-source-grid{ display:grid; gap:10px; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.mission-source-grid > div{ background:#07111f; border:1px solid #18324a; border-radius:8px; display:grid; gap:4px; padding:12px; }
+.mission-source-grid strong{ color:#f8fafc; }
+.mission-source-grid span,.mission-source-grid small{ color:#94a3b8; overflow-wrap:anywhere; }
+.mission-device-toolbar{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
+.mission-device-toolbar select{ background:#07111f; border:1px solid #24445f; border-radius:6px; color:#dbeafe; min-height:36px; padding:7px 10px; }
+.mission-device-card a{ color:#00ffcc; font-size:12px; margin-top:4px; overflow-wrap:anywhere; }
+
+.mission-summary-meta{
+    margin-top:12px !important;
+}
+
+.mission-comparison-grid{
+    display:grid;
+    gap:10px;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    margin-top:12px;
+}
+
+.mission-comparison-window{
+    border-top:1px solid #18324a;
+    padding-top:10px;
+}
+
+.mission-comparison-window h4{
+    color:#dbeafe;
+    font-size:13px;
+    margin:0 0 5px;
+}
+
+.mission-comparison-metrics{
+    display:grid;
+    gap:6px;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+
+.mission-comparison-metric{
+    display:grid;
+    gap:2px;
+}
+
+.mission-comparison-metric span{
+    color:#b6c5d6;
+    font-size:12px;
+}
+
+.mission-comparison-metric strong{
+    color:#f8fafc;
+    font-size:14px;
 }
 
 .mission-analysis-columns{
@@ -1766,7 +1918,15 @@ MISSION CONTROL
 
     .mission-analysis-grid,
     .mission-analysis-columns,
-    .mission-series-detail-grid{
+    .mission-series-detail-grid,
+    .mission-recovery-form,
+    .mission-comparison-grid,
+    .mission-comparison-metrics,
+    .mission-source-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mission-recovery-windows{
         grid-template-columns:1fr;
     }
 

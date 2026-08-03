@@ -37,6 +37,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 from services.i18n_service import DEFAULT_LOCALE, catalog_for, normalize_locale
+from services.research_summary import build_research_summary
 
 SESSION_CLIENT_TABLES = (
     "tests",
@@ -1137,6 +1138,12 @@ def build_pdf_report(
     wellness_history = report_data.get("wellness_history") or {}
     baseline = wellness_history.get("baseline") or {}
     quality_warnings = analysis_result.get("quality_warnings") or []
+    research_input = {
+        **analysis_result,
+        "model_name": analysis_result.get("model_name") or analysis.get("model_name"),
+        "model_version": analysis_result.get("model_version") or analysis.get("model_version"),
+    }
+    research_summary = build_research_summary(research_input) if analysis else None
     client_session_number = session_config.get("client_session_number") or "-"
     program_name = session_config.get("program_name") or "Single session"
     program_progress = (
@@ -1343,6 +1350,51 @@ def build_pdf_report(
             ]
         )
     )
+
+    if research_summary:
+        research_facts = research_summary["fact_sheet"]
+        research_sections = research_summary["sections"]
+        research_narration = research_summary["narration"]
+        story.extend(
+            [
+                PageBreak(),
+                make_page_header("Research AI", styles),
+                Spacer(1, 6),
+                KeepTogether(
+                    [
+                        Paragraph("Methods and versions", styles["ReportSection"]),
+                        make_table(
+                            [
+                                ("Fact sheet", research_summary.get("fact_sheet_version")),
+                                ("Research narration", research_narration.get("narration_version")),
+                                ("Narration source", research_narration.get("source")),
+                                ("Analysis model", research_facts["analysis"].get("model_version")),
+                                ("HRV algorithm", research_facts["measurements"].get("hrv_algorithm_version")),
+                                ("HRV window", format_measurement(research_facts["measurements"].get("hrv_window_seconds"), " s", 0)),
+                            ]
+                        ),
+                    ]
+                ),
+                *[
+                    KeepTogether(
+                        [
+                            Paragraph(title, styles["ReportSection"]),
+                            Paragraph(escape_text(research_sections[key]), styles["BodyText"]),
+                        ]
+                    )
+                    for key, title in (
+                        ("abstract", "Abstract"),
+                        ("methods", "Methods"),
+                        ("observations", "Observations"),
+                        ("interpretation", "Interpretation"),
+                        ("limitations", "Limitations"),
+                        ("future_data_required", "Future data required"),
+                    )
+                ],
+                Spacer(1, 5),
+                Paragraph(escape_text(research_summary["disclaimer"]), styles["NoticeText"]),
+            ]
+        )
 
     story.extend(
         [

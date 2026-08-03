@@ -426,6 +426,7 @@
 
                 <div class="chamber-section-header">
                     <div>
+                        <span class="chamber-eyebrow">Telemetry Intelligence</span>
                         <h3>{{ t('chamber.data_sources') }}</h3>
                         <p>{{ t('chamber.data_sources_help') }}</p>
                     </div>
@@ -433,15 +434,28 @@
 
                 <div class="data-source-grid">
                     <article class="data-source-card">
-                        <h4>{{ t('chamber.hr_timeline_title') }}</h4>
+                        <div class="data-source-card-header">
+                            <div>
+                                <span class="data-source-type">HR / RR</span>
+                                <h4>{{ t('chamber.hr_timeline_title') }}</h4>
+                            </div>
+                            <span class="source-format-badge">FIT</span>
+                        </div>
+
                         <p class="source-format-hint">{{ t('chamber.supported_fit') }}</p>
                         <input type="file" id="fitFile" accept=".fit">
 
-                        <button id="uploadFitButton" type="button" onclick="uploadFIT()">
-                            {{ t('chamber.upload_hr_hrv') }}
-                        </button>
+                        <div class="data-source-actions">
+                            <button type="button" class="secondary-action" onclick="preflightTelemetry('fit')">
+                                {{ t('chamber.validate_file') }}
+                            </button>
+                            <button id="uploadFitButton" type="button" onclick="uploadFIT()">
+                                {{ t('chamber.upload_hr_hrv') }}
+                            </button>
+                        </div>
 
                         <div id="fitStatus"></div>
+                        <div id="fitPreflight" class="telemetry-preflight"></div>
                         <div id="fitTableStatus" class="table-status"></div>
 
                         <div class="data-table-wrap">
@@ -449,9 +463,9 @@
                                 <thead>
                                     <tr>
                                         <th title="Timestamp from HR/HRV timeline file">Time</th>
-                                        <th title="Heart rate from compatible wearable data">HR</th>
-                                        <th title="RR interval from HR/HRV source">RR</th>
-                                        <th title="HRV calculated from RR interval">HRV</th>
+                                        <th title="Heart rate from uploaded telemetry">HR</th>
+                                        <th title="Beat-to-beat RR interval">RR</th>
+                                        <th title="HRV calculated from RR intervals">HRV</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -460,13 +474,28 @@
                     </article>
 
                     <article class="data-source-card">
-                        <h4>{{ t('chamber.spo2_timeline_title') }}</h4>
+                        <div class="data-source-card-header">
+                            <div>
+                                <span class="data-source-type">SpO2 / Pulse</span>
+                                <h4>{{ t('chamber.spo2_timeline_title') }}</h4>
+                            </div>
+                            <span class="source-format-badge">CSV</span>
+                        </div>
+
                         <p class="source-format-hint">{{ t('chamber.supported_csv') }}</p>
                         <input type="file" id="csvFile" accept=".csv">
 
-                        <button type="button" onclick="uploadCSV()">{{ t('chamber.upload_spo2_pulse') }}</button>
+                        <div class="data-source-actions">
+                            <button type="button" class="secondary-action" onclick="preflightTelemetry('csv')">
+                                {{ t('chamber.validate_file') }}
+                            </button>
+                            <button type="button" onclick="uploadCSV()">
+                                {{ t('chamber.upload_spo2_pulse') }}
+                            </button>
+                        </div>
 
                         <div id="csvStatus"></div>
+                        <div id="csvPreflight" class="telemetry-preflight"></div>
                         <div id="csvTableStatus" class="table-status"></div>
 
                         <div class="data-table-wrap">
@@ -474,7 +503,7 @@
                                 <thead>
                                     <tr>
                                         <th title="Timestamp from SpO2/pulse timeline file">Time</th>
-                                        <th title="Pulse from pulse oximeter or external sensor">Pulse</th>
+                                        <th title="Pulse from uploaded telemetry">Pulse</th>
                                         <th title="Blood oxygen saturation">SpO2</th>
                                     </tr>
                                 </thead>
@@ -482,7 +511,74 @@
                             </table>
                         </div>
                     </article>
+
+                    <article class="data-source-card">
+                        <div class="data-source-card-header">
+                            <div>
+                                <span class="data-source-type">External</span>
+                                <h4>{{ t('chamber.external_telemetry_title') }}</h4>
+                            </div>
+                            <span class="source-format-badge">CSV / XML / JSON</span>
+                        </div>
+
+                        <p class="source-format-hint">{{ t('chamber.external_telemetry_help') }}</p>
+
+                        <!-- Values are preserved temporarily for backend compatibility;
+                             visible labels expose formats rather than device brands. -->
+                        <select id="externalTelemetryType">
+                            <option value="polar_csv">CSV</option>
+                            <option value="apple_health_xml">XML</option>
+                            <option value="health_connect_json">JSON</option>
+                        </select>
+
+                        <!-- Retained for current JavaScript compatibility, but hidden from product UI. -->
+                        <input
+                            type="hidden"
+                            id="externalTelemetryDeviceModel"
+                            value=""
+                        >
+
+                        <label for="externalTelemetryTimezone">{{ t('chamber.source_timezone') }}</label>
+                        <select id="externalTelemetryTimezone">
+                            <option value="browser">{{ t('chamber.timezone_browser') }}</option>
+                            <option value="unknown">{{ t('chamber.timezone_unknown') }}</option>
+                            <option value="Europe/Warsaw">Europe/Warsaw</option>
+                            <option value="UTC">UTC</option>
+                        </select>
+
+                        <input type="file" id="externalTelemetryFile" accept=".csv,.xml,.json">
+
+                        <div class="data-source-actions">
+                            <button type="button" class="secondary-action" onclick="preflightTelemetry('external')">
+                                {{ t('chamber.validate_file') }}
+                            </button>
+                            <button type="button" onclick="uploadExternalTelemetry()">
+                                {{ t('chamber.upload_external_telemetry') }}
+                            </button>
+                        </div>
+
+                        <div id="externalTelemetryStatus"></div>
+                        <div id="externalTelemetryPreflight" class="telemetry-preflight"></div>
+                    </article>
                 </div>
+
+                <section
+                    id="telemetry_intelligence_panel"
+                    class="telemetry-intelligence-panel"
+                    aria-live="polite"
+                >
+                    <div class="telemetry-intelligence-layout">
+                        <div id="telemetry_capabilities"></div>
+                        <div id="telemetry_quality"></div>
+                        <div id="analysis_availability"></div>
+                    </div>
+                    <div id="telemetry_recommendation"></div>
+                </section>
+
+                <section class="session-data-sources" aria-live="polite">
+                    <h3>{{ t('chamber.session_data_sources') }}</h3>
+                    <div id="sessionDataSources">{{ t('chamber.session_data_sources_empty') }}</div>
+                </section>
 
                 <div class="subsection-divider"></div>
 
@@ -686,7 +782,8 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/fit_chart.js') }}?v=chamber-polish-20260721"></script>
-<script src="{{ url_for('static', filename='js/chamber_form.js') }}?v=analysis-i18n-20260729"></script>
+<script src="{{ url_for('static', filename='js/fit_chart.js') }}?v=telemetry-intelligence-20260803"></script>
+<script src="{{ url_for('static', filename='js/telemetry_intelligence.js') }}?v=telemetry-intelligence-20260803"></script>
+<script src="{{ url_for('static', filename='js/chamber_form.js') }}?v=telemetry-intelligence-20260803"></script>
 
 {% endblock %}

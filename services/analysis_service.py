@@ -14,6 +14,30 @@ from typing import Any
 
 from database_postgres import db
 from core.analytics.adaptation_analysis import classify_recovery_status
+from services.hrv_pipeline import (
+    DEFAULT_HRV_WINDOW_SECONDS,
+    calculate_hrv_from_rr,
+    calculate_hrv_phase_metrics,
+    calculate_hrv_windows,
+)
+from services.telemetry_quality import (
+    SENSOR_MISMATCH_THRESHOLD_BPM,
+    assess_telemetry_quality,
+)
+from services.llm_narration import (
+    FACT_SHEET_VERSION,
+    NARRATION_VERSION,
+    build_session_fact_sheet,
+    narrate_fact_sheet,
+    narration_instructions,
+)
+from services.insight_views import (
+    build_operator_report,
+    build_recovery_coach,
+    build_session_comparison,
+    build_session_summary,
+    session_quality_label,
+)
 
 from repositories.analysis_repository import (
     complete_ai_result,
@@ -25,17 +49,83 @@ from repositories.merge_repository import (
     load_merged_measurements,
 )
 from repositories.wellness_repository import (
+    get_wellness_summary,
     refresh_daily_baseline,
     upsert_session_features,
+)
+from repositories.recovery_repository import (
+    load_latest_recovery_follow_ups,
+    load_recovery_follow_up_history,
 )
 
 
 MODEL_NAME = "CoreLabTech Wellness Session Analysis"
-MODEL_VERSION = "wellness-rules-v1"
+MODEL_VERSION = "wellness-rules-v2"
 WELLNESS_DISCLAIMER = (
     "Wellness and educational insight only. "
     "Not intended to diagnose, treat, cure, or prevent disease."
 )
+
+
+def get_analysis_model_manifest() -> dict[str, Any]:
+    """Return the admin-facing, versioned description of the active rules."""
+
+    result = {
+        "name": MODEL_NAME,
+        "version": MODEL_VERSION,
+        "mode": "Deterministic wellness rules",
+        "hrv_algorithm_version": "rr-clean-v2",
+        "layers": [
+            {
+                "title": "Signals and provenance",
+                "items": [
+                    "Chest HRM/ECG is the reference for heart rate and RR.",
+                    "Pulse oximeter is the reference for SpO2; its PPG pulse is auxiliary.",
+                    "Unknown and wearable PPG sources remain trend-only.",
+                ],
+            },
+            {
+                "title": "Data-quality gate",
+                "items": [
+                    "UTC-aware nearest-timestamp merge with a configured tolerance.",
+                    "Coverage, temporal coverage, HR-PPG agreement and sustained divergence affect confidence.",
+                    "Sensor disagreement does not reduce the wellness score or flag a physiological anomaly by itself.",
+                ],
+            },
+            {
+                "title": "Versioned HRV",
+                "items": [
+                    "RR is accepted only from chest_hrm/ecg sources.",
+                    "Artifact filter: 300-2000 ms with delta and ratio checks.",
+                    "RMSSD, SDNN and pNN50 are calculated for the session, 60-second windows and configured phases.",
+                ],
+            },
+            {
+                "title": "Wellness scoring",
+                "items": [
+                    "Score starts at 100; low SpO2, validated low HRV and high heart rate can reduce it.",
+                    "HRV is not scored without sufficient approved RR.",
+                    "analysis_confidence is reported separately from the wellness score.",
+                ],
+            },
+        ],
+        "guardrails": [
+            "Wellness and educational use only; no diagnosis, treatment or disease claim.",
+            "Device-reported HRV cannot replace raw approved RR intervals.",
+            "Historical data with unknown provenance remains explicitly unknown.",
+        ],
+        "llm_narration": {
+            "version": NARRATION_VERSION,
+            "fact_sheet_version": FACT_SHEET_VERSION,
+            "summary": (
+                "Optional LLM layer receives only the versioned fact sheet "
+                "after deterministic analysis."
+            ),
+            "instructions": narration_instructions(),
+        },
+    }
+
+    return result
 
 
 class AnalysisError(Exception):
@@ -127,6 +217,8 @@ def run_session_analysis(
             session_context=session_context,
         )
         result["client_id"] = final_user_id
+        result["model_name"] = MODEL_NAME
+        result["model_version"] = MODEL_VERSION
         result["protocol"] = session_context.get("protocol") or {}
         result["chamber"] = session_context.get("chamber") or {}
 
@@ -137,12 +229,6 @@ def run_session_analysis(
             user_id=final_user_id,
             model_name=MODEL_NAME,
             model_version=MODEL_VERSION,
-        )
-
-        complete_ai_result(
-            cursor,
-            ai_result_id=ai_result_id,
-            result=result,
         )
 
         upsert_session_features(
@@ -157,6 +243,38 @@ def run_session_analysis(
             protocol_id=session_context["protocol_id"],
             target_ata=session_context.get("target_ata"),
             actual_ata=session_context.get("actual_ata"),
+        )
+
+        result["wellness_history"] = get_wellness_summary(
+            cursor,
+            user_id=final_user_id,
+            protocol_id=session_context["protocol_id"],
+            limit=30,
+        )
+        result["operator_report"] = build_operator_report(result)
+        result["session_quality"] = {
+            "label": session_quality_label(result.get("data_quality_score")),
+            "data_quality_score": result.get("data_quality_score"),
+        }
+        result["session_comparison"] = build_session_comparison(
+            result["wellness_history"]
+        )
+        result["recovery_coach"] = build_recovery_coach(
+            analysis=result,
+            follow_ups=session_context.get("recovery_follow_ups"),
+            check_in=session_context.get("pre_check_in"),
+            personal_history=load_recovery_follow_up_history(
+                cursor,
+                user_id=final_user_id,
+                exclude_session_id=session_id,
+            ),
+        )
+        attach_narration(result)
+
+        complete_ai_result(
+            cursor,
+            ai_result_id=ai_result_id,
+            result=result,
         )
 
         refresh_daily_baseline(
@@ -200,6 +318,8 @@ def analyze_measurements(
     thresholds for oxygenation trends, load indicators and sensor mismatch.
     """
 
+    session_context = session_context or {}
+
     spo2_values = numeric_values(
         usable,
         "spo2",
@@ -207,41 +327,60 @@ def analyze_measurements(
 
     hr_values = numeric_values(
         usable,
-        "heart_rate",
+        "heart_rate_bpm",
     )
+
+    if not hr_values:
+        hr_values = numeric_values(usable, "heart_rate")
+
+    reference_hr_rows = [
+        row for row in usable
+        if row.get("hr_source_type") == "chest_hrm"
+        and row.get("hr_measurement_method") == "ecg"
+    ]
+    reference_hr_values = numeric_values(
+        reference_hr_rows,
+        "heart_rate_bpm",
+    ) or numeric_values(reference_hr_rows, "heart_rate")
 
     pulse_values = numeric_values(
         usable,
-        "pulse",
+        "pulse_rate_bpm",
     )
 
-    hrv_values = numeric_values(
+    if not pulse_values:
+        pulse_values = numeric_values(usable, "pulse")
+
+    reported_hrv_values = numeric_values(
         usable,
         "hrv",
     )
 
-    differences = [
-        abs(
-            float(row["heart_rate"])
-            - float(row["pulse"])
-        )
-        for row in usable
-        if (
-            row.get("heart_rate") is not None
-            and row.get("pulse") is not None
-        )
-    ]
-
     min_spo2 = minimum(spo2_values)
-    avg_hrv = average(hrv_values)
-    max_hr = maximum(hr_values)
-    max_difference = maximum(differences)
-    rr_values = numeric_values(
+    hrv_metrics = calculate_hrv_from_rr(usable)
+    hrv_windows = calculate_hrv_windows(
         usable,
-        "rr_interval",
+        session_segments=session_context.get("segments"),
     )
+    hrv_phase_metrics = calculate_hrv_phase_metrics(
+        usable,
+        session_segments=session_context.get("segments"),
+    )
+    avg_hrv = hrv_metrics["rmssd"]
+    max_hr = maximum(hr_values)
+    max_reference_hr = maximum(reference_hr_values)
+    rr_values = numeric_values(usable, "rr_interval")
     window_start = first_timestamp(usable)
     window_end = last_timestamp(usable)
+    time_alignment_quality = source_summary(
+        usable, "time_alignment_quality"
+    )
+    telemetry_quality = assess_telemetry_quality(
+        measurements=measurements,
+        usable=usable,
+        time_alignment_quality=time_alignment_quality,
+    )
+    max_difference = telemetry_quality["max_hr_pulse_difference_bpm"]
 
     hypoxia_detected = (
         min_spo2 is not None
@@ -250,17 +389,18 @@ def analyze_measurements(
 
     stress_detected = (
         avg_hrv is not None
+        and hrv_metrics["hrv_usable_for_scoring"]
         and avg_hrv < 30
     )
 
     cardiovascular_warning = (
-        max_hr is not None
-        and max_hr > 160
+        max_reference_hr is not None
+        and max_reference_hr > 160
     )
 
     sensor_mismatch = (
         max_difference is not None
-        and max_difference > 20
+        and max_difference > SENSOR_MISMATCH_THRESHOLD_BPM
     )
 
     score = 100
@@ -294,13 +434,6 @@ def analyze_measurements(
             "Heart rate exceeded the configured high-load threshold"
         )
 
-    if sensor_mismatch:
-        score -= 10
-        reasons.append(
-            "Notable discrepancy between wearable heart rate "
-            "and pulse oximeter pulse"
-        )
-
     score = max(0, min(score, 100))
 
     match_rate = round(
@@ -312,17 +445,27 @@ def analyze_measurements(
         samples_total=len(measurements),
         samples_synchronized=len(usable),
         match_rate=match_rate,
-        has_hrv=bool(hrv_values or rr_values),
+        has_hrv=bool(hrv_metrics["rr_count"]),
         has_spo2=bool(spo2_values),
         sensor_mismatch=sensor_mismatch,
     )
+
+    quality_warnings.extend(telemetry_quality["quality_reasons"])
+
+    hr_source_type = source_summary(usable, "hr_source_type")
+    if hr_values and hr_source_type == "unknown":
+        quality_warnings.append("heart_rate_source_unknown")
+    if hrv_metrics["hrv_confidence"] in {"low", "unavailable"}:
+        quality_warnings.append("insufficient_rr_for_hrv")
+    if hrv_metrics["rr_source_rejected_count"]:
+        quality_warnings.append("unapproved_rr_source")
 
     data_quality_score = calculate_data_quality_score(
         match_rate=match_rate,
         quality_warnings=quality_warnings,
     )
 
-    context_features = summarize_session_context(session_context or {})
+    context_features = summarize_session_context(session_context)
 
     features = {
         "samples_total": len(measurements),
@@ -339,24 +482,42 @@ def analyze_measurements(
         "avg_heart_rate": average(hr_values),
         "min_heart_rate": minimum(hr_values),
         "max_heart_rate": max_hr,
+        "avg_reference_heart_rate": average(reference_hr_values),
+        "max_reference_heart_rate": max_reference_hr,
 
         "avg_pulse": average(pulse_values),
         "min_pulse": minimum(pulse_values),
         "max_pulse": maximum(pulse_values),
 
         "avg_hrv": avg_hrv,
-        "min_hrv": minimum(hrv_values),
-        "max_hrv": maximum(hrv_values),
-        "rr_count": len(rr_values),
-        "sdnn": standard_deviation(rr_values),
-        "pnn50": pnn50(rr_values),
-        "artifact_ratio": artifact_ratio(rr_values),
+        "min_hrv": None,
+        "max_hrv": None,
+        "device_reported_hrv": average(reported_hrv_values),
+        **hrv_metrics,
+        "hrv_window_seconds": DEFAULT_HRV_WINDOW_SECONDS,
+        "hrv_windows": hrv_windows,
+        "hrv_phase_metrics": hrv_phase_metrics,
 
-        "avg_hr_pulse_difference": average(
-            differences
-        ),
+        "avg_hr_pulse_difference": telemetry_quality[
+            "median_hr_pulse_difference_bpm"
+        ],
+        **telemetry_quality,
         "max_hr_pulse_difference": max_difference,
-        "session_context": session_context or {},
+        "hr_source_type": source_summary(usable, "hr_source_type"),
+        "hr_measurement_method": source_summary(
+            usable, "hr_measurement_method"
+        ),
+        "pulse_source_type": source_summary(
+            usable, "pulse_source_type"
+        ),
+        "pulse_measurement_method": source_summary(
+            usable, "pulse_measurement_method"
+        ),
+        "time_alignment_method": source_summary(
+            usable, "time_alignment_method"
+        ),
+        "time_alignment_quality": time_alignment_quality,
+        "session_context": session_context,
         "context_features": context_features,
     }
 
@@ -364,7 +525,6 @@ def analyze_measurements(
         hypoxia_detected
         or stress_detected
         or cardiovascular_warning
-        or sensor_mismatch
     )
     oxygenation_drop = bool(
         min_spo2 is not None
@@ -406,7 +566,7 @@ def analyze_measurements(
         context_features=context_features,
     )
 
-    return {
+    result = {
         "overall_score": score,
         "wellness_response_score": score,
         "score_type": "Wellness Response",
@@ -427,6 +587,13 @@ def analyze_measurements(
             else None
         ),
         "data_quality_score": data_quality_score,
+        "analysis_confidence": calculate_analysis_confidence(
+            data_quality_score=data_quality_score,
+            has_reference_hr=hr_source_type == "chest_hrm",
+            has_rr=hrv_metrics["hrv_usable_for_scoring"],
+            time_alignment_quality=time_alignment_quality,
+            signal_quality=telemetry_quality["signal_quality"],
+        ),
 
         "anomaly_detected": anomaly_detected,
         "stress_detected": stress_detected,
@@ -448,7 +615,7 @@ def analyze_measurements(
             "data_quality_warning": wellness_status == "data_quality_warning",
         },
         "quality_warnings": quality_warnings,
-        "session_context": session_context or {},
+        "session_context": session_context,
         "context_features": context_features,
 
         "summary": (
@@ -475,6 +642,27 @@ def analyze_measurements(
         "medical_disclaimer": WELLNESS_DISCLAIMER,
         "wellness_disclaimer": WELLNESS_DISCLAIMER,
     }
+
+    return result
+
+
+def attach_narration(result: dict[str, Any]) -> None:
+    """Attach the optional LLM narrative after all deterministic facts exist."""
+
+    deterministic_summary = result["summary"]
+    fact_sheet = build_session_fact_sheet(result)
+    narration = narrate_fact_sheet(fact_sheet)
+    result["deterministic_summary"] = deterministic_summary
+    result["narration"] = {
+        **narration.to_dict(),
+        "fact_sheet": fact_sheet,
+    }
+    result["session_summary"] = build_session_summary(
+        analysis=result,
+        narration=result["narration"],
+    )
+    if narration.status == "generated":
+        result["summary"] = narration.text
 
 
 def load_session_client_id(
@@ -517,6 +705,28 @@ def numeric_values(
             continue
 
     return result
+
+
+def first_not_none(*values: Any) -> Any:
+    """Return the first available value without treating zero as missing."""
+
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def source_summary(rows: list[dict[str, Any]], key: str) -> str:
+    """Summarize provenance without inventing a source for historical rows."""
+
+    values = {
+        str(row[key])
+        for row in rows
+        if row.get(key) not in (None, "", "unknown")
+    }
+    if not values:
+        return "unknown"
+    return values.pop() if len(values) == 1 else "mixed"
 
 
 def first_timestamp(
@@ -627,6 +837,14 @@ def calculate_data_quality_score(
         "missing_hrv_or_rr": 15,
         "missing_spo2": 15,
         "sensor_alignment_warning": 10,
+        "low_synchronized_coverage": 10,
+        "low_synchronized_temporal_coverage": 10,
+        "low_hr_pulse_agreement": 10,
+        "sustained_hr_pulse_divergence": 10,
+        "time_alignment_uncertain": 15,
+        "heart_rate_source_unknown": 10,
+        "insufficient_rr_for_hrv": 10,
+        "unapproved_rr_source": 10,
     }
 
     score = match_rate - sum(
@@ -634,6 +852,34 @@ def calculate_data_quality_score(
         for warning in quality_warnings
     )
     return round(max(0, min(score, 100)), 2)
+
+
+def calculate_analysis_confidence(
+    *,
+    data_quality_score: float,
+    has_reference_hr: bool,
+    has_rr: bool,
+    time_alignment_quality: str,
+    signal_quality: str,
+) -> str:
+    """Grade interpretation confidence separately from wellness outcome."""
+
+    if (
+        data_quality_score >= 80
+        and has_reference_hr
+        and has_rr
+        and time_alignment_quality == "high"
+        and signal_quality == "high"
+    ):
+        return "high"
+    if (
+        data_quality_score >= 60
+        and has_reference_hr
+        and time_alignment_quality not in {"low", "unknown"}
+        and signal_quality in {"medium", "high"}
+    ):
+        return "medium"
+    return "low"
 
 
 def build_research_summary(
@@ -940,6 +1186,14 @@ def load_session_context(
         }
         for segment in cursor.fetchall()
     ]
+    follow_ups = load_latest_recovery_follow_ups(cursor, session_id=session_id)
+    context["recovery_follow_ups"] = follow_ups
+    # Kept for fact sheets generated before recovery-coach-v2.
+    context["recovery_follow_up"] = max(
+        follow_ups.values(),
+        key=lambda entry: entry.get("recorded_at") or "",
+        default=None,
+    )
     return context
 
 
@@ -1016,11 +1270,19 @@ def serialize_timeline_row(row: dict[str, Any]) -> dict[str, Any]:
             else timestamp
         ),
         "heart_rate": row.get("heart_rate"),
+        "heart_rate_bpm": first_not_none(
+            row.get("heart_rate_bpm"), row.get("heart_rate")
+        ),
         "pulse": row.get("pulse"),
+        "pulse_rate_bpm": first_not_none(
+            row.get("pulse_rate_bpm"), row.get("pulse")
+        ),
         "spo2": row.get("spo2"),
         "hrv": row.get("hrv"),
         "rr_interval": row.get("rr_interval"),
         "synchronized": row.get("synchronized"),
+        "hr_source_type": row.get("hr_source_type") or "unknown",
+        "pulse_source_type": row.get("pulse_source_type") or "unknown",
     }
 
 

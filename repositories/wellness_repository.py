@@ -51,14 +51,17 @@ def upsert_session_features(
             data_quality_score,
             target_ata,
             actual_ata,
+            hrv_algorithm_version,
+            hrv_confidence,
             features_json
         )
         VALUES (
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s, %s,
-            %s::jsonb
+            %s, %s, %s, %s,
+            %s, %s, %s, %s,
+            %s, %s, %s::jsonb
         )
         ON CONFLICT (session_id, phase, window_start, window_end)
         DO UPDATE SET
@@ -83,6 +86,8 @@ def upsert_session_features(
             data_quality_score = EXCLUDED.data_quality_score,
             target_ata = EXCLUDED.target_ata,
             actual_ata = EXCLUDED.actual_ata,
+            hrv_algorithm_version = EXCLUDED.hrv_algorithm_version,
+            hrv_confidence = EXCLUDED.hrv_confidence,
             features_json = EXCLUDED.features_json
         """,
         (
@@ -111,6 +116,8 @@ def upsert_session_features(
             result.get("data_quality_score"),
             target_ata,
             actual_ata,
+            features.get("hrv_algorithm_version"),
+            features.get("hrv_confidence"),
             json.dumps(
                 {
                     **features,

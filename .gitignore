@@ -20,6 +20,7 @@ __pycache__/
 
 venv/
 .venv/
+.deps/
 
 # =========================================================
 # NODE / PLAYWRIGHT
@@ -88,6 +89,7 @@ Thumbs.db
 
 htmlcov/
 .coverage
+reports/generated/
 
 # =========================================================
 # DOCKER
@@ -114,3 +116,4 @@ change_demo_passwords.py
 
 # Playwright auth state
 tests/e2e/.auth/
+.python-deps/

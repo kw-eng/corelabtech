@@ -12,6 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from database_postgres import db
+from core.telemetry.contract import (
+    SCHEMA_VERSION,
+    pulse_oximeter_metadata,
+)
+from services.hrv_pipeline import annotate_hrv_rmssd_timeline
+from core.telemetry.device_catalog import resolve_device_capability, resolve_fit_device
+from services.importers.registry import get_importer
+from services.telemetry_time import normalize_rows_timestamps
 
 from repositories.data_repository import (
     complete_csv_import,
@@ -25,12 +33,7 @@ from repositories.data_repository import (
     insert_fit_measurements,
 )
 
-from services.csv_parser import parse_csv_file
-from services.fit_parser import parse_fit_file
-
-
-CSV_PARSER_VERSION = "csv-v1"
-FIT_PARSER_VERSION = "fit-v3"
+TIMESTAMP_NORMALIZATION_VERSION = "time-v1"
 
 CSV_DEVICE = "Checkme O2"
 FIT_DEVICE = "FIT-compatible wearable"
@@ -109,6 +112,77 @@ class ImportResult:
         return asdict(self)
 
 
+def preview_telemetry_file(
+    *,
+    path: str | Path,
+    import_type: str,
+    source_timezone: str | None = None,
+    device_model: str | None = None,
+) -> dict[str, Any]:
+    """Parse an upload without persistence and return bounded import facts."""
+
+    path = normalize_path(path)
+    validate_file(path)
+    importer = get_importer(import_type)
+    parsed_rows = importer.import_data(path)
+    validator = validate_csv_rows if import_type == "csv" else validate_fit_rows
+    valid_rows = normalize_rows_timestamps(
+        validator(parsed_rows), source_timezone=source_timezone
+    )
+
+    inferred_model = next(
+        (row.get("device_model") for row in valid_rows if row.get("device_model")),
+        None,
+    )
+    resolved_model = device_model or inferred_model
+    if import_type == "csv":
+        capability = pulse_oximeter_metadata()
+    elif import_type == "fit":
+        capability = resolve_fit_device(resolved_model)
+    else:
+        capability = resolve_device_capability(resolved_model)
+
+    has_rr = any(row.get("rr_intervals") or row.get("rr_interval") for row in valid_rows)
+    reported_hrv = any(
+        row.get("device_reported_hrv_sdnn_ms") is not None
+        or row.get("device_reported_hrv_rmssd_ms") is not None
+        for row in valid_rows
+    )
+    signals = {
+        "heart_rate": any(row.get("heart_rate_bpm") is not None for row in valid_rows),
+        "pulse": any(row.get("pulse_rate_bpm") is not None for row in valid_rows),
+        "spo2": any(row.get("spo2") is not None for row in valid_rows),
+        "raw_rr": has_rr,
+        "reported_hrv": reported_hrv,
+    }
+    if has_rr and capability.get("measurement_method") == "ecg":
+        hrv_status = "eligible_from_raw_rr"
+    elif has_rr:
+        hrv_status = "raw_rr_requires_source_review"
+    elif reported_hrv:
+        hrv_status = "reported_by_device_only"
+    else:
+        hrv_status = "not_available"
+
+    first_timestamp, last_timestamp = get_timestamp_range(valid_rows)
+    return {
+        "status": "ready",
+        "import_type": import_type,
+        "parser_version": importer.parser_version,
+        "records_parsed": len(parsed_rows),
+        "records_valid": len(valid_rows),
+        "records_rejected": len(parsed_rows) - len(valid_rows),
+        "first_timestamp": first_timestamp,
+        "last_timestamp": last_timestamp,
+        "device_model": resolved_model or "unknown",
+        "device_type": capability.get("device_type", "unknown"),
+        "measurement_method": capability.get("measurement_method", "unknown"),
+        "signal_quality": capability.get("signal_quality", "unknown"),
+        "signals": signals,
+        "hrv_status": hrv_status,
+    }
+
+
 # =========================================================
 # CSV IMPORT
 # =========================================================
@@ -119,6 +193,7 @@ def import_csv_file(
     filename: str,
     session_id: str,
     user_id: str | None = None,
+    source_timezone: str | None = None,
 ) -> ImportResult:
     """Parse and persist a pulse oximeter CSV upload.
 
@@ -132,8 +207,12 @@ def import_csv_file(
 
     validate_file(path)
 
-    parsed_rows = parse_csv_file(path)
-    valid_rows = validate_csv_rows(parsed_rows)
+    importer = get_importer("csv")
+    parsed_rows = importer.import_data(path)
+    valid_rows = normalize_rows_timestamps(
+        validate_csv_rows(parsed_rows),
+        source_timezone=source_timezone,
+    )
 
     file_hash = calculate_file_hash(path)
 
@@ -160,6 +239,8 @@ def import_csv_file(
             notes="Auto-created during CSV import",
         )
 
+        telemetry_metadata = pulse_oximeter_metadata()
+
         import_id = create_csv_import(
             cursor,
             session_id=session_id,
@@ -168,7 +249,13 @@ def import_csv_file(
             file_hash=file_hash,
             records_parsed=len(parsed_rows),
             device=CSV_DEVICE,
-            parser_version=CSV_PARSER_VERSION,
+            parser_version=importer.parser_version,
+            device_type=telemetry_metadata["device_type"],
+            device_model="checkme_o2",
+            measurement_method=telemetry_metadata["measurement_method"],
+            telemetry_schema_version=SCHEMA_VERSION,
+            source_timezone=valid_rows[0]["source_timezone"],
+            timestamp_normalization_version=TIMESTAMP_NORMALIZATION_VERSION,
         )
 
         records_saved = insert_csv_measurements(
@@ -178,6 +265,7 @@ def import_csv_file(
             user_id=user_id,
             filename=filename,
             rows=valid_rows,
+            telemetry_metadata=telemetry_metadata,
         )
 
         records_rejected = len(parsed_rows) - records_saved
@@ -210,7 +298,7 @@ def import_csv_file(
             first_timestamp=first_timestamp,
             last_timestamp=last_timestamp,
             device=CSV_DEVICE,
-            parser_version=CSV_PARSER_VERSION,
+            parser_version=importer.parser_version,
         )
 
     except DuplicateImportError:
@@ -229,6 +317,119 @@ def import_csv_file(
         connection.close()
 
 
+def import_external_telemetry_file(
+    *,
+    path: str | Path,
+    filename: str,
+    session_id: str,
+    import_type: str,
+    user_id: str | None = None,
+    source_timezone: str | None = None,
+    device_model: str | None = None,
+) -> ImportResult:
+    """Persist non-FIT HR/HRV adapters through the traceable wearable pipeline."""
+
+    path = normalize_path(path)
+    session_id = required_text(session_id, "session_id")
+    user_id = optional_text(user_id) or extract_user_id(session_id)
+    validate_file(path)
+
+    importer = get_importer(import_type)
+    parsed_rows = importer.import_data(path)
+    valid_rows = normalize_rows_timestamps(
+        validate_fit_rows(parsed_rows), source_timezone=source_timezone
+    )
+    file_hash = calculate_file_hash(path)
+    file_size = path.stat().st_size
+    inferred_model = next(
+        (row.get("device_model") for row in valid_rows if row.get("device_model")),
+        None,
+    )
+    resolved_model = device_model or inferred_model or import_type
+    capability = resolve_device_capability(resolved_model)
+    for row in valid_rows:
+        row["device_type"] = capability["device_type"]
+        row["device_model"] = resolved_model
+        row["measurement_method"] = capability["measurement_method"]
+        row["signal_quality"] = capability["signal_quality"]
+        row["quality_reason"] = capability["quality_reason"]
+    annotate_hrv_rmssd_timeline(valid_rows)
+
+    connection = db()
+    cursor = connection.cursor()
+    try:
+        duplicate = find_fit_import(cursor, session_id=session_id, file_hash=file_hash)
+        if duplicate:
+            raise DuplicateImportError(
+                import_type=import_type,
+                import_id=duplicate["id"],
+                records_saved=duplicate["records_saved"] or 0,
+            )
+        ensure_research_user(cursor, user_id=user_id, notes=f"Auto-created during {import_type} import")
+        import_id = create_fit_import(
+            cursor,
+            session_id=session_id,
+            user_id=user_id,
+            filename=filename,
+            file_hash=file_hash,
+            file_size=file_size,
+            records_parsed=len(parsed_rows),
+            parser_version=importer.parser_version,
+            manufacturer=import_type,
+            product=resolved_model,
+            device_type=capability["device_type"],
+            device_model=resolved_model,
+            measurement_method=capability["measurement_method"],
+            telemetry_schema_version=SCHEMA_VERSION,
+            source_timezone=valid_rows[0]["source_timezone"],
+            timestamp_normalization_version=TIMESTAMP_NORMALIZATION_VERSION,
+            import_type=import_type,
+        )
+        records_saved = insert_fit_measurements(
+            cursor,
+            import_id=import_id,
+            session_id=session_id,
+            user_id=user_id,
+            filename=filename,
+            rows=valid_rows,
+            telemetry_metadata=capability,
+        )
+        first_timestamp, last_timestamp = get_timestamp_range(valid_rows)
+        complete_fit_import(
+            cursor,
+            import_id=import_id,
+            records_saved=records_saved,
+            records_rejected=len(parsed_rows) - records_saved,
+            first_timestamp=first_timestamp,
+            last_timestamp=last_timestamp,
+        )
+        connection.commit()
+        return ImportResult(
+            import_id=import_id,
+            import_type=import_type,
+            session_id=session_id,
+            user_id=user_id,
+            filename=filename,
+            file_hash=file_hash,
+            records_parsed=len(parsed_rows),
+            records_saved=records_saved,
+            records_rejected=len(parsed_rows) - records_saved,
+            first_timestamp=first_timestamp,
+            last_timestamp=last_timestamp,
+            device=resolved_model,
+            parser_version=importer.parser_version,
+        )
+    except DuplicateImportError:
+        connection.rollback()
+        raise
+    except Exception as exc:
+        connection.rollback()
+        raise DataIngestionError(f"{import_type} import failed: {exc}") from exc
+    finally:
+        cursor.close()
+        connection.close()
+
+
 # =========================================================
 # FIT IMPORT
 # =========================================================
@@ -239,6 +440,8 @@ def import_fit_file(
     filename: str,
     session_id: str,
     user_id: str | None = None,
+    source_timezone: str | None = "UTC",
+    device_model: str | None = None,
 ) -> ImportResult:
     """Parse and persist a FIT upload from a compatible wearable.
 
@@ -252,13 +455,25 @@ def import_fit_file(
 
     validate_file(path)
 
-    parsed_rows = parse_fit_file(path)
-    valid_rows = validate_fit_rows(parsed_rows)
+    importer = get_importer("fit")
+    parsed_rows = importer.import_data(path)
+    valid_rows = normalize_rows_timestamps(
+        validate_fit_rows(parsed_rows),
+        source_timezone=source_timezone,
+    )
 
     file_hash = calculate_file_hash(path)
     file_size = path.stat().st_size
 
     metadata = extract_fit_metadata(valid_rows)
+    resolved_model = device_model or metadata.get("product")
+    telemetry_metadata = resolve_fit_device(resolved_model)
+    for row in valid_rows:
+        row["device_type"] = telemetry_metadata["device_type"]
+        row["device_model"] = resolved_model
+        row["measurement_method"] = telemetry_metadata["measurement_method"]
+        row["signal_quality"] = telemetry_metadata["signal_quality"]
+    annotate_hrv_rmssd_timeline(valid_rows)
 
     connection = db()
     cursor = connection.cursor()
@@ -271,7 +486,7 @@ def import_fit_file(
         )
 
         if duplicate:
-            if duplicate.get("parser_version") == FIT_PARSER_VERSION:
+            if duplicate.get("parser_version") == importer.parser_version:
                 raise DuplicateImportError(
                     import_type="fit",
                     import_id=duplicate["id"],
@@ -302,6 +517,12 @@ def import_fit_file(
                     manufacturer = %s,
                     product = %s,
                     device_serial = %s,
+                    device_type = %s,
+                    device_model = %s,
+                    measurement_method = %s,
+                    telemetry_schema_version = %s,
+                    source_timezone = %s,
+                    timestamp_normalization_version = %s,
                     status = 'processing',
                     error_message = NULL
                 WHERE id = %s
@@ -311,10 +532,16 @@ def import_fit_file(
                     filename,
                     file_size,
                     len(parsed_rows),
-                    FIT_PARSER_VERSION,
+                    importer.parser_version,
                     metadata.get("manufacturer"),
                     metadata.get("product"),
                     metadata.get("device_serial"),
+                    telemetry_metadata["device_type"],
+                    resolved_model,
+                    telemetry_metadata["measurement_method"],
+                    SCHEMA_VERSION,
+                    valid_rows[0]["source_timezone"],
+                    TIMESTAMP_NORMALIZATION_VERSION,
                     import_id,
                 ),
             )
@@ -334,10 +561,16 @@ def import_fit_file(
                 file_hash=file_hash,
                 file_size=file_size,
                 records_parsed=len(parsed_rows),
-                parser_version=FIT_PARSER_VERSION,
+                parser_version=importer.parser_version,
                 manufacturer=metadata.get("manufacturer"),
                 product=metadata.get("product"),
                 device_serial=metadata.get("device_serial"),
+                device_type=telemetry_metadata["device_type"],
+                device_model=resolved_model,
+                measurement_method=telemetry_metadata["measurement_method"],
+                telemetry_schema_version=SCHEMA_VERSION,
+                source_timezone=valid_rows[0]["source_timezone"],
+                timestamp_normalization_version=TIMESTAMP_NORMALIZATION_VERSION,
             )
 
         records_saved = insert_fit_measurements(
@@ -347,6 +580,7 @@ def import_fit_file(
             user_id=user_id,
             filename=filename,
             rows=valid_rows,
+            telemetry_metadata=telemetry_metadata,
         )
 
         records_rejected = len(parsed_rows) - records_saved
@@ -379,7 +613,7 @@ def import_fit_file(
             first_timestamp=first_timestamp,
             last_timestamp=last_timestamp,
             device=FIT_DEVICE,
-            parser_version=FIT_PARSER_VERSION,
+            parser_version=importer.parser_version,
         )
 
     except DuplicateImportError:
@@ -418,10 +652,7 @@ def validate_csv_rows(
         timestamp = row.get("timestamp")
         spo2 = row.get("spo2")
 
-        pulse = first_not_none(
-            row.get("pulse"),
-            row.get("heart_rate"),
-        )
+        pulse = row.get("pulse_rate_bpm")
 
         if timestamp is None:
             continue
@@ -473,15 +704,16 @@ def validate_fit_rows(
     for row in rows:
         timestamp = row.get("timestamp")
 
-        heart_rate = first_not_none(
-            row.get("heart_rate"),
-            row.get("pulse"),
-            row.get("hr"),
-        )
+        heart_rate = row.get("heart_rate_bpm")
 
         hrv = row.get("hrv")
         rr_interval = row.get("rr_interval")
+        rr_intervals = row.get("rr_intervals") or []
         spo2 = row.get("spo2")
+        device_reported_hrv = (
+            row.get("device_reported_hrv_sdnn_ms")
+            or row.get("device_reported_hrv_rmssd_ms")
+        )
 
         if timestamp is None:
             continue
@@ -492,7 +724,9 @@ def validate_fit_rows(
                 heart_rate,
                 hrv,
                 rr_interval,
+                rr_intervals,
                 spo2,
+                device_reported_hrv,
             )
         ):
             continue

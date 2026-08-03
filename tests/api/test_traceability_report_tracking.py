@@ -93,11 +93,21 @@ class TraceabilityReportTrackingTests(unittest.TestCase):
         fake_connection = FakeConnection([
             (
                 "from fit_imports where session_id",
-                [("hr.fit", "completed", 120, 0, now, None)],
+                [
+                    (
+                        "hr.fit", "completed", 120, 0, now, None,
+                        "chest_hrm", "Garmin HRM 600", "ecg", None, "fit",
+                    )
+                ],
             ),
             (
                 "from csv_imports where session_id",
-                [("spo2.csv", "completed", 130, 1, now, None)],
+                [
+                    (
+                        "spo2.csv", "completed", 130, 1, now, None,
+                        "finger_oximeter", "Checkme O2", "ppg", None,
+                    )
+                ],
             ),
             (
                 "from merge_jobs where session_id",
@@ -153,6 +163,7 @@ class TraceabilityReportTrackingTests(unittest.TestCase):
         self.assertEqual(steps["ai_generated"]["status"], "completed")
         self.assertEqual(steps["report_exported"]["status"], "completed")
         self.assertEqual(payload["events"][0]["action"], "report.export")
+        self.assertEqual(payload["data_sources"][0]["import_type"], "fit")
 
     def test_session_report_download_records_report_export_audit_event(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

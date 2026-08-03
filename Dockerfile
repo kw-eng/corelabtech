@@ -33,6 +33,8 @@ RUN npx playwright install --with-deps chromium \
 
 COPY . .
 
+RUN chmod +x /app/docker-entrypoint.sh
+
 RUN mkdir -p \
     logs \
     data/uploads/temp \
@@ -42,5 +44,7 @@ RUN mkdir -p \
     test-results
 
 EXPOSE 5000
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 CMD ["gunicorn", "app:app", "--workers", "3", "--bind", "0.0.0.0:5000", "--timeout", "300"]

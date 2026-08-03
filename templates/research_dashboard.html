@@ -104,6 +104,75 @@
         </article>
     </section>
 
+    <section class="mission-card mission-recovery-card">
+        <div class="mission-section-heading">
+            <div>
+                <h2>{{ t('mission.recovery_follow_up') }}</h2>
+                <p>{{ t('mission.recovery_follow_up_help') }}</p>
+            </div>
+            <span id="recoveryFollowUpSession" class="mission-pill">{{ t('mission.no_session_selected') }}</span>
+        </div>
+        <form id="recoveryFollowUpForm" class="mission-recovery-form">
+            <label>
+                <span>{{ t('mission.follow_up_window') }}</span>
+                <select id="recoveryFollowUpWindow">
+                    <option value="one_hour">{{ t('mission.follow_up_one_hour') }}</option>
+                    <option value="next_day">{{ t('mission.follow_up_next_day') }}</option>
+                </select>
+            </label>
+            <label>
+                <span>{{ t('mission.energy') }}</span>
+                <select id="recoveryEnergyLevel">
+                    <option value="">{{ t('mission.not_recorded') }}</option>
+                    <option value="lower">{{ t('mission.lower') }}</option>
+                    <option value="same">{{ t('mission.same') }}</option>
+                    <option value="higher">{{ t('mission.higher') }}</option>
+                </select>
+            </label>
+            <label>
+                <span>{{ t('mission.fatigue') }}</span>
+                <select id="recoveryFatigueLevel">
+                    <option value="">{{ t('mission.not_recorded') }}</option>
+                    <option value="lower">{{ t('mission.lower') }}</option>
+                    <option value="same">{{ t('mission.same') }}</option>
+                    <option value="higher">{{ t('mission.higher') }}</option>
+                </select>
+            </label>
+            <label>
+                <span>{{ t('mission.sleep_quality') }}</span>
+                <select id="recoverySleepQuality">
+                    <option value="">{{ t('mission.not_recorded') }}</option>
+                    <option value="poor">{{ t('mission.poor') }}</option>
+                    <option value="fair">{{ t('mission.fair') }}</option>
+                    <option value="good">{{ t('mission.good') }}</option>
+                </select>
+            </label>
+            <label>
+                <span>{{ t('mission.discomfort') }}</span>
+                <select id="recoveryDiscomfort">
+                    <option value="">{{ t('mission.not_recorded') }}</option>
+                    <option value="none">{{ t('mission.none') }}</option>
+                    <option value="mild">{{ t('mission.mild') }}</option>
+                    <option value="moderate">{{ t('mission.moderate') }}</option>
+                </select>
+            </label>
+            <label>
+                <span>{{ t('mission.follow_up_hr') }}</span>
+                <input id="recoveryHeartRate" type="number" min="20" max="250" step="0.1" inputmode="decimal">
+            </label>
+            <label>
+                <span>SpO2</span>
+                <input id="recoverySpo2" type="number" min="50" max="100" step="0.1" inputmode="decimal">
+            </label>
+            <div class="mission-recovery-action">
+                <button type="submit">{{ t('mission.save_recovery_follow_up') }}</button>
+            </div>
+        </form>
+        <div id="recoveryCoachOutput" class="mission-recovery-output" aria-live="polite">
+            {{ t('mission.recovery_follow_up_empty') }}
+        </div>
+    </section>
+
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
@@ -121,6 +190,7 @@
         <div id="traceabilityBox" class="mission-traceability">
             {{ t('mission.trace_empty') }}
         </div>
+        <div id="dataSourcesBox" class="mission-data-sources"></div>
     </section>
 
     <section class="mission-card">
@@ -150,6 +220,30 @@
         <pre id="rawOutput" class="mission-raw">{{ t('mission.raw_empty') }}</pre>
     </section>
 
+    <section class="mission-card">
+        <div class="mission-section-heading">
+            <div>
+                <h2>{{ t('mission.device_compatibility') }}</h2>
+                <p>{{ t('mission.device_compatibility_help') }}</p>
+            </div>
+            <button type="button" class="mission-inline-button" onclick="loadDeviceCatalog()">{{ t('mission.refresh_device_catalog') }}</button>
+        </div>
+        <div id="deviceCatalogBox" class="mission-data-sources">{{ t('mission.device_catalog_loading') }}</div>
+    </section>
+
+    {% if current_user.role in ["researcher", "admin"] %}
+    <section class="mission-card">
+        <div class="mission-section-heading">
+            <div>
+                <h2>{{ t('mission.research_ai') }}</h2>
+                <p>{{ t('mission.research_ai_help') }}</p>
+            </div>
+            <button type="button" class="mission-inline-button" onclick="loadResearchSummary()">{{ t('mission.refresh_research_ai') }}</button>
+        </div>
+        <div id="researchSummaryOutput" class="mission-analysis">{{ t('mission.research_ai_empty') }}</div>
+    </section>
+    {% endif %}
+
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
@@ -170,6 +264,8 @@ function tr(key, params = null){
 
 window.addEventListener("load", async () => {
     await loadSessions()
+    await loadDeviceCatalog()
+    document.getElementById("recoveryFollowUpForm")?.addEventListener("submit", saveRecoveryFollowUp)
 
     if(getSelectedSessionId()){
         await loadDashboardSession()
@@ -445,6 +541,133 @@ function updateSelectedSessionLabel(){
         : tr("mission.no_session_selected")
 
     setText("selectedSessionLabel", label)
+    setText("recoveryFollowUpSession", label)
+}
+
+function optionalNumber(id){
+    const value = document.getElementById(id)?.value
+    return value === "" || value === undefined ? null : Number(value)
+}
+
+function recoveryFollowUpPayload(){
+    return {
+        follow_up_window: document.getElementById("recoveryFollowUpWindow")?.value || "one_hour",
+        energy_level: document.getElementById("recoveryEnergyLevel")?.value || null,
+        fatigue_level: document.getElementById("recoveryFatigueLevel")?.value || null,
+        sleep_quality: document.getElementById("recoverySleepQuality")?.value || null,
+        discomfort: document.getElementById("recoveryDiscomfort")?.value || null,
+        heart_rate_bpm: optionalNumber("recoveryHeartRate"),
+        spo2: optionalNumber("recoverySpo2")
+    }
+}
+
+function renderRecoveryCoach(recoveryCoach){
+    const box = document.getElementById("recoveryCoachOutput")
+    if(!box){
+        return
+    }
+
+    if(!recoveryCoach){
+        box.innerText = tr("mission.recovery_follow_up_empty")
+        return
+    }
+
+    const monitored = Array.isArray(recoveryCoach.monitor_before_next_session)
+        ? recoveryCoach.monitor_before_next_session.map(item => escapeHtml(item)).join(", ")
+        : "-"
+    const limitations = Array.isArray(recoveryCoach.limitations)
+        ? recoveryCoach.limitations.map(item => escapeHtml(translateMissionFinding(item))).join(", ")
+        : "-"
+    const followUps = recoveryCoach.follow_ups || {}
+    const comparisons = recoveryCoach.comparisons || {}
+    const recoveryWindow = (window, label) => {
+        const entry = followUps[window]
+        const comparison = comparisons[window] || {}
+        if(!entry){
+            return `<div class="mission-recovery-window"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(tr("mission.recovery_window_pending"))}</span></div>`
+        }
+        const details = [
+            entry.heart_rate_bpm != null ? `HR ${escapeHtml(entry.heart_rate_bpm)} bpm` : null,
+            entry.spo2 != null ? `SpO2 ${escapeHtml(entry.spo2)}%` : null,
+            entry.energy_level ? `${escapeHtml(tr("mission.energy"))}: ${escapeHtml(entry.energy_level)}` : null,
+            entry.fatigue_level ? `${escapeHtml(tr("mission.fatigue"))}: ${escapeHtml(entry.fatigue_level)}` : null
+        ].filter(Boolean).join(" | ") || tr("mission.not_recorded")
+        const metrics = comparison.metrics || {}
+        const deltas = [
+            metrics.heart_rate_bpm?.check_in_delta,
+            metrics.spo2?.check_in_delta
+        ].filter(value => value !== null && value !== undefined)
+        const comparisonText = deltas.length
+            ? `${tr("mission.compared_with_check_in")}: ${deltas.map(value => `${value > 0 ? "+" : ""}${value}`).join(" | ")}`
+            : tr("mission.recovery_checkin_unavailable")
+        const historyDeltas = [
+            ["HR", metrics.heart_rate_bpm?.personal_history],
+            ["SpO2", metrics.spo2?.personal_history]
+        ].map(([label, metric]) => {
+            if(metric?.reference_average == null || metric?.delta == null){
+                return null
+            }
+            return `${label}: ${metric.delta > 0 ? "+" : ""}${metric.delta} (${metric.reference_average})`
+        }).filter(Boolean)
+        const personalHistoryText = historyDeltas.length
+            ? `${tr("mission.compared_with_personal_history")}: ${historyDeltas.join(" | ")}`
+            : tr("mission.recovery_history_not_ready")
+        return `<div class="mission-recovery-window"><strong>${escapeHtml(label)}</strong><span>${details}</span><span>${escapeHtml(comparisonText)}</span><span>${escapeHtml(personalHistoryText)}</span></div>`
+    }
+    const history = recoveryCoach.history || {}
+    const historyText = history.available_entries
+        ? tr("mission.recovery_history_entries", {count: history.available_entries})
+        : tr("mission.recovery_history_unavailable")
+
+    box.innerHTML = `
+        <strong>${escapeHtml(recoveryCoach.summary || tr("mission.recovery_follow_up_saved"))}</strong>
+        <div class="mission-recovery-windows">
+            ${recoveryWindow("one_hour", tr("mission.follow_up_one_hour"))}
+            ${recoveryWindow("next_day", tr("mission.follow_up_next_day"))}
+        </div>
+        <span>${escapeHtml(historyText)}</span>
+        <span>${escapeHtml(tr("mission.monitor_before_next"))}: ${monitored}</span>
+        ${limitations !== "-" ? `<span>${escapeHtml(tr("mission.data_limitations"))}: ${limitations}</span>` : ""}
+    `
+}
+
+async function saveRecoveryFollowUp(event){
+    event.preventDefault()
+    const sessionId = getSelectedSessionId()
+    const output = document.getElementById("recoveryCoachOutput")
+
+    if(!sessionId){
+        if(output){
+            output.innerText = tr("mission.select_session_alert")
+        }
+        return
+    }
+
+    if(output){
+        output.innerText = tr("mission.recovery_follow_up_saving")
+    }
+
+    try{
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/recovery-follow-up`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(recoveryFollowUpPayload())
+        })
+        const data = await parseJsonResponse(res, "RECOVERY FOLLOW-UP")
+
+        if(!res.ok || data.error){
+            throw new Error(data.error || res.status)
+        }
+
+        renderRecoveryCoach(data.recovery_coach)
+        setText("rawOutput", prettyCompact(data))
+        await loadDashboardSession()
+    }catch(err){
+        if(output){
+            output.innerText = tr("mission.recovery_follow_up_failed", {error: err.message || err})
+        }
+    }
 }
 
 function formatSessionOption(session){
@@ -518,6 +741,9 @@ async function loadDashboardSession(){
         await loadUserTrend({
             updateRaw: false
         })
+        await loadResearchSummary({
+            updateRaw: false
+        })
     }catch(err){
         console.error("loadDashboardSession error:", err)
         resetDashboardState(tr("mission.latest_analysis_load_failed"))
@@ -565,6 +791,9 @@ async function runSelectedAI(){
         setText("rawOutput", prettyCompact(data))
         await loadSessionTraceability()
         await loadUserTrend({
+            updateRaw: false
+        })
+        await loadResearchSummary({
             updateRaw: false
         })
     }catch(err){
@@ -616,6 +845,62 @@ async function loadSessionTraceability(){
                 ${escapeHtml(tr("mission.trace_request_failed", {error: err.message || err}))}
             </div>
         `
+    }
+}
+
+function renderResearchSummary(summary){
+    const box = document.getElementById("researchSummaryOutput")
+    if(!box){
+        return
+    }
+    if(!summary){
+        box.innerText = tr("mission.research_ai_empty")
+        return
+    }
+    const sections = summary.sections || {}
+    const narration = summary.narration || {}
+    const facts = summary.fact_sheet || {}
+    const methods = facts.measurements || {}
+    box.innerHTML = `
+        <div class="mission-summary-heading">
+            <h3>${escapeHtml(tr("mission.research_ai"))}</h3>
+            <span>${escapeHtml(summary.fact_sheet_version || "-")}</span>
+        </div>
+        <div class="mission-analysis-grid two">
+            <div><span>${escapeHtml(tr("mission.research_narration_source"))}</span><strong>${escapeHtml(narration.source || "-")}</strong></div>
+            <div><span>${escapeHtml(tr("mission.hrv_algorithm"))}</span><strong>${escapeHtml(methods.hrv_algorithm_version || "-")}</strong></div>
+        </div>
+        <p><strong>${escapeHtml(tr("mission.research_methods"))}</strong><br>${escapeHtml(sections.methods || "-")}</p>
+        <p><strong>${escapeHtml(tr("mission.research_observations"))}</strong><br>${escapeHtml(sections.observations || "-")}</p>
+        <p><strong>${escapeHtml(tr("mission.data_limitations"))}</strong><br>${escapeHtml(sections.limitations || "-")}</p>
+    `
+}
+
+async function loadResearchSummary(options = {}){
+    const box = document.getElementById("researchSummaryOutput")
+    const sessionId = getSelectedSessionId()
+    if(!box){
+        return
+    }
+    if(!sessionId){
+        renderResearchSummary(null)
+        return
+    }
+    box.innerText = tr("mission.loading")
+    try{
+        const res = await fetch(`/api/analysis/${encodeURIComponent(sessionId)}/research-summary`, {
+            credentials: "same-origin"
+        })
+        const data = await parseJsonResponse(res, "RESEARCH SUMMARY")
+        if(!res.ok || data.error){
+            throw new Error(data.error || res.status)
+        }
+        renderResearchSummary(data.research_summary)
+        if(options.updateRaw !== false){
+            setText("rawOutput", prettyCompact(data))
+        }
+    }catch(err){
+        box.innerHTML = `<div class="mission-warning">${escapeHtml(tr("mission.research_ai_load_failed", {error: err.message || err}))}</div>`
     }
 }
 
@@ -690,6 +975,109 @@ function renderSessionTraceability(data){
             </table>
         </div>
     `
+    renderDataSources(data.data_sources)
+}
+
+function renderDataSources(sources){
+    const box = document.getElementById("dataSourcesBox")
+    if(!box){
+        return
+    }
+    const rows = Array.isArray(sources) ? sources : []
+    if(!rows.length){
+        box.innerHTML = `<p class="mission-muted">${escapeHtml(tr("mission.sources_empty"))}</p>`
+        return
+    }
+    box.innerHTML = `
+        <h3>${escapeHtml(tr("mission.data_sources"))}</h3>
+        <div class="mission-source-grid">
+            ${rows.map(source => `
+                <div>
+                    <strong>${escapeHtml(source.signal_role || "-")}</strong>
+                    <span>${escapeHtml(source.device_model || "unknown")}</span>
+                    <span>${escapeHtml(source.device_type || "unknown")} · ${escapeHtml(source.measurement_method || "unknown")}</span>
+                    <small>${escapeHtml(tr("mission.signal_quality"))}: ${escapeHtml(source.signal_quality || "unknown")} · ${escapeHtml(tr("mission.samples_count", {count: source.records_saved || 0}))}</small>
+                </div>
+            `).join("")}
+        </div>
+    `
+}
+
+async function loadDeviceCatalog(){
+    const box = document.getElementById("deviceCatalogBox")
+    if(!box){
+        return
+    }
+    box.innerText = tr("mission.device_catalog_loading")
+    try{
+        const res = await fetch("/api/device-catalog", {credentials: "same-origin"})
+        const data = await parseJsonResponse(res, "DEVICE CATALOG")
+        if(!res.ok || data.error){
+            throw new Error(data.error || res.status)
+        }
+        const devices = Array.isArray(data.devices) ? data.devices : []
+        const compatibility = Array.isArray(data.compatibility) ? data.compatibility : []
+        if(compatibility.length){
+            box.innerHTML = `
+                <div class="mission-device-toolbar">
+                    <select id="deviceSupportFilter" aria-label="Support level">
+                        <option value="all">All support levels</option>
+                        <option value="core">Core session</option>
+                        <option value="trend">Trend import</option>
+                        <option value="planned">Planned integration</option>
+                    </select>
+                    <select id="deviceRrFilter" aria-label="Raw RR availability">
+                        <option value="all">All RR policies</option>
+                        <option value="yes">Raw RR confirmed</option>
+                        <option value="conditional">Raw RR conditional</option>
+                        <option value="no">No raw RR</option>
+                    </select>
+                </div>
+                <div id="deviceCompatibilityRows" class="mission-source-grid"></div>
+            `
+            const renderCompatibility = () => {
+                const support = document.getElementById("deviceSupportFilter")?.value || "all"
+                const rr = document.getElementById("deviceRrFilter")?.value || "all"
+                const filtered = compatibility.filter(device => (
+                    (support === "all" || device.support_level === support) &&
+                    (rr === "all" || device.raw_rr === rr)
+                ))
+                const rows = document.getElementById("deviceCompatibilityRows")
+                if(!rows){
+                    return
+                }
+                rows.innerHTML = filtered.map(device => `
+                    <div class="mission-device-card">
+                        <strong>${escapeHtml(device.manufacturer)} ${escapeHtml(device.model)}</strong>
+                        <span>${escapeHtml(device.device_class)} · ${escapeHtml(device.support_level)}</span>
+                        <small>Formats: ${escapeHtml((device.formats || []).join(", "))}</small>
+                        <small>Raw RR: ${escapeHtml(device.raw_rr)} · Reported HRV: ${escapeHtml(device.reported_hrv)} · Timestamps: ${escapeHtml(device.timestamps)}</small>
+                        <small>API: ${escapeHtml(device.official_api)} · Cloud: ${escapeHtml(device.cloud_account)}</small>
+                        <small>Verification: ${escapeHtml(device.verification_status)}</small>
+                        ${device.source_url && device.source_url !== "local-reference-export" ? `<a href="${escapeHtml(device.source_url)}" target="_blank" rel="noopener noreferrer">Manufacturer source</a>` : ""}
+                    </div>
+                `).join("") || `<div class="mission-warning">No device matches the selected filters.</div>`
+            }
+            document.getElementById("deviceSupportFilter")?.addEventListener("change", renderCompatibility)
+            document.getElementById("deviceRrFilter")?.addEventListener("change", renderCompatibility)
+            renderCompatibility()
+            return
+        }
+        box.innerHTML = `
+            <div class="mission-source-grid">
+                ${devices.map(device => `
+                    <div>
+                        <strong>${escapeHtml(device.device_class || "-")}</strong>
+                        <span>${escapeHtml(device.examples || "-")}</span>
+                        <span>${escapeHtml(device.measurement_method || "unknown")} · ${escapeHtml(device.signal_quality || "unknown")}</span>
+                        <small>${escapeHtml(tr("mission.hrv_policy"))}: ${escapeHtml(device.hrv_policy || "-")}</small>
+                    </div>
+                `).join("")}
+            </div>
+        `
+    }catch(err){
+        box.innerHTML = `<div class="mission-warning">${escapeHtml(tr("mission.device_catalog_load_failed", {error: err.message || err}))}</div>`
+    }
 }
 
 function resetDashboardState(message){
@@ -706,12 +1094,15 @@ function resetDashboardState(message){
     alarm.innerText = message
 
     document.getElementById("ai").innerHTML = escapeHtml(message)
+    renderRecoveryCoach(null)
+    renderResearchSummary(null)
     renderDashboardChart([])
 }
 
 function renderAnalysis(data){
     renderAIMetrics(data)
     renderAIText(data)
+    renderRecoveryCoach(data.recovery_coach)
     renderDashboardChart(
         data.timeline || [],
         data.timeline_total || data.timeline_count || null
@@ -880,6 +1271,14 @@ function renderAIText(data){
     const anomaly = getAnomaly(data)
     const risk = data.risk_level || getRiskLabel(score, anomaly)
     const reviewLabel = getReviewLabel(risk)
+    const sessionSummary = data.session_summary || {
+        content: data.summary,
+        source: "deterministic_fallback",
+        analysis_confidence: data.analysis_confidence,
+        data_quality_score: data.data_quality_score,
+        limitations: data.quality_warnings || [],
+        disclaimer: data.wellness_disclaimer || data.medical_disclaimer
+    }
 
     document.getElementById("ai").innerHTML = `
         <div class="mission-analysis-grid">
@@ -902,9 +1301,18 @@ function renderAIText(data){
         </div>
 
         <div class="mission-analysis-block">
-            <h3>${escapeHtml(tr("mission.wellness_interpretation"))}</h3>
-            <p>${escapeHtml(translateMissionFinding(data.summary || tr("mission.no_analysis_summary")))}</p>
+            <div class="mission-summary-heading">
+                <h3>${escapeHtml(tr("mission.session_summary_ai"))}</h3>
+                <span>${escapeHtml(sessionSummary.source === "llm" ? tr("mission.summary_source_llm") : tr("mission.summary_source_fallback"))}</span>
+            </div>
+            <p class="mission-summary-content">${escapeHtml(translateMissionFinding(sessionSummary.content || tr("mission.no_analysis_summary")))}</p>
+            <p class="mission-summary-meta">
+                ${escapeHtml(tr("mission.analysis_confidence"))}: ${escapeHtml(sessionSummary.analysis_confidence || "-")}
+                · ${escapeHtml(tr("mission.data_quality"))}: ${escapeHtml(formatMetric(sessionSummary.data_quality_score, "/100", 0))}
+            </p>
         </div>
+
+        ${renderSessionComparison(data.session_comparison)}
 
         <div class="mission-analysis-columns">
             <div>
@@ -918,8 +1326,100 @@ function renderAIText(data){
         </div>
 
         <p class="mission-disclaimer">
-            ${escapeHtml(translateMissionFinding(data.wellness_disclaimer || data.medical_disclaimer || tr("mission.wellness_disclaimer")))}
+            ${escapeHtml(translateMissionFinding(sessionSummary.disclaimer || data.wellness_disclaimer || data.medical_disclaimer || tr("mission.wellness_disclaimer")))}
         </p>
+    `
+}
+
+function renderSessionComparison(comparison){
+    if(!comparison || !comparison.latest_available){
+        return `
+            <div class="mission-analysis-block">
+                <h3>${escapeHtml(tr("mission.session_comparison"))}</h3>
+                <p>${escapeHtml(tr("mission.comparison_unavailable"))}</p>
+            </div>
+        `
+    }
+
+    const metricLabels = {
+        rmssd: "HRV (RMSSD)",
+        avg_hr: tr("mission.wearable_hr"),
+        avg_spo2: "SpO2",
+        data_quality_score: tr("mission.data_quality")
+    }
+    const metricUnits = {
+        rmssd: "ms",
+        avg_hr: "bpm",
+        avg_spo2: "%",
+        data_quality_score: "/100"
+    }
+    const directions = {
+        higher: tr("mission.comparison_higher"),
+        lower: tr("mission.comparison_lower"),
+        unchanged: tr("mission.comparison_unchanged"),
+        unavailable: tr("mission.comparison_unavailable")
+    }
+    const comparisons = comparison.comparisons || {}
+    const windows = [1, 5, 10, 30]
+        .map(windowSize => ({windowSize, value: comparisons[String(windowSize)]}))
+        .filter(({value}) => value)
+    const windowsHtml = windows.map(({windowSize, value}) => {
+        if(!value.available){
+            return `
+                <div class="mission-comparison-window">
+                    <h4>${escapeHtml(tr("mission.comparison_against", {count: windowSize}))}</h4>
+                    <p>${escapeHtml(tr("mission.comparison_not_ready"))}</p>
+                </div>
+            `
+        }
+
+        const metrics = Object.entries(value.metrics || {}).map(([key, metric]) => {
+            const unit = metricUnits[key] || ""
+            const delta = metric.delta === null || metric.delta === undefined
+                ? "-"
+                : `${metric.delta >= 0 ? "+" : ""}${formatNumber(metric.delta, 1)}${unit ? ` ${unit}` : ""}`
+            return `
+                <div class="mission-comparison-metric">
+                    <span>${escapeHtml(metricLabels[key] || key)}</span>
+                    <strong>${escapeHtml(delta)}</strong>
+                    <small>${escapeHtml(directions[metric.direction] || directions.unavailable)}</small>
+                </div>
+            `
+        }).join("")
+        return `
+            <div class="mission-comparison-window">
+                <h4>${escapeHtml(tr("mission.comparison_against", {count: windowSize}))}</h4>
+                <p>${escapeHtml(tr("mission.comparison_reference_sessions", {count: value.reference_sessions || 0}))}</p>
+                <div class="mission-comparison-metrics">${metrics}</div>
+            </div>
+        `
+    }).join("")
+
+    return `
+        <div class="mission-analysis-block">
+            <div class="mission-summary-heading">
+                <h3>${escapeHtml(tr("mission.session_comparison"))}</h3>
+                <span>${escapeHtml(tr("mission.comparison_confidence", {value: comparison.confidence || "-"}))}</span>
+            </div>
+            <p>${escapeHtml(tr("mission.comparison_help"))}</p>
+            <div class="mission-comparison-grid">${windowsHtml}</div>
+        </div>
+    `
+}
+
+function renderTrendAI(trendAI){
+    if(!trendAI){
+        return ""
+    }
+
+    return `
+        <div class="mission-analysis-block mission-trend-ai">
+            <div class="mission-summary-heading">
+                <h3>${escapeHtml(tr("mission.trend_ai"))}</h3>
+                <span>${escapeHtml(tr("mission.trend_ai_version", {version: trendAI.narration_version || trendAI.version || "-"}))}</span>
+            </div>
+            <p class="mission-summary-content">${escapeHtml(trendAI.text || tr("mission.comparison_unavailable"))}</p>
+        </div>
     `
 }
 
@@ -1348,6 +1848,7 @@ async function loadUserTrend(options = {}){
                 <span>${escapeHtml(tr("mission.total_sessions_value", {count: data.session_count ?? "-"}))}</span>
                 <span>${escapeHtml(tr("mission.review_flags_value", {count: data.flagged_session_count ?? data.anomaly_count ?? 0}))}</span>
             </div>
+            ${renderTrendAI(data.trend_ai)}
             <div class="mission-series-chart-panel">
                 <canvas id="seriesTrendChart"></canvas>
                 <div id="seriesTrendEmpty" class="mission-chart-empty">

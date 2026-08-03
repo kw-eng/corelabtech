@@ -21,11 +21,11 @@
      -f deploy/vps/docker-compose.yml config
    ```
 
-5. Start database and application:
+5. Start database, application and automatic backup worker:
 
    ```bash
    docker compose --env-file deploy/vps/.env.production \
-     -f deploy/vps/docker-compose.yml up -d db web
+     -f deploy/vps/docker-compose.yml up -d db web backup
    ```
 
 6. Apply schema and migrations:
@@ -54,11 +54,10 @@
 
 ## Backup and restore
 
-Nightly cron example:
-
-```cron
-15 2 * * * cd /opt/corelabtech && ./scripts/postgres_backup.sh /srv/corelabtech-backups
-```
+The `backup` service writes an encrypted-volume-ready PostgreSQL dump on the
+configured interval and enforces `BACKUP_RETENTION_DAYS`. Its local volume is
+not an off-server backup: copy the generated dumps to an encrypted remote
+destination under the organization's approved backup policy.
 
 Run a restore test after the first backup and at least monthly:
 

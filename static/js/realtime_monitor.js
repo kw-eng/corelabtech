@@ -1,26 +1,45 @@
 // static/js/realtime_monitor.js
 
 let telemetryInterval = null
+let telemetryCsrfToken = null
 
 // ========================================
 // PUSH TELEMETRY
 // ========================================
 
-async function pushTelemetry(payload) {
+async function pushTelemetry({ sessionId, clientId, ...payload }) {
+
+    if (!sessionId || !clientId) {
+        throw new Error("Session and client identifiers are required for realtime telemetry")
+    }
+
+    if (!telemetryCsrfToken) {
+        const tokenResponse = await fetch("/api/realtime-telemetry/csrf-token", {
+            credentials: "same-origin",
+        })
+        if (!tokenResponse.ok) {
+            throw new Error("Unable to initialize secure realtime telemetry")
+        }
+        telemetryCsrfToken = (await tokenResponse.json()).csrf_token
+    }
 
     try {
 
-        const res = await fetch("/api/push_telemetry", {
+        const res = await fetch(
+            `/api/sessions/${encodeURIComponent(sessionId)}/realtime-telemetry`,
+            {
 
             method: "POST",
 
             credentials: "same-origin",
 
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-CSRFToken": telemetryCsrfToken,
             },
 
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ client_id: clientId, ...payload })
+            }
         })
 
         if (!res.ok) {

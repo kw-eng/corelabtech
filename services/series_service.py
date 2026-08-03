@@ -185,6 +185,11 @@ def build_series_analyses(rows) -> tuple[list[dict[str, Any]], dict[str, list[fl
 
         score = row[1]
         avg_hrv = pick_feature(features, "avg_hrv")
+        avg_reference_heart_rate = pick_feature(
+            features,
+            "avg_reference_heart_rate",
+            "avg_hr",
+        )
         avg_spo2 = pick_feature(features, "avg_spo2", "avg_csv_spo2")
         avg_pulse = pick_feature(features, "avg_pulse", "avg_csv_pulse")
         data_quality_score = row[2]
@@ -195,6 +200,8 @@ def build_series_analyses(rows) -> tuple[list[dict[str, Any]], dict[str, list[fl
             samples_total,
             samples_synchronized,
         )
+        session_context = features.get("session_context") or {}
+        timing = session_context.get("session_timing") or {}
         quality_warnings = (
             result_json.get("quality_warnings")
             or features.get("quality_warnings")
@@ -235,8 +242,10 @@ def build_series_analyses(rows) -> tuple[list[dict[str, Any]], dict[str, list[fl
             ),
             "summary": row[4],
             "avg_spo2": avg_spo2,
+            "avg_reference_heart_rate": avg_reference_heart_rate,
             "avg_pulse": avg_pulse,
             "avg_hrv": avg_hrv,
+            "total_duration_min": timing.get("total_duration_min"),
             "match_rate": match_rate,
             "coverage_percent": coverage_percent,
             "samples_total": samples_total,

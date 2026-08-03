@@ -21,6 +21,7 @@ const TABLE_PREVIEW_LIMIT = 5000
 const TABLE_RENDER_CHUNK_SIZE = 100
 const FIT_UPLOAD_TIMEOUT_MS = 120000
 const GENERATED_SESSION_SUFFIX_PATTERN = /_\d{10,}$/
+let compatibilityDevices = []
 
 function i18n(key, params = null) {
     if (typeof window !== "undefined" && typeof window.t === "function") {
@@ -234,6 +235,8 @@ function clearMergedPreview() {
 window.onload = () => {
 
     loadSubjects()
+
+    loadDeviceCompatibility()
 
     loadSessions()
 
@@ -1520,6 +1523,11 @@ async function uploadFIT() {
         getSelectedSubjectId()
     )
 
+    const selectedDevice = getSelectedCompatibilityDevice()
+    if (selectedDevice) {
+        fd.append("device_model", selectedDevice.model)
+    }
+
     try {
 
         if (uploadButton) {
@@ -1612,6 +1620,7 @@ async function uploadFIT() {
 
             loadFitChart(sessionId, data.import_id)
         }
+        await loadSessionDataSources()
 
     } catch (err) {
 
@@ -1637,6 +1646,256 @@ async function uploadFIT() {
         if (uploadButton) {
             uploadButton.disabled = false
         }
+    }
+}
+
+function getSelectedCompatibilityDevice() {
+    const selectedId = document.getElementById("compatibilityDevice")?.value
+    return compatibilityDevices.find(device => device.id === selectedId) || null
+}
+
+function compatibilityDeviceLabel(device) {
+    const manufacturer = String(device?.manufacturer || "").trim()
+    const model = String(device?.model || "").trim()
+    return model.toLowerCase().startsWith(manufacturer.toLowerCase())
+        ? model
+        : `${manufacturer} ${model}`.trim()
+}
+
+function deviceAnalysisGuidance(role) {
+    const key = {
+        raw_rr_when_present_and_verified: "chamber.device_analysis_raw_rr",
+        watch_trend_unless_external_hrm_is_verified: "chamber.device_analysis_watch",
+        reported_hrv_and_trend_only: "chamber.device_analysis_reported",
+        spo2_reference_pulse_auxiliary: "chamber.device_analysis_spo2",
+    }[role]
+    return key ? i18n(key) : role || "-"
+}
+
+function applyDeviceCompatibility() {
+    const selected = getSelectedCompatibilityDevice()
+    const guidance = document.getElementById("compatibilityDeviceGuidance")
+    const externalType = document.getElementById("externalTelemetryType")
+    const deviceModel = document.getElementById("externalTelemetryDeviceModel")
+
+    if (!selected) {
+        if (guidance) {
+            guidance.textContent = i18n("chamber.device_guidance_empty")
+        }
+        return
+    }
+
+    if (deviceModel) {
+        deviceModel.value = compatibilityDeviceLabel(selected)
+    }
+
+    const importTypes = Array.isArray(selected.import_types)
+        ? selected.import_types
+        : []
+    const preferredExternalType = importTypes.find(type => (
+        type !== "fit" && type !== "csv"
+    ))
+    if (externalType && preferredExternalType) {
+        externalType.value = preferredExternalType
+    }
+
+    if (!guidance) {
+        return
+    }
+
+    const importMessage = importTypes.length
+        ? i18n("chamber.device_import_ready", {
+            formats: (selected.formats || []).join(", "),
+        })
+        : i18n("chamber.device_import_planned")
+    guidance.innerHTML = `
+        <strong>${escapeHtml(compatibilityDeviceLabel(selected))}</strong>
+        <small>${escapeHtml(importMessage)}</small>
+        <small>${escapeHtml(i18n("chamber.device_raw_rr", {value: selected.raw_rr || "-"}))} · ${escapeHtml(i18n("chamber.device_reported_hrv", {value: selected.reported_hrv || "-"}))}</small>
+        <small>${escapeHtml(i18n("chamber.device_analysis_role", {value: deviceAnalysisGuidance(selected.analysis_role)}))} · ${escapeHtml(i18n("chamber.device_cloud", {value: selected.cloud_account || "-"}))}</small>
+    `
+}
+
+async function loadDeviceCompatibility() {
+    const select = document.getElementById("compatibilityDevice")
+    if (!select) {
+        return
+    }
+
+    try {
+        const response = await fetch("/api/device-catalog", {
+            credentials: "same-origin",
+        })
+        const data = await parseJsonResponse(response, "LOAD DEVICE COMPATIBILITY")
+        if (!response.ok || !Array.isArray(data.compatibility)) {
+            throw new Error(data.error || "device catalog unavailable")
+        }
+
+        compatibilityDevices = data.compatibility.slice().sort((left, right) => (
+            `${left.manufacturer} ${left.model}`.localeCompare(
+                `${right.manufacturer} ${right.model}`,
+            )
+        ))
+        const selectedValue = select.value
+        select.replaceChildren(new Option(
+            i18n("chamber.select_device_placeholder"),
+            "",
+        ))
+        compatibilityDevices.forEach(device => {
+            select.add(new Option(
+                `${device.manufacturer} ${device.model} · ${device.support_level}`,
+                device.id,
+            ))
+        })
+        select.value = selectedValue
+        select.addEventListener("change", applyDeviceCompatibility)
+    } catch (error) {
+        console.error("Device compatibility unavailable", error)
+    }
+}
+
+async function uploadExternalTelemetry() {
+    const input = document.getElementById("externalTelemetryFile")
+    const type = document.getElementById("externalTelemetryType")?.value
+    const deviceModel = document.getElementById("externalTelemetryDeviceModel")?.value.trim()
+    const timezoneInput = document.getElementById("externalTelemetryTimezone")
+    const status = document.getElementById("externalTelemetryStatus")
+    const sessionId = document.getElementById("session_id")?.value.trim()
+
+    if (!input?.files.length || !type) {
+        alert(i18n("chamber.select_external_telemetry"))
+        return
+    }
+    if (!sessionId) {
+        alert(i18n("chamber.generate_session_first"))
+        return
+    }
+
+    const formData = new FormData()
+    formData.append("file", input.files[0])
+    formData.append("session_id", sessionId)
+    formData.append("client_id", getSelectedSubjectId())
+    formData.append("import_type", type)
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const selectedTimezone = timezoneInput?.value || "browser"
+    const sourceTimezone = selectedTimezone === "browser" ? browserTimezone : selectedTimezone
+    if (sourceTimezone && sourceTimezone !== "unknown") {
+        formData.append("source_timezone", sourceTimezone)
+    }
+    if (deviceModel) {
+        formData.append("device_model", deviceModel)
+    }
+    if (status) {
+        status.innerHTML = `<div class="success-box">${escapeHtml(i18n("chamber.uploading_external_telemetry"))}</div>`
+    }
+    try {
+        const response = await fetch("/upload_telemetry", {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+        })
+        const data = await parseJsonResponse(response, "UPLOAD EXTERNAL TELEMETRY")
+        const duplicate = response.status === 409 && data?.status === "duplicate"
+        if ((!response.ok && !duplicate) || (data.error && !duplicate)) {
+            throw new Error(data.error || i18n("chamber.external_telemetry_upload_failed"))
+        }
+        if (status) {
+            status.innerHTML = `<div class="success-box">${escapeHtml(duplicate ? i18n("chamber.external_telemetry_already_imported") : i18n("chamber.external_telemetry_uploaded"))}<br>${escapeHtml(i18n("chamber.records_count", {count: data.records_saved || data.records || 0}))}</div>`
+        }
+        await loadFITTable(sessionId, data.import_id)
+        clearMergedPreview()
+        if (typeof loadFitChart === "function") {
+            loadFitChart(sessionId, data.import_id)
+        }
+        await loadSessionDataSources()
+    } catch (error) {
+        console.error("uploadExternalTelemetry failed", error)
+        if (status) {
+            status.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
+        }
+    }
+}
+
+function preflightConfig(kind) {
+    if (kind === "fit") {
+        return {input: "fitFile", output: "fitPreflight", importType: "fit"}
+    }
+    if (kind === "csv") {
+        return {input: "csvFile", output: "csvPreflight", importType: "csv"}
+    }
+    return {
+        input: "externalTelemetryFile",
+        output: "externalTelemetryPreflight",
+        importType: document.getElementById("externalTelemetryType")?.value,
+    }
+}
+
+function hrvStatusLabel(status) {
+    return i18n(`chamber.hrv_${status || "not_available"}`)
+}
+
+function telemetryValueLabel(value) {
+    const normalized = String(value || "unknown").toLowerCase()
+    const key = `chamber.value_${normalized}`
+    const translated = i18n(key)
+    return translated === key ? normalized : translated
+}
+
+async function preflightTelemetry(kind) {
+    const config = preflightConfig(kind)
+    const input = document.getElementById(config.input)
+    const output = document.getElementById(config.output)
+    if (!input?.files.length || !config.importType) {
+        if (output) output.innerHTML = `<div class="error-box">${escapeHtml(i18n("chamber.preflight_select_file"))}</div>`
+        return
+    }
+    const formData = new FormData()
+    formData.append("file", input.files[0])
+    formData.append("import_type", config.importType)
+    const selected = getSelectedCompatibilityDevice()
+    const model = kind === "external"
+        ? document.getElementById("externalTelemetryDeviceModel")?.value.trim()
+        : selected?.model
+    if (model) formData.append("device_model", model)
+    if (output) output.textContent = i18n("chamber.preflight_validating")
+    try {
+        const response = await fetch("/api/telemetry/preflight", {
+            method: "POST", credentials: "same-origin", body: formData,
+        })
+        const data = await parseJsonResponse(response, "TELEMETRY PREFLIGHT")
+        if (!response.ok || data.error) throw new Error(data.error || "Validation failed")
+        const signals = Object.entries(data.signals || {})
+            .filter(([, available]) => available)
+            .map(([name]) => i18n(`chamber.signal_${name}`))
+            .join(", ") || i18n("chamber.preflight_signals_none")
+        output.innerHTML = `<div class="preflight-ready"><strong>${escapeHtml(i18n("chamber.preflight_ready"))}</strong><small>${escapeHtml(i18n("chamber.preflight_records", {valid: data.records_valid, rejected: data.records_rejected}))}</small><small>${escapeHtml(i18n("chamber.preflight_range", {start: data.first_timestamp || "-", end: data.last_timestamp || "-"}))}</small><small>${escapeHtml(i18n("chamber.preflight_signals", {signals}))}</small><small>${escapeHtml(i18n("chamber.preflight_hrv_quality", {hrv: hrvStatusLabel(data.hrv_status), quality: telemetryValueLabel(data.signal_quality)}))}</small><small>${escapeHtml(i18n("chamber.preflight_parser", {version: data.parser_version}))}</small></div>`
+    } catch (error) {
+        if (output) output.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
+    }
+}
+
+async function loadSessionDataSources() {
+    const sessionId = document.getElementById("session_id")?.value.trim()
+    const clientId = getSelectedSubjectId()
+    const output = document.getElementById("sessionDataSources")
+    if (!output || !sessionId || !clientId) return
+    try {
+        const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/data-sources?client_id=${encodeURIComponent(clientId)}`, {credentials: "same-origin"})
+        const data = await parseJsonResponse(response, "SESSION DATA SOURCES")
+        if (!response.ok || data.error) throw new Error(data.error || "Could not load sources")
+        if (!data.sources?.length) {
+            output.textContent = i18n("chamber.session_data_sources_none")
+            return
+        }
+        output.innerHTML = `<div class="session-data-source-list">${data.sources.map(source => {
+            const hrv = source.has_raw_rr ? i18n("chamber.source_hrv_from_rr") : (source.import_type === "apple_health_xml" || source.import_type === "health_connect_json" ? i18n("chamber.source_hrv_reported") : i18n("chamber.source_hrv_none"))
+            const records = i18n("chamber.source_records", {start: source.first_timestamp || "-", end: source.last_timestamp || "-", count: source.records_saved || 0})
+            const provenance = i18n("chamber.source_provenance", {hrv, parser: source.parser_version || "-", timezone: source.source_timezone || "unknown"})
+            const audit = i18n("chamber.source_audit", {imported: source.imported_at || "-", hash: String(source.file_hash || "-").slice(0, 12)})
+            return `<div class="session-data-source"><strong>${escapeHtml(source.device_model || source.import_type)}</strong><small>${escapeHtml(source.import_type)} | ${escapeHtml(source.measurement_method || "unknown")} | ${escapeHtml(source.device_type || "unknown")}</small><small>${escapeHtml(records)}</small><small>${escapeHtml(provenance)}</small><small>${escapeHtml(audit)}</small><small>${escapeHtml(i18n("chamber.source_reimport_required"))}</small></div>`
+        }).join("")}</div>`
+    } catch (error) {
+        output.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
     }
 }
 
@@ -1843,6 +2102,7 @@ let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
             ).value,
             data.import_id
         )
+        await loadSessionDataSources()
         clearMergedPreview()
 
     } catch (err) {
@@ -3918,7 +4178,10 @@ window.addSessionSegment = addSessionSegment
 
 window.savePRE = savePRE
 window.uploadFIT = uploadFIT
+window.uploadExternalTelemetry = uploadExternalTelemetry
 window.uploadCSV = uploadCSV
+window.preflightTelemetry = preflightTelemetry
+window.loadSessionDataSources = loadSessionDataSources
 window.loadFITTable = loadFITTable
 window.loadCSVTable = loadCSVTable
 

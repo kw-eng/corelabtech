@@ -211,8 +211,10 @@ def parse_csv_file(path: str | Path) -> list[dict]:
 
         row = {
             "timestamp": timestamp.isoformat(),
+            "original_timestamp": str(raw_timestamp),
             "pulse": pulse,
-            "heart_rate": pulse,
+            "pulse_rate_bpm": pulse,
+            "heart_rate_bpm": None,
             "spo2": spo2,
             "motion": (
                 safe_int(record[motion_column])

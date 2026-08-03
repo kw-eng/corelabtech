@@ -30,6 +30,14 @@ MIGRATIONS = [
     ROOT / "migrations" / "016_add_session_phase_timing.py",
     ROOT / "migrations" / "017_add_commercial_wellness_model.py",
     ROOT / "migrations" / "018_add_extended_wellness_programs.py",
+    ROOT / "migrations" / "019_add_telemetry_provenance.py",
+    ROOT / "migrations" / "020_add_telemetry_time_alignment.py",
+    ROOT / "migrations" / "021_add_raw_rr_retention.py",
+    ROOT / "migrations" / "022_add_recovery_follow_ups.py",
+    ROOT / "migrations" / "023_add_recovery_follow_up_window.py",
+    ROOT / "migrations" / "024_add_telemetry_import_type.py",
+    ROOT / "migrations" / "025_create_realtime_telemetry_events.py",
+    ROOT / "migrations" / "026_create_llm_observability_events.py",
 ]
 
 
