@@ -122,7 +122,6 @@
   "admin.total_sessions": "Sesje łącznie",
   "analysis.ai_timeline": "Oś AI",
   "analysis.avg_hr": "Średnie HR",
-  "analysis.avg_hrv": "Średnie HRV",
   "analysis.avg_pulse": "Średni puls",
   "analysis.avg_spo2": "Średnie SpO2",
   "analysis.baseline_confidence": "Pewność baseline",
@@ -159,11 +158,9 @@
   "analysis.not_available": "Brak danych",
   "analysis.pending": "Oczekuje",
   "analysis.phys_avg_hrv": "średnie HRV wyniosło {avg} ms",
-  "analysis.phys_hr_avg_range": "HR z wearable wynosiło średnio {avg} bpm (zakres {min}-{max} bpm)",
   "analysis.phys_pulse_avg_range": "puls wynosił średnio {avg} bpm (zakres {min}-{max} bpm)",
   "analysis.physiology_metrics": "Metryki fizjologiczne",
   "analysis.positive_findings": "Pozytywne obserwacje",
-  "analysis.pulse_hrv_summary": "Puls, HR z wearable i HRV należy interpretować jako sygnały trendu wellness: {details}.",
   "analysis.pulse_range": "Zakres pulsu",
   "analysis.recovery_trend": "Trend recovery",
   "analysis.review_context": "Przegląd kontekstu",
@@ -1104,5 +1101,24 @@
 "chamber.data_quality_excellent": "doskonała",
 "chamber.data_quality_good": "dobra",
 "chamber.data_quality_fair": "średnia",
-"chamber.data_quality_poor": "niska"
+"chamber.data_quality_poor": "niska",
+  "analysis.pulse_avg": "Średni puls wyniósł {avg} ud./min.",
+  "analysis.pulse_avg_range": "Średni puls wyniósł {avg} ud./min (zakres {min}–{max} ud./min).",
+
+  "analysis.phys_hr_avg": "Średnie tętno z urządzenia ubieralnego wyniosło {avg} ud./min.",
+  "analysis.phys_hr_avg_range": "Średnie tętno z urządzenia ubieralnego wyniosło {avg} ud./min (zakres {min}–{max} ud./min).",
+
+  "analysis.avg_hrv": "Średnie HRV wyniosło {value} ms.",
+
+  "analysis.pulse_hrv_summary": "Puls, tętno z urządzenia ubieralnego oraz HRV należy interpretować jako wskaźniki trendu wellness: {details}.",
+
+  "analysis.context_low_sleep": "obniżona jakość lub krótki czas snu",
+  "analysis.context_training": "zwiększone obciążenie treningowe",
+  "analysis.context_stress": "zgłoszony stres lub zmęczenie",
+  "analysis.context_recovery": "poprawa samopoczucia po sesji",
+
+  "analysis.context_none": "Dane z ankiety check-in nie wskazują na istotne zaburzenia snu, zwiększony stres, zmęczenie ani podwyższone obciążenie treningowe.",
+
+  "analysis.context_prefix": "Kontekst check-in:"
 }
+

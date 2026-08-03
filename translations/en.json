@@ -122,7 +122,6 @@
   "admin.total_sessions": "Total sessions",
   "analysis.ai_timeline": "AI Timeline",
   "analysis.avg_hr": "Average HR",
-  "analysis.avg_hrv": "Average HRV",
   "analysis.avg_pulse": "Average pulse",
   "analysis.avg_spo2": "Average SpO2",
   "analysis.baseline_confidence": "Baseline confidence",
@@ -159,11 +158,9 @@
   "analysis.not_available": "Not available",
   "analysis.pending": "Pending",
   "analysis.phys_avg_hrv": "average HRV was {avg} ms",
-  "analysis.phys_hr_avg_range": "wearable HR averaged {avg} bpm (range {min}-{max} bpm)",
   "analysis.phys_pulse_avg_range": "pulse averaged {avg} bpm (range {min}-{max} bpm)",
   "analysis.physiology_metrics": "Physiology Metrics",
   "analysis.positive_findings": "Positive Findings",
-  "analysis.pulse_hrv_summary": "Pulse, wearable HR and HRV should be interpreted as wellness trend signals: {details}.",
   "analysis.pulse_range": "Pulse range",
   "analysis.recovery_trend": "Recovery trend",
   "analysis.review_context": "Review context",
@@ -1104,5 +1101,23 @@
 "chamber.data_quality_excellent": "excellent",
 "chamber.data_quality_good": "good",
 "chamber.data_quality_fair": "fair",
-"chamber.data_quality_poor": "poor"
+"chamber.data_quality_poor": "poor",
+  "analysis.pulse_avg": "Pulse averaged {avg} bpm.",
+  "analysis.pulse_avg_range": "Pulse averaged {avg} bpm (range {min}-{max} bpm).",
+
+  "analysis.phys_hr_avg": "Wearable heart rate averaged {avg} bpm.",
+  "analysis.phys_hr_avg_range": "Wearable heart rate averaged {avg} bpm (range {min}-{max} bpm).",
+
+  "analysis.avg_hrv": "Average HRV was {value} ms.",
+
+  "analysis.pulse_hrv_summary": "Pulse, wearable heart rate and HRV should be interpreted as wellness trend indicators: {details}.",
+
+  "analysis.context_low_sleep": "reduced sleep quality or short sleep",
+  "analysis.context_training": "higher recent activity load",
+  "analysis.context_stress": "reported stress or fatigue",
+  "analysis.context_recovery": "improved post-session recovery feedback",
+
+  "analysis.context_none": "No elevated sleep, fatigue, stress or recent activity context was identified in the available check-in data.",
+
+  "analysis.context_prefix": "Check-in context:"
 }

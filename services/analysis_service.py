@@ -58,6 +58,7 @@ from repositories.recovery_repository import (
     load_recovery_follow_up_history,
 )
 
+from services.i18n_service import translate
 
 MODEL_NAME = "CoreLabTech Wellness Session Analysis"
 MODEL_VERSION = "wellness-rules-v2"
@@ -944,76 +945,113 @@ def build_research_summary(
 def build_physiology_summary_sentence(features: dict[str, Any]) -> str:
     """Summarize pulse, HR and HRV without turning them into diagnosis."""
 
-    parts = []
+    parts: list[str] = []
+
     avg_pulse = features.get("avg_pulse")
     min_pulse = features.get("min_pulse")
     max_pulse = features.get("max_pulse")
+
     avg_hr = features.get("avg_heart_rate")
     min_hr = features.get("min_heart_rate")
     max_hr = features.get("max_heart_rate")
+
     avg_hrv = features.get("avg_hrv")
 
     if avg_pulse is not None:
-        pulse_text = f"Pulse averaged {format_summary_number(avg_pulse, 0)} bpm"
+
         if min_pulse is not None and max_pulse is not None:
-            pulse_text += (
-                f" (range {format_summary_number(min_pulse, 0)}-"
-                f"{format_summary_number(max_pulse, 0)} bpm)"
+
+            parts.append(
+                translate(
+                    "analysis.pulse_avg_range",
+                    avg=format_summary_number(avg_pulse, 0),
+                    min=format_summary_number(min_pulse, 0),
+                    max=format_summary_number(max_pulse, 0),
+                )
             )
-        parts.append(pulse_text)
+
+        else:
+
+            parts.append(
+                translate(
+                    "analysis.pulse_avg",
+                    avg=format_summary_number(avg_pulse, 0),
+                )
+            )
 
     if avg_hr is not None:
-        hr_text = f"wearable HR averaged {format_summary_number(avg_hr, 0)} bpm"
+
         if min_hr is not None and max_hr is not None:
-            hr_text += (
-                f" (range {format_summary_number(min_hr, 0)}-"
-                f"{format_summary_number(max_hr, 0)} bpm)"
+
+            parts.append(
+                translate(
+                    "analysis.phys_hr_avg_range",
+                    avg=format_summary_number(avg_hr, 0),
+                    min=format_summary_number(min_hr, 0),
+                    max=format_summary_number(max_hr, 0),
+                )
             )
-        parts.append(hr_text)
+
+        else:
+
+            parts.append(
+                translate(
+                    "analysis.phys_hr_avg",
+                    avg=format_summary_number(avg_hr, 0),
+                )
+            )
 
     if avg_hrv is not None:
+
         parts.append(
-            f"average HRV was {format_summary_number(avg_hrv, 1)} ms"
+            translate(
+                "analysis.avg_hrv",
+                value=format_summary_number(avg_hrv, 1),
+            )
         )
 
     if not parts:
         return ""
 
-    return (
-        "Pulse, wearable HR and HRV should be interpreted as wellness trend "
-        f"signals: {'; '.join(parts)}."
+    return translate(
+        "analysis.pulse_hrv_summary",
+        details=" ".join(parts),
     )
 
 
 def build_context_summary_sentence(context_features: dict[str, Any]) -> str:
     """Connect check-in context to interpretation without overstating causality."""
 
-    notes = []
+    notes: list[str] = []
 
     if context_features.get("poor_sleep"):
-        notes.append("reduced sleep quality or short sleep")
-
-    if context_features.get("high_training_load"):
-        notes.append("higher recent activity load")
-
-    if context_features.get("high_stress_or_fatigue"):
-        notes.append("reported stress or fatigue")
-
-    if context_features.get("recovery_improved"):
-        notes.append("post-session recovery feedback improved")
-
-    if not notes:
-        return (
-            "No elevated sleep, fatigue, stress or recent activity context was "
-            "flagged in the available check-in data."
+        notes.append(
+            translate("analysis.context_low_sleep")
         )
 
+    if context_features.get("high_training_load"):
+        notes.append(
+            translate("analysis.context_training")
+        )
+
+    if context_features.get("high_stress_or_fatigue"):
+        notes.append(
+            translate("analysis.context_stress")
+        )
+
+    if context_features.get("recovery_improved"):
+        notes.append(
+            translate("analysis.context_recovery")
+        )
+
+    if not notes:
+        return translate("analysis.context_none")
+
     return (
-        "Check-in context may influence today’s physiology interpretation: "
+        f"{translate('analysis.context_prefix')} "
         + ", ".join(notes)
         + "."
     )
-
 
 def format_summary_number(value: Any, digits: int = 1) -> str:
     try:
