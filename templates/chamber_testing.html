@@ -427,66 +427,119 @@
                 <div class="chamber-section-header">
                     <div>
                         <span class="chamber-eyebrow">Telemetry Intelligence</span>
-                        <h3>{{ t('chamber.data_sources') }}</h3>
-                        <p>{{ t('chamber.data_sources_help') }}</p>
+                        <h3>{{ t('chamber.telemetry_intelligence') }}</h3>
+                        <p>{{ t('chamber.telemetry_intelligence_help') }}</p>
                     </div>
                 </div>
 
                 <div class="data-source-grid">
-                    <article class="data-source-card">
-                        <div class="data-source-card-header">
+                    <article class="data-source-card telemetry-upload-card">
+                        <div class="data-source-card-header telemetry-source-heading">
                             <div>
-                                <span class="data-source-type">HR / RR</span>
-                                <h4>{{ t('chamber.hr_timeline_title') }}</h4>
+                                <span class="data-source-type">
+                                    {{ t('chamber.telemetry_source') }}
+                                </span>
+                                <h4>{{ t('chamber.wearable_telemetry') }}</h4>
                             </div>
-                            <span class="source-format-badge">FIT</span>
                         </div>
 
-                        <p class="source-format-hint">{{ t('chamber.supported_fit') }}</p>
+                        <p class="source-format-hint">
+                            {{ t('chamber.wearable_telemetry_help') }}
+                        </p>
+
+                        <div class="expected-signal-panel">
+                            <strong>{{ t('chamber.expected_signals') }}</strong>
+                            <div class="expected-signal-list">
+                                <span>✓ {{ t('chamber.signal_heart_rate') }}</span>
+                                <span>✓ {{ t('chamber.signal_rr_intervals') }}</span>
+                                <span>✓ {{ t('chamber.signal_timestamp') }}</span>
+                            </div>
+                        </div>
+
+                        <small class="telemetry-format-note">
+                            {{ t('chamber.accepted_format') }}: FIT
+                        </small>
+
                         <input type="file" id="fitFile" accept=".fit">
 
                         <div class="data-source-actions">
-                            <button type="button" class="secondary-action" onclick="preflightTelemetry('fit')">
+                            <button
+                                type="button"
+                                class="secondary-action"
+                                onclick="preflightTelemetry('fit')"
+                            >
                                 {{ t('chamber.validate_file') }}
                             </button>
-                            <button id="uploadFitButton" type="button" onclick="uploadFIT()">
+                            <button
+                                id="uploadFitButton"
+                                type="button"
+                                onclick="uploadFIT()"
+                            >
                                 {{ t('chamber.upload_hr_hrv') }}
                             </button>
                         </div>
 
-                        <div id="fitStatus"></div>
-                        <div id="fitPreflight" class="telemetry-preflight"></div>
-                        <div id="fitTableStatus" class="table-status"></div>
-
-                        <div class="data-table-wrap">
-                            <table id="fitDataTable">
-                                <thead>
-                                    <tr>
-                                        <th title="Timestamp from HR/HRV timeline file">Time</th>
-                                        <th title="Heart rate from uploaded telemetry">HR</th>
-                                        <th title="Beat-to-beat RR interval">RR</th>
-                                        <th title="HRV calculated from RR intervals">HRV</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                        <div class="telemetry-detection-result" aria-live="polite">
+                            <div id="fitStatus"></div>
+                            <div id="fitPreflight" class="telemetry-preflight"></div>
                         </div>
+
+                        <details class="telemetry-table-details">
+                            <summary>{{ t('chamber.show_imported_data') }}</summary>
+
+                            <div id="fitTableStatus" class="table-status"></div>
+
+                            <div class="data-table-wrap">
+                                <table id="fitDataTable">
+                                    <thead>
+                                        <tr>
+                                            <th title="Timestamp from wearable telemetry">Time</th>
+                                            <th title="Heart rate from uploaded telemetry">HR</th>
+                                            <th title="Beat-to-beat RR interval">RR</th>
+                                            <th title="HRV calculated from RR intervals">HRV</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </details>
                     </article>
 
-                    <article class="data-source-card">
-                        <div class="data-source-card-header">
+                    <article class="data-source-card telemetry-upload-card">
+                        <div class="data-source-card-header telemetry-source-heading">
                             <div>
-                                <span class="data-source-type">SpO2 / Pulse</span>
-                                <h4>{{ t('chamber.spo2_timeline_title') }}</h4>
+                                <span class="data-source-type">
+                                    {{ t('chamber.telemetry_source') }}
+                                </span>
+                                <h4>{{ t('chamber.pulse_oximetry') }}</h4>
                             </div>
-                            <span class="source-format-badge">CSV</span>
                         </div>
 
-                        <p class="source-format-hint">{{ t('chamber.supported_csv') }}</p>
+                        <p class="source-format-hint">
+                            {{ t('chamber.pulse_oximetry_help') }}
+                        </p>
+
+                        <div class="expected-signal-panel">
+                            <strong>{{ t('chamber.expected_signals') }}</strong>
+                            <div class="expected-signal-list">
+                                <span>✓ SpO₂</span>
+                                <span>✓ {{ t('chamber.signal_pulse') }}</span>
+                                <span>✓ {{ t('chamber.signal_timestamp') }}</span>
+                            </div>
+                        </div>
+
+                        <small class="telemetry-format-note">
+                            {{ t('chamber.accepted_format') }}: CSV
+                        </small>
+
                         <input type="file" id="csvFile" accept=".csv">
 
                         <div class="data-source-actions">
-                            <button type="button" class="secondary-action" onclick="preflightTelemetry('csv')">
+                            <button
+                                type="button"
+                                class="secondary-action"
+                                onclick="preflightTelemetry('csv')"
+                            >
                                 {{ t('chamber.validate_file') }}
                             </button>
                             <button type="button" onclick="uploadCSV()">
@@ -494,51 +547,57 @@
                             </button>
                         </div>
 
-                        <div id="csvStatus"></div>
-                        <div id="csvPreflight" class="telemetry-preflight"></div>
-                        <div id="csvTableStatus" class="table-status"></div>
-
-                        <div class="data-table-wrap">
-                            <table id="csvDataTable">
-                                <thead>
-                                    <tr>
-                                        <th title="Timestamp from SpO2/pulse timeline file">Time</th>
-                                        <th title="Pulse from uploaded telemetry">Pulse</th>
-                                        <th title="Blood oxygen saturation">SpO2</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                        <div class="telemetry-detection-result" aria-live="polite">
+                            <div id="csvStatus"></div>
+                            <div id="csvPreflight" class="telemetry-preflight"></div>
                         </div>
+
+                        <details class="telemetry-table-details">
+                            <summary>{{ t('chamber.show_imported_data') }}</summary>
+
+                            <div id="csvTableStatus" class="table-status"></div>
+
+                            <div class="data-table-wrap">
+                                <table id="csvDataTable">
+                                    <thead>
+                                        <tr>
+                                            <th title="Timestamp from pulse-oximetry telemetry">Time</th>
+                                            <th title="Pulse from uploaded telemetry">Pulse</th>
+                                            <th title="Blood oxygen saturation">SpO₂</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </details>
                     </article>
 
-                    <article class="data-source-card">
-                        <div class="data-source-card-header">
+                    <article class="data-source-card telemetry-upload-card">
+                        <div class="data-source-card-header telemetry-source-heading">
                             <div>
-                                <span class="data-source-type">External</span>
+                                <span class="data-source-type">
+                                    {{ t('chamber.telemetry_source') }}
+                                </span>
                                 <h4>{{ t('chamber.external_telemetry_title') }}</h4>
                             </div>
                             <span class="source-format-badge">CSV / XML / JSON</span>
                         </div>
 
-                        <p class="source-format-hint">{{ t('chamber.external_telemetry_help') }}</p>
+                        <p class="source-format-hint">
+                            {{ t('chamber.external_telemetry_help') }}
+                        </p>
 
-                        <!-- Values are preserved temporarily for backend compatibility;
-                             visible labels expose formats rather than device brands. -->
+                        <!-- Technical importer identifiers are retained for backend compatibility.
+                             Users only see neutral file-format labels. -->
                         <select id="externalTelemetryType">
                             <option value="polar_csv">CSV</option>
                             <option value="apple_health_xml">XML</option>
                             <option value="health_connect_json">JSON</option>
                         </select>
 
-                        <!-- Retained for current JavaScript compatibility, but hidden from product UI. -->
-                        <input
-                            type="hidden"
-                            id="externalTelemetryDeviceModel"
-                            value=""
-                        >
-
-                        <label for="externalTelemetryTimezone">{{ t('chamber.source_timezone') }}</label>
+                        <label for="externalTelemetryTimezone">
+                            {{ t('chamber.source_timezone') }}
+                        </label>
                         <select id="externalTelemetryTimezone">
                             <option value="browser">{{ t('chamber.timezone_browser') }}</option>
                             <option value="unknown">{{ t('chamber.timezone_unknown') }}</option>
@@ -546,10 +605,18 @@
                             <option value="UTC">UTC</option>
                         </select>
 
-                        <input type="file" id="externalTelemetryFile" accept=".csv,.xml,.json">
+                        <input
+                            type="file"
+                            id="externalTelemetryFile"
+                            accept=".csv,.xml,.json"
+                        >
 
                         <div class="data-source-actions">
-                            <button type="button" class="secondary-action" onclick="preflightTelemetry('external')">
+                            <button
+                                type="button"
+                                class="secondary-action"
+                                onclick="preflightTelemetry('external')"
+                            >
                                 {{ t('chamber.validate_file') }}
                             </button>
                             <button type="button" onclick="uploadExternalTelemetry()">
@@ -557,8 +624,13 @@
                             </button>
                         </div>
 
-                        <div id="externalTelemetryStatus"></div>
-                        <div id="externalTelemetryPreflight" class="telemetry-preflight"></div>
+                        <div class="telemetry-detection-result" aria-live="polite">
+                            <div id="externalTelemetryStatus"></div>
+                            <div
+                                id="externalTelemetryPreflight"
+                                class="telemetry-preflight"
+                            ></div>
+                        </div>
                     </article>
                 </div>
 
