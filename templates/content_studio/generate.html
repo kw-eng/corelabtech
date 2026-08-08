@@ -1,0 +1,260 @@
+{% extends "content_studio/base.html" %}
+
+{% from
+    "content_studio/components/layout/page_header.html"
+    import page_header
+%}
+
+
+{% block content_studio_styles %}
+<link
+    rel="stylesheet"
+    href="{{ url_for(
+        'static',
+        filename='css/content_studio/generate.css'
+    ) }}"
+>
+{% endblock %}
+
+
+{% block studio_content %}
+
+{{ page_header(
+    title="Generate",
+    subtitle="Create CoreLabTech images and videos from characters, scenes and prompts.",
+    eyebrow="AI Generation"
+) }}
+
+
+<div class="generate-layout">
+
+    <div class="generate-left">
+
+        <div class="studio-card">
+
+            <h2>Generation Settings</h2>
+
+            <form
+                id="generation-form"
+                class="generate-settings"
+            >
+
+                <div class="studio-form-group">
+
+                    <label for="provider">
+                        Provider
+                    </label>
+
+                    <select
+                        id="provider"
+                        class="studio-select"
+                    >
+                        <option value="mock">
+                            Mock Provider
+                        </option>
+
+                        <option value="gpt-image" disabled>
+                            GPT Image — not connected
+                        </option>
+
+                        <option value="comfyui" disabled>
+                            ComfyUI — not connected
+                        </option>
+
+                        <option value="kling" disabled>
+                            Kling — not connected
+                        </option>
+
+                        <option value="veo" disabled>
+                            Veo — not connected
+                        </option>
+                    </select>
+
+                </div>
+
+
+                <div class="studio-form-group">
+
+                    <label for="output-type">
+                        Output
+                    </label>
+
+                    <select
+                        id="output-type"
+                        class="studio-select"
+                    >
+                        <option value="image">
+                            Image
+                        </option>
+
+                        <option value="video">
+                            Video
+                        </option>
+                    </select>
+
+                </div>
+
+
+                <div class="studio-form-group">
+
+                    <label for="character">
+                        Character
+                    </label>
+
+                    <select
+                        id="character"
+                        class="studio-select"
+                    >
+                        <option value="athlete">
+                            Athlete
+                        </option>
+
+                        <option value="doctor">
+                            Doctor
+                        </option>
+
+                        <option value="operator">
+                            Operator
+                        </option>
+
+                        <option value="researcher">
+                            Researcher
+                        </option>
+                    </select>
+
+                </div>
+
+
+                <div class="studio-form-group">
+
+                    <label for="scene">
+                        Scene
+                    </label>
+
+                    <select
+                        id="scene"
+                        class="studio-select"
+                    >
+                        <option value="HOME_HERO">
+                            HOME_HERO
+                        </option>
+
+                        <option value="RUNNING_TRACK">
+                            RUNNING_TRACK
+                        </option>
+
+                        <option value="HBOT_SESSION">
+                            HBOT_SESSION
+                        </option>
+
+                        <option value="RECOVERY">
+                            RECOVERY
+                        </option>
+
+                        <option value="AI_ANALYSIS">
+                            AI_ANALYSIS
+                        </option>
+                    </select>
+
+                </div>
+
+
+                <div class="studio-form-group">
+
+                    <label for="storyboard">
+                        Storyboard
+                    </label>
+
+                    <select
+                        id="storyboard"
+                        class="studio-select"
+                    >
+                        <option value="">
+                            None
+                        </option>
+                    </select>
+
+                </div>
+
+
+                <button
+                    id="generate-button"
+                    type="submit"
+                    class="studio-button primary"
+                >
+                    Generate
+                </button>
+
+            </form>
+
+
+            <div
+                id="generation-progress"
+                class="generate-progress"
+            >
+
+                <div class="generate-progress-track">
+
+                    <div
+                        id="generation-progress-bar"
+                        class="generate-progress-bar"
+                    ></div>
+
+                </div>
+
+                <div class="generate-job-status">
+
+                    <span id="generation-status">
+                        Ready
+                    </span>
+
+                    <span id="generation-percent">
+                        0%
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <p
+                id="generation-message"
+                class="prompt-builder-message"
+            ></p>
+
+        </div>
+
+    </div>
+
+
+    <div class="generate-right">
+
+        <div class="studio-card generate-prompt-preview">
+
+            <h2>Prompt Preview</h2>
+
+            <textarea
+                id="prompt-preview"
+                class="studio-textarea"
+                readonly
+            ></textarea>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block content_studio_scripts %}
+
+<script
+    src="{{ url_for(
+        'static',
+        filename='js/content_studio/generate.js'
+    ) }}"
+></script>
+
+{% endblock %}

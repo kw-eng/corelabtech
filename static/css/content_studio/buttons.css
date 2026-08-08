@@ -1,0 +1,116 @@
+/* ==========================================================
+   Buttons
+   Wszystkie przyciski i akcje
+   ========================================================== */
+
+.studio-button,
+.studio-action-button,
+button.primary{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:10px;
+
+    padding:12px 20px;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    text-decoration:none;
+
+    font-weight:600;
+
+    transition:all var(--transition-fast);
+
+}
+
+.studio-button{
+
+    background:#162235;
+
+    color:white;
+
+}
+
+.studio-button:hover{
+
+    background:#1F3551;
+
+}
+
+.studio-button.primary,
+.studio-action-button.primary,
+button.primary{
+
+    background:linear-gradient(
+        135deg,
+        var(--studio-primary),
+        var(--studio-secondary)
+    );
+
+    color:white;
+
+}
+
+.studio-button.primary:hover{
+
+    transform:translateY(-2px);
+
+    box-shadow:
+
+        0 10px 24px rgba(22,167,255,.30);
+
+}
+
+.studio-button.outline{
+
+    background:transparent;
+
+    border:1px solid var(--studio-border);
+
+}
+
+.studio-button.outline:hover{
+
+    border-color:var(--studio-primary);
+
+}
+
+.studio-button.success{
+
+    background:var(--studio-success);
+
+    color:#04210E;
+
+}
+
+.studio-button.warning{
+
+    background:var(--studio-warning);
+
+    color:#2B2100;
+
+}
+
+.studio-button.danger{
+
+    background:var(--studio-danger);
+
+    color:white;
+
+}
+
+.studio-button:disabled{
+
+    opacity:.45;
+
+    cursor:not-allowed;
+
+}

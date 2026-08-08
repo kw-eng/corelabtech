@@ -91,7 +91,10 @@
         <div class="profile-actions">
             <a class="profile-primary-action" href="/chamber">Open Chamber</a>
             <a class="profile-secondary-action" href="/research">Open Mission Control</a>
-            <a class="profile-danger-action" href="/logout">Logout</a>
+            <form class="profile-logout-form" action="{{ url_for('auth.logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="profile-danger-action" type="submit">Logout</button>
+            </form>
         </div>
     </section>
 

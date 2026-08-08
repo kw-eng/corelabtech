@@ -3402,6 +3402,29 @@ function renderFindingList(items, fallback, className = "") {
     `
 }
 
+function structuredFindingText(item) {
+    const keys = {
+        spo2_low_threshold: "analysis.spo2_low_threshold",
+        spo2_below_preferred: "analysis.spo2_below_preferred",
+        spo2_stable_expected: "analysis.spo2_stable_expected",
+        hrv_below_threshold: "analysis.hrv_below_threshold",
+        heart_rate_high_threshold: "analysis.hr_high_threshold",
+        sensor_mismatch: "analysis.sensor_mismatch",
+    }
+    const key = keys[item?.code]
+    return key ? i18n(key) : ""
+}
+
+function structuredFindings(data, kind) {
+    if (!Array.isArray(data?.finding_items)) {
+        return null
+    }
+    return data.finding_items
+        .filter(item => item?.kind === kind)
+        .map(structuredFindingText)
+        .filter(Boolean)
+}
+
 function renderMetricRows(rows) {
     return rows.map(row => `
         <div class="metric-row">
@@ -3601,14 +3624,12 @@ function renderAIVisualization(data) {
             : i18n("analysis.no_session_quality_flag")
 
     const warnings =
-        Array.isArray(data.reasons)
-            ? data.reasons
-            : []
+        structuredFindings(data, "warning") ??
+        (Array.isArray(data.reasons) ? data.reasons : [])
 
     const positiveFindings =
-        Array.isArray(data.positive_findings)
-            ? data.positive_findings
-            : []
+        structuredFindings(data, "positive") ??
+        (Array.isArray(data.positive_findings) ? data.positive_findings : [])
 
     const disclaimer =
         translateAnalysisText(

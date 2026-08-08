@@ -1,0 +1,59 @@
+<header class="studio-topbar">
+
+    <div class="studio-topbar-left">
+
+        <button
+            class="studio-mobile-menu-button"
+            id="studio-mobile-menu-button"
+            type="button"
+            aria-label="Open Content Studio navigation"
+            aria-controls="studio-sidebar"
+            aria-expanded="false"
+        >
+            ☰
+        </button>
+
+        <div class="studio-topbar-context">
+
+            <span class="studio-topbar-label">
+                AI Content Studio
+            </span>
+
+            {% if current_project %}
+                <strong class="studio-topbar-project">
+                    {{ current_project }}
+                </strong>
+            {% else %}
+                <strong class="studio-topbar-project">
+                    CoreLabTech
+                </strong>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <div class="studio-topbar-right">
+
+        {% if current_user.is_authenticated %}
+
+            <div class="studio-topbar-user">
+
+                <span class="studio-topbar-user-role">
+                    {{ current_user.role|capitalize }}
+                </span>
+
+                <a
+                    class="studio-topbar-user-link"
+                    href="{{ url_for('auth.profile') }}"
+                >
+                    Profile
+                </a>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</header>

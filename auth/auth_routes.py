@@ -1,6 +1,6 @@
 """Authentication routes for browser login, logout and profile views."""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
 from auth.user_model import get_user_by_email
@@ -41,6 +41,7 @@ def login():
             flash("Account is inactive")
             return render_template("login.html")
 
+        session.permanent = True
         login_user(user)
 
         return redirect("/chamber")
@@ -48,10 +49,10 @@ def login():
     return render_template("login.html")
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
-    """Clear the current Flask-Login session."""
+    """Clear the current Flask-Login session through a CSRF-protected request."""
 
     logout_user()
 

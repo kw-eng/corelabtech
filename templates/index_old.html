@@ -1,0 +1,127 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="home-page">
+
+    <section class="home-hero">
+        <div class="home-hero-copy">
+            <span class="home-eyebrow">{{ t('public.home.eyebrow') }}</span>
+
+            <h1>{{ t('public.home.title') }}</h1>
+
+            <p>{{ t('public.home.hero') }}</p>
+
+            <div class="home-actions">
+                <a class="home-primary-action" href="/chamber">
+                    {{ t('public.home.start_session') }}
+                </a>
+
+                <a class="home-secondary-action" href="/ai_lab">
+                    {{ t('public.home.open_ai_lab') }}
+                </a>
+
+                <a class="home-secondary-action" href="/platform">
+                    {{ t('public.home.research_platform') }}
+                </a>
+            </div>
+        </div>
+
+        <div class="home-hero-panel">
+            <div class="home-signal-row">
+                <span>{{ t('public.home.pipeline') }}</span>
+                <strong>{{ t('public.home.pipeline_value') }}</strong>
+            </div>
+
+            <div class="home-signal-grid">
+                <div>
+                    <span>SpO2</span>
+                    <strong>SpO2 / Pulse</strong>
+                </div>
+                <div>
+                    <span>HR / HRV</span>
+                    <strong>HR / HRV</strong>
+                </div>
+                <div>
+                    <span>{{ t('public.home.merge') }}</span>
+                    <strong>{{ t('public.home.time_sync') }}</strong>
+                </div>
+                <div>
+                    <span>AI</span>
+                    <strong>{{ t('public.home.ai_review') }}</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-status-strip">
+        <div>
+            <span>{{ t('public.home.session_workflow') }}</span>
+            <strong>{{ t('public.home.ready') }}</strong>
+        </div>
+        <div>
+            <span>{{ t('public.home.data_ingestion') }}</span>
+            <strong>HR/HRV + SpO2</strong>
+        </div>
+        <div>
+            <span>{{ t('public.home.analysis_mode') }}</span>
+            <strong>{{ t('public.home.research_only') }}</strong>
+        </div>
+        <div>
+            <span>{{ t('public.home.dashboard') }}</span>
+            <strong>{{ t('public.home.live_telemetry') }}</strong>
+        </div>
+    </section>
+
+    <section class="home-section-header">
+        <h2>{{ t('public.home.core_modules') }}</h2>
+        <p>{{ t('public.home.modules_intro') }}</p>
+    </section>
+
+    <section class="home-module-grid">
+        <a class="home-module-card featured" href="/chamber">
+            <span>01</span>
+            <h3>{{ t('public.home.session_input') }}</h3>
+            <p>{{ t('public.home.session_input_text') }}</p>
+            <strong>{{ t('public.home.start_session_short') }}</strong>
+        </a>
+
+        <a class="home-module-card" href="/research">
+            <span>02</span>
+            <h3>{{ t('public.home.mission_control') }}</h3>
+            <p>{{ t('public.home.mission_control_text') }}</p>
+            <strong>{{ t('public.home.open_dashboard') }}</strong>
+        </a>
+
+        <a class="home-module-card" href="/ai_lab">
+            <span>03</span>
+            <h3>AI Lab</h3>
+            <p>{{ t('public.home.ai_lab_text') }}</p>
+            <strong>{{ t('public.home.run_analysis') }}</strong>
+        </a>
+
+        <a class="home-module-card" href="/platform">
+            <span>04</span>
+            <h3>{{ t('public.home.research_platform') }}</h3>
+            <p>{{ t('public.home.research_platform_text') }}</p>
+            <strong>{{ t('public.home.open_platform') }}</strong>
+        </a>
+
+        <a class="home-module-card" href="/qa">
+            <span>05</span>
+            <h3>{{ t('public.home.software_qa_lab') }}</h3>
+            <p>{{ t('public.home.software_qa_text') }}</p>
+            <strong>{{ t('public.home.open_qa_lab') }}</strong>
+        </a>
+
+        <a class="home-module-card" href="/ai-qa-lab">
+            <span>06</span>
+            <h3>AI QA Lab</h3>
+            <p>{{ t('public.home.ai_qa_text') }}</p>
+            <strong>{{ t('public.home.open_ai_qa') }}</strong>
+        </a>
+    </section>
+
+</div>
+
+{% endblock %}

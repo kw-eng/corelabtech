@@ -1,0 +1,302 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/technology.css') }}?v=technology-image-fit-20260721"
+>
+{% endblock %}
+
+{% block content %}
+
+<div class="technology-page">
+
+    <section class="technology-hero">
+        <div class="technology-hero-copy">
+            <span class="technology-eyebrow">{{ t('public.tech.eyebrow') }}</span>
+            <h1>{{ t('public.tech.title') }}</h1>
+            <p>{{ t('public.tech.hero') }}</p>
+
+            <div class="technology-actions">
+                <a href="/platform" class="technology-primary-action">
+                    {{ t('public.home.research_platform') }}
+                </a>
+                <a href="/ai_lab" class="technology-secondary-action">
+                    {{ t('public.home.open_ai_lab') }}
+                </a>
+            </div>
+        </div>
+
+        <div class="technology-hero-visual">
+            <img
+                src="{{ url_for('static', filename='img/tech.png') }}"
+                alt="{{ t('public.tech.alt') }}"
+            >
+        </div>
+    </section>
+
+    <section class="technology-status-grid">
+        <div>
+            <span>{{ t('public.tech.wearable') }}</span>
+            <strong>HR & HRV Timeline</strong>
+        </div>
+        <div>
+            <span>{{ t('public.tech.oximeter') }}</span>
+            <strong>SpO2 & Pulse Timeline</strong>
+        </div>
+        <div>
+            <span>{{ t('public.tech.sync') }}</span>
+            <strong>{{ t('public.tech.timestamp_merge') }}</strong>
+        </div>
+        <div>
+            <span>{{ t('public.tech.analysis_layer') }}</span>
+            <strong>{{ t('public.about.analysis_output_value') }}</strong>
+        </div>
+    </section>
+
+    <div class="technology-accordion">
+
+        <section class="technology-accordion-item active">
+            <button class="technology-accordion-header" type="button">
+                <span>{{ t('public.tech.system_overview') }}</span>
+                <strong>{{ t('public.tech.lifecycle') }}</strong>
+            </button>
+
+            <div class="technology-accordion-content">
+                <div class="technology-step-grid">
+                    <article>
+                        <img src="{{ url_for('static', filename='img/heart.png') }}" alt="">
+                        <span>{{ t('public.tech.step1') }}</span>
+                        <h3>{{ t('public.tech.checkin') }}</h3>
+                        <p>{{ t('public.tech.checkin_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/chamb1.png') }}" alt="">
+                        <span>{{ t('public.tech.step2') }}</span>
+                        <h3>{{ t('public.tech.start_session') }}</h3>
+                        <p>{{ t('public.tech.start_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/garm_puls.svg') }}" alt="">
+                        <span>{{ t('public.tech.step3') }}</span>
+                        <h3>{{ t('public.tech.during') }}</h3>
+                        <p>{{ t('public.tech.during_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/exit.svg') }}" alt="">
+                        <span>{{ t('public.tech.step4') }}</span>
+                        <h3>{{ t('public.tech.exit') }}</h3>
+                        <p>{{ t('public.tech.exit_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/files.svg') }}" alt="">
+                        <span>{{ t('public.tech.step5') }}</span>
+                        <h3>{{ t('public.tech.upload') }}</h3>
+                        <p>{{ t('public.tech.upload_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/report.svg') }}" alt="">
+                        <span>{{ t('public.tech.step6') }}</span>
+                        <h3>{{ t('public.tech.review_report') }}</h3>
+                        <p>{{ t('public.tech.review_text') }}</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="technology-accordion-item">
+            <button class="technology-accordion-header" type="button">
+                <span>{{ t('public.tech.data_flow') }}</span>
+                <strong>{{ t('public.tech.data_flow_sub') }}</strong>
+            </button>
+
+            <div class="technology-accordion-content">
+                <div class="technology-flow-grid">
+                    <article>
+                        <img src="{{ url_for('static', filename='img/fit.svg') }}" alt="">
+                        <h3>{{ t('public.tech.hr_timeline') }}</h3>
+                        <p>{{ t('public.tech.hr_timeline_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/csv.svg') }}" alt="">
+                        <h3>{{ t('public.tech.spo2_timeline') }}</h3>
+                        <p>{{ t('public.tech.spo2_timeline_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/merge.svg') }}" alt="">
+                        <h3>{{ t('public.tech.merge_engine') }}</h3>
+                        <p>{{ t('public.tech.merge_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/timeline.svg') }}" alt="">
+                        <h3>{{ t('public.tech.unified_timeline') }}</h3>
+                        <p>{{ t('public.tech.unified_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/ai.svg') }}" alt="">
+                        <h3>{{ t('public.tech.ai_engine') }}</h3>
+                        <p>{{ t('public.tech.ai_text') }}</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="technology-accordion-item">
+            <button class="technology-accordion-header" type="button">
+                <span>{{ t('public.tech.devices_title') }}</span>
+                <strong>{{ t('public.tech.devices_sub') }}</strong>
+            </button>
+
+            <div class="technology-accordion-content">
+                <div class="technology-card-grid">
+                    <article>
+                        <img src="{{ url_for('static', filename='img/device.svg') }}" alt="">
+                        <h3>{{ t('public.tech.devices') }}</h3>
+                        <ul>
+                            <li>{{ t('public.tech.device_item1') }}</li>
+                            <li>{{ t('public.tech.device_item2') }}</li>
+                            <li>{{ t('public.tech.device_item3') }}</li>
+                        </ul>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/tech1.svg') }}" alt="">
+                        <h3>{{ t('public.tech.stack') }}</h3>
+                        <ul>
+                            <li>{{ t('public.tech.stack_item1') }}</li>
+                            <li>{{ t('public.tech.stack_item2') }}</li>
+                            <li>{{ t('public.tech.stack_item3') }}</li>
+                        </ul>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/ai.svg') }}" alt="">
+                        <h3>{{ t('public.tech.ai_scoring') }}</h3>
+                        <ul>
+                            <li>{{ t('public.tech.scoring_item1') }}</li>
+                            <li>{{ t('public.tech.scoring_item2') }}</li>
+                            <li>{{ t('public.tech.scoring_item3') }}</li>
+                        </ul>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="technology-accordion-item">
+            <button class="technology-accordion-header" type="button">
+                <span>{{ t('public.tech.ai_qa_title') }}</span>
+                <strong>{{ t('public.tech.ai_qa_sub') }}</strong>
+            </button>
+
+            <div class="technology-accordion-content">
+                <div class="technology-card-grid">
+                    <article>
+                        <h3>{{ t('public.tech.ai_qa_lab') }}</h3>
+                        <ul>
+                            <li>{{ t('public.tech.qa_item1') }}</li>
+                            <li>{{ t('public.tech.qa_item2') }}</li>
+                            <li>{{ t('public.tech.qa_item3') }}</li>
+                        </ul>
+                    </article>
+
+                    <article>
+                        <h3>{{ t('public.tech.playwright') }}</h3>
+                        <ul>
+                            <li>{{ t('public.tech.playwright_item1') }}</li>
+                            <li>{{ t('public.tech.playwright_item2') }}</li>
+                            <li>{{ t('public.tech.playwright_item3') }}</li>
+                        </ul>
+                    </article>
+
+                    <article>
+                        <h3>{{ t('public.tech.performance') }}</h3>
+                        <ul>
+                            <li>{{ t('public.tech.performance_item1') }}</li>
+                            <li>{{ t('public.tech.performance_item2') }}</li>
+                            <li>{{ t('public.tech.performance_item3') }}</li>
+                        </ul>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="technology-accordion-item">
+            <button class="technology-accordion-header" type="button">
+                <span>{{ t('public.tech.business') }}</span>
+                <strong>{{ t('public.tech.business_sub') }}</strong>
+            </button>
+
+            <div class="technology-accordion-content">
+                <div class="technology-process-flow">
+                    <article>
+                        <img src="{{ url_for('static', filename='img/recruit.svg') }}" alt="">
+                        <h3>{{ t('public.tech.recruit') }}</h3>
+                        <p>{{ t('public.tech.recruit_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/session.svg') }}" alt="">
+                        <h3>{{ t('public.tech.run_hbot') }}</h3>
+                        <p>{{ t('public.tech.run_hbot_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/merge.svg') }}" alt="">
+                        <h3>{{ t('public.tech.integrate') }}</h3>
+                        <p>{{ t('public.tech.integrate_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/ai.svg') }}" alt="">
+                        <h3>{{ t('public.tech.ai_analysis') }}</h3>
+                        <p>{{ t('public.tech.ai_analysis_text') }}</p>
+                    </article>
+
+                    <article>
+                        <img src="{{ url_for('static', filename='img/report.svg') }}" alt="">
+                        <h3>{{ t('public.tech.report') }}</h3>
+                        <p>{{ t('public.tech.report_text') }}</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <section class="technology-mission">
+        <div>
+            <span>{{ t('public.tech.mission') }}</span>
+            <h2>{{ t('public.tech.mission_title') }}</h2>
+        </div>
+
+        <p>{{ t('public.tech.mission_text') }}</p>
+    </section>
+
+</div>
+
+<script>
+document.querySelectorAll(".technology-accordion-header").forEach(header => {
+    header.addEventListener("click", () => {
+        const item = header.closest(".technology-accordion-item")
+
+        document.querySelectorAll(".technology-accordion-item").forEach(section => {
+            if (section !== item) {
+                section.classList.remove("active")
+            }
+        })
+
+        item.classList.toggle("active")
+    })
+})
+</script>
+
+{% endblock %}

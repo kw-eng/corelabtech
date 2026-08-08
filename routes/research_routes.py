@@ -480,10 +480,10 @@ def admin_accounts():
 
 @research_bp.route("/api/device-catalog", methods=["GET"])
 @login_required
-@role_required("viewer", "operator", "researcher", "admin")
+@role_required("admin")
 @limiter.limit(PERF_LIMIT)
 def telemetry_device_catalog():
-    """Return declared device classes and the versioned compatibility matrix."""
+    """Return technical device metadata for administrative diagnostics."""
 
     return jsonify({
         "version": "device-catalog-v2",

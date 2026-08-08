@@ -173,6 +173,7 @@
         </div>
     </section>
 
+    {% if current_user.role == "admin" %}
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
@@ -192,6 +193,7 @@
         </div>
         <div id="dataSourcesBox" class="mission-data-sources"></div>
     </section>
+    {% endif %}
 
     <section class="mission-card">
         <div class="mission-section-heading">
@@ -220,6 +222,7 @@
         <pre id="rawOutput" class="mission-raw">{{ t('mission.raw_empty') }}</pre>
     </section>
 
+    {% if current_user.role == "admin" %}
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
@@ -230,6 +233,7 @@
         </div>
         <div id="deviceCatalogBox" class="mission-data-sources">{{ t('mission.device_catalog_loading') }}</div>
     </section>
+    {% endif %}
 
     {% if current_user.role in ["researcher", "admin"] %}
     <section class="mission-card">
@@ -264,7 +268,9 @@ function tr(key, params = null){
 
 window.addEventListener("load", async () => {
     await loadSessions()
-    await loadDeviceCatalog()
+    if(document.getElementById("deviceCatalogBox")){
+        await loadDeviceCatalog()
+    }
     document.getElementById("recoveryFollowUpForm")?.addEventListener("submit", saveRecoveryFollowUp)
 
     if(getSelectedSessionId()){
@@ -709,45 +715,122 @@ async function loadDashboardSession(){
     setText("timelineStatus", tr("mission.loading"))
 
     try{
-        const res = await fetch(`/api/analysis/${encodeURIComponent(sessionId)}/latest?timeline_sample=${MAX_CHART_POINTS}`, {
-            credentials: "same-origin"
-        })
+        const res = await fetch(
+            `/api/analysis/${encodeURIComponent(sessionId)}/latest?timeline_sample=${MAX_CHART_POINTS}`,
+            {
+                credentials: "same-origin"
+            }
+        )
 
-        const data = await parseJsonResponse(res, "LATEST ANALYSIS")
+        const data = await parseJsonResponse(
+            res,
+            "LATEST ANALYSIS"
+        )
 
         if(!res.ok || data.error){
-            resetDashboardState(tr("mission.no_saved_ai_analysis"))
-            setText("analysisStatus", tr("mission.not_analyzed"))
-            setText("rawOutput", prettyCompact(data))
-            await loadSessionTraceability()
-            await loadUserTrend({
-                updateRaw: false
-            })
+            resetDashboardState(
+                tr("mission.no_saved_ai_analysis")
+            )
+
+            setText(
+                "analysisStatus",
+                tr("mission.not_analyzed")
+            )
+
+            setText(
+                "rawOutput",
+                prettyCompact(data)
+            )
+
+            // Nie blokuj głównego renderowania.
+            window.setTimeout(() => {
+                loadSessionTraceability()
+            }, 0)
+
             return
         }
 
         const normalized = {
             ...data.result,
             ...data,
-            features: data.features || data.result?.features || {},
-            timeline: data.result?.timeline || data.timeline || [],
-            timeline_total: data.timeline_total || data.result?.timeline_total,
-            timeline_sampled: data.timeline_sampled || data.result?.timeline_sampled
+            features:
+                data.features
+                || data.result?.features
+                || {},
+            timeline:
+                data.result?.timeline
+                || data.timeline
+                || [],
+            timeline_total:
+                data.timeline_total
+                || data.result?.timeline_total,
+            timeline_sampled:
+                data.timeline_sampled
+                || data.result?.timeline_sampled
         }
 
+        /*
+         * Najpierw renderujemy podstawowe dane sesji.
+         */
         renderAnalysis(normalized)
-        setText("rawOutput", prettyCompact(normalized))
-        await loadSessionTraceability()
-        await loadUserTrend({
-            updateRaw: false
-        })
-        await loadResearchSummary({
-            updateRaw: false
-        })
+
+        /*
+         * Nie przekazujemy całej osi czasu do prettyCompact().
+         * Timeline jest już używany przez wykres i nie musi być ponownie
+         * serializowany jako duży tekst diagnostyczny.
+         */
+        const rawPreview = {
+            ...normalized,
+            timeline: {
+                omitted: true,
+                samples: normalized.timeline.length,
+                total:
+                    normalized.timeline_total
+                    || normalized.timeline.length,
+                sampled:
+                    normalized.timeline_sampled
+                    || normalized.timeline.length
+            }
+        }
+
+        setText(
+            "rawOutput",
+            prettyCompact(rawPreview)
+        )
+
+        /*
+         * Pozwalamy przeglądarce najpierw odświeżyć ekran.
+         */
+        await new Promise(resolve =>
+            requestAnimationFrame(resolve)
+        )
+
+        /*
+         * Traceability i Research Summary mogą ładować się równolegle.
+         * Series nie jest ładowane automatycznie — służy do tego
+         * osobny przycisk "Load Series".
+         */
+        await Promise.allSettled([
+            loadSessionTraceability(),
+            loadResearchSummary({
+                updateRaw: false
+            })
+        ])
+
     }catch(err){
-        console.error("loadDashboardSession error:", err)
-        resetDashboardState(tr("mission.latest_analysis_load_failed"))
-        setText("rawOutput", String(err))
+        console.error(
+            "loadDashboardSession error:",
+            err
+        )
+
+        resetDashboardState(
+            tr("mission.latest_analysis_load_failed")
+        )
+
+        setText(
+            "rawOutput",
+            String(err)
+        )
     }
 }
 
@@ -788,14 +871,32 @@ async function runSelectedAI(){
         }
 
         renderAnalysis(data)
-        setText("rawOutput", prettyCompact(data))
-        await loadSessionTraceability()
-        await loadUserTrend({
-            updateRaw: false
-        })
-        await loadResearchSummary({
-            updateRaw: false
-        })
+
+const rawPreview = {
+    ...data,
+    timeline: Array.isArray(data.timeline)
+        ? {
+            omitted: true,
+            samples: data.timeline.length
+        }
+        : data.timeline
+}
+
+setText(
+    "rawOutput",
+    prettyCompact(rawPreview)
+)
+
+await new Promise(resolve =>
+    requestAnimationFrame(resolve)
+)
+
+await Promise.allSettled([
+    loadSessionTraceability(),
+    loadResearchSummary({
+        updateRaw: false
+    })
+])
     }catch(err){
         console.error("runSelectedAI error:", err)
         document.getElementById("ai").innerHTML = `

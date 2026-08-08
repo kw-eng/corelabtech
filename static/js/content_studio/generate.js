@@ -1,0 +1,551 @@
+document.addEventListener("DOMContentLoaded", function () {
+
+    const form =
+        document.getElementById("generation-form");
+
+    const provider =
+        document.getElementById("provider");
+
+    const outputType =
+        document.getElementById("output-type");
+
+    const character =
+        document.getElementById("character");
+
+    const scene =
+        document.getElementById("scene");
+
+    const storyboard =
+        document.getElementById("storyboard");
+
+    const promptPreview =
+        document.getElementById("prompt-preview");
+
+    const generateButton =
+        document.getElementById("generate-button");
+
+    const progress =
+        document.getElementById("generation-progress");
+
+    const progressBar =
+        document.getElementById("generation-progress-bar");
+
+    const status =
+        document.getElementById("generation-status");
+
+    const percent =
+        document.getElementById("generation-percent");
+
+    const message =
+        document.getElementById("generation-message");
+
+
+    if (
+        !form ||
+        !provider ||
+        !outputType ||
+        !character ||
+        !scene ||
+        !promptPreview ||
+        !generateButton
+    ) {
+        console.error(
+            "AI Content Studio: generation form elements are missing."
+        );
+
+        return;
+    }
+
+
+    // ======================================================
+    // PROMPT BUILDER
+    // ======================================================
+
+    function buildPrompt() {
+
+        const lines = [
+            "CoreLabTech AI Content Studio",
+            "",
+            "Character: " + character.value,
+            "Scene: " + scene.value,
+            "Output: " + outputType.value
+        ];
+
+
+        if (
+            storyboard &&
+            storyboard.value
+        ) {
+            lines.push(
+                "Storyboard: " + storyboard.value
+            );
+        }
+
+
+        lines.push(
+            "",
+            "Use the official CoreLabTech character reference.",
+            "",
+            "Preserve exactly:",
+            "- character identity",
+            "- facial features",
+            "- hairstyle",
+            "- body proportions",
+            "- clothing",
+            "- HR chest strap",
+            "- smartwatch",
+            "",
+            "Visual style:",
+            "- premium CoreLabTech commercial style",
+            "- dark navy environment",
+            "- electric blue accents",
+            "- cyan highlights",
+            "- professional cinematic lighting",
+            "- modern technology aesthetic",
+            "- realistic human proportions",
+            "",
+            "Do not include:",
+            "- commercial logos",
+            "- watermark",
+            "- distorted anatomy",
+            "- duplicated limbs",
+            "- extra fingers",
+            "- incorrect face",
+            "- different hairstyle"
+        );
+
+
+        return lines.join("\n");
+    }
+
+
+    function refreshPrompt() {
+
+        promptPreview.value =
+            buildPrompt();
+    }
+
+
+    provider.addEventListener(
+        "change",
+        refreshPrompt
+    );
+
+    outputType.addEventListener(
+        "change",
+        refreshPrompt
+    );
+
+    character.addEventListener(
+        "change",
+        refreshPrompt
+    );
+
+    scene.addEventListener(
+        "change",
+        refreshPrompt
+    );
+
+
+    if (storyboard) {
+        storyboard.addEventListener(
+            "change",
+            refreshPrompt
+        );
+    }
+
+
+    // ======================================================
+    // UI HELPERS
+    // ======================================================
+
+    function setProgress(
+        value,
+        statusText
+    ) {
+
+        if (!progress) {
+            return;
+        }
+
+
+        progress.classList.add(
+            "is-visible"
+        );
+
+
+        if (progressBar) {
+            progressBar.style.width =
+                value + "%";
+        }
+
+
+        if (percent) {
+            percent.textContent =
+                value + "%";
+        }
+
+
+        if (status && statusText) {
+            status.textContent =
+                statusText;
+        }
+    }
+
+
+    function setMessage(
+        text,
+        type
+    ) {
+
+        if (!message) {
+            return;
+        }
+
+
+        message.textContent =
+            text || "";
+
+
+        message.classList.remove(
+            "success",
+            "error"
+        );
+
+
+        if (type) {
+            message.classList.add(
+                type
+            );
+        }
+    }
+
+
+    function setButtonLoading(
+        loading
+    ) {
+
+        generateButton.disabled =
+            loading;
+
+
+        generateButton.textContent =
+            loading
+                ? "Generating..."
+                : "Generate";
+    }
+
+
+    // ======================================================
+    // CSRF
+    // ======================================================
+
+    function getCsrfToken() {
+
+        const element =
+            document.querySelector(
+                'meta[name="csrf-token"]'
+            );
+
+
+        if (!element) {
+            return null;
+        }
+
+
+        return element.getAttribute(
+            "content"
+        );
+    }
+
+
+    // ======================================================
+    // RESPONSE HANDLING
+    // ======================================================
+
+    async function parseResponse(
+        response
+    ) {
+
+        const contentType =
+            response.headers.get(
+                "content-type"
+            ) || "";
+
+
+        if (
+            contentType.includes(
+                "application/json"
+            )
+        ) {
+
+            return await response.json();
+        }
+
+
+        const text =
+            await response.text();
+
+
+        console.error(
+            "AI Content Studio received non-JSON response:",
+            {
+                status:
+                    response.status,
+
+                statusText:
+                    response.statusText,
+
+                response:
+                    text
+            }
+        );
+
+
+        throw new Error(
+            "Server returned HTTP " +
+            response.status +
+            " instead of JSON. Check Docker logs."
+        );
+    }
+
+
+    // ======================================================
+    // GENERATE
+    // ======================================================
+
+    form.addEventListener(
+        "submit",
+        async function (event) {
+
+            event.preventDefault();
+
+
+            setMessage("", null);
+
+            setButtonLoading(true);
+
+            setProgress(
+                10,
+                "Creating generation job..."
+            );
+
+
+            const csrfToken =
+                getCsrfToken();
+
+
+            if (!csrfToken) {
+
+                setProgress(
+                    0,
+                    "Failed"
+                );
+
+
+                setMessage(
+                    "CSRF token not found. Check layout.html.",
+                    "error"
+                );
+
+
+                setButtonLoading(false);
+
+                return;
+            }
+
+
+            const payload = {
+
+                provider:
+                    provider.value,
+
+                output_type:
+                    outputType.value,
+
+                character_id:
+                    character.value,
+
+                scene_id:
+                    scene.value,
+
+                storyboard_id:
+                    storyboard
+                        ? storyboard.value || null
+                        : null,
+
+                prompt:
+                    promptPreview.value
+            };
+
+
+            console.log(
+                "Starting generation job:",
+                payload
+            );
+
+
+            try {
+
+                setProgress(
+                    25,
+                    "Sending request..."
+                );
+
+
+                const response =
+                    await fetch(
+                        "/content-studio/api/generation-jobs",
+                        {
+                            method:
+                                "POST",
+
+                            credentials:
+                                "same-origin",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+
+                                "Accept":
+                                    "application/json",
+
+                                "X-CSRFToken":
+                                    csrfToken
+                            },
+
+                            body:
+                                JSON.stringify(
+                                    payload
+                                )
+                        }
+                    );
+
+
+                setProgress(
+                    55,
+                    "Processing response..."
+                );
+
+
+                const data =
+                    await parseResponse(
+                        response
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.error ||
+                        (
+                            "Generation request failed with HTTP " +
+                            response.status
+                        )
+                    );
+                }
+
+
+                if (
+                    !data ||
+                    data.status !== "success" ||
+                    !data.job
+                ) {
+
+                    throw new Error(
+                        "Invalid generation API response."
+                    );
+                }
+
+
+                setProgress(
+                    data.job.progress_percent ?? 100,
+                    data.job.status || "Completed"
+                );
+
+
+                setMessage(
+                    "Generation job #" +
+                    data.job.id +
+                    " created successfully.",
+                    "success"
+                );
+
+
+                console.log(
+                    "Generation job created:",
+                    data.job
+                );
+
+            }
+
+            catch (error) {
+
+                console.error(
+                    "Generation failed:",
+                    error
+                );
+
+
+                setProgress(
+                    0,
+                    "Failed"
+                );
+
+
+                setMessage(
+                    error.message ||
+                    "Unable to start generation.",
+                    "error"
+                );
+
+            }
+
+            finally {
+
+                setButtonLoading(false);
+            }
+
+        }
+    );
+
+
+    // ======================================================
+    // INITIAL STATE
+    // ======================================================
+
+    refreshPrompt();
+
+
+    if (progress) {
+
+        progress.classList.remove(
+            "is-visible"
+        );
+    }
+
+
+    if (progressBar) {
+
+        progressBar.style.width =
+            "0%";
+    }
+
+
+    if (percent) {
+
+        percent.textContent =
+            "0%";
+    }
+
+
+    if (status) {
+
+        status.textContent =
+            "Ready";
+    }
+
+
+    setMessage("", null);
+
+});

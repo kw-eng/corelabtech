@@ -1,0 +1,607 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+<style>
+    .content-studio-page {
+        display: grid;
+        gap: 32px;
+        padding: 32px 0 56px;
+    }
+
+    .content-studio-header h1 {
+        margin: 0 0 8px;
+    }
+
+    .content-studio-header p {
+        margin: 0;
+        opacity: 0.75;
+    }
+
+    .content-studio-panel {
+        padding: 24px;
+        border: 1px solid rgba(56, 189, 248, 0.18);
+        border-radius: 18px;
+        background: rgba(3, 12, 24, 0.72);
+    }
+
+    .content-studio-form-grid,
+    .content-studio-filter-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(4, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .content-studio-field {
+        display: grid;
+        gap: 7px;
+    }
+
+    .content-studio-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .content-studio-field label {
+        font-size: 0.86rem;
+        font-weight: 700;
+    }
+
+    .content-studio-field input,
+    .content-studio-field select,
+    .content-studio-field textarea {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        padding: 11px 12px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 10px;
+        color: inherit;
+        background: rgba(2, 8, 20, 0.78);
+    }
+
+    .content-studio-field textarea {
+        min-height: 130px;
+        resize: vertical;
+    }
+
+    .content-studio-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 20px;
+    }
+
+    .content-studio-actions button,
+    .media-save-button {
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 10px;
+        color: white;
+        background: #168ff7;
+        cursor: pointer;
+    }
+
+    .content-studio-actions button:disabled,
+    .media-save-button:disabled {
+        cursor: wait;
+        opacity: 0.6;
+    }
+
+    .content-media-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+    .content-media-card {
+        overflow: hidden;
+        border: 1px solid rgba(56, 189, 248, 0.17);
+        border-radius: 16px;
+        background: rgba(3, 12, 24, 0.76);
+    }
+
+    .content-media-preview-wrap {
+        display: grid;
+        place-items: center;
+        aspect-ratio: 16 / 10;
+        overflow: hidden;
+        background: #020712;
+    }
+
+    .content-media-preview {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .content-media-placeholder {
+        opacity: 0.65;
+    }
+
+    .content-media-body {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+    }
+
+    .content-media-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .content-media-title-row h3 {
+        margin: 0;
+        overflow-wrap: anywhere;
+        font-size: 1rem;
+    }
+
+    .media-badge {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 800;
+    }
+
+    .media-badge.final {
+        color: #052e16;
+        background: #4ade80;
+    }
+
+    .content-media-meta {
+        display: grid;
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 0;
+    }
+
+    .content-media-meta div {
+        min-width: 0;
+    }
+
+    .content-media-meta dt {
+        font-size: 0.73rem;
+        opacity: 0.58;
+    }
+
+    .content-media-meta dd {
+        margin: 2px 0 0;
+        overflow-wrap: anywhere;
+        font-size: 0.86rem;
+    }
+
+    .content-media-details summary {
+        cursor: pointer;
+    }
+
+    .content-media-prompt {
+        max-height: 180px;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-size: 0.82rem;
+        opacity: 0.82;
+    }
+
+    .content-media-details code {
+        display: block;
+        overflow-wrap: anywhere;
+        white-space: normal;
+        font-size: 0.75rem;
+    }
+
+    .content-media-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .media-status-select {
+        flex: 1;
+        min-width: 125px;
+        padding: 8px;
+        border-radius: 8px;
+        color: inherit;
+        background: #020712;
+    }
+
+    .media-final-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .content-studio-message,
+    .content-studio-success,
+    .content-studio-error {
+        margin: 0;
+    }
+
+    .content-studio-success {
+        color: #4ade80;
+    }
+
+    .content-studio-error {
+        color: #fb7185;
+    }
+
+    @media (max-width: 1050px) {
+        .content-media-grid {
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+        }
+
+        .content-studio-form-grid,
+        .content-studio-filter-grid {
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 680px) {
+        .content-media-grid,
+        .content-studio-form-grid,
+        .content-studio-filter-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="content-studio-page">
+
+    <header class="content-studio-header">
+        <span>AI Content Studio</span>
+
+        <h1>Generated Media</h1>
+
+        <p>
+            Register and manage CoreLabTech images,
+            videos and promotional assets.
+        </p>
+    </header>
+
+    <section class="content-studio-panel">
+        <h2>Register media</h2>
+
+        <form id="media-form">
+            <div class="content-studio-form-grid">
+
+                <div class="content-studio-field">
+                    <label for="media-type">
+                        Media type
+                    </label>
+
+                    <select
+                        id="media-type"
+                        name="media_type"
+                        required
+                    >
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="thumbnail">
+                            Thumbnail
+                        </option>
+                        <option value="social">
+                            Social
+                        </option>
+                    </select>
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="scene-id">
+                        Scene ID
+                    </label>
+
+                    <input
+                        id="scene-id"
+                        name="scene_id"
+                        value="HOME_HERO"
+                        required
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="character-id">
+                        Character
+                    </label>
+
+                    <input
+                        id="character-id"
+                        name="character_id"
+                        value="athlete"
+                        required
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="version">
+                        Version
+                    </label>
+
+                    <input
+                        id="version"
+                        name="version"
+                        value="v01"
+                        required
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="ai-provider">
+                        AI provider
+                    </label>
+
+                    <input
+                        id="ai-provider"
+                        name="ai_provider"
+                        placeholder="GPT Image, Kling, Veo..."
+                        required
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="status">
+                        Status
+                    </label>
+
+                    <select
+                        id="status"
+                        name="status"
+                        required
+                    >
+                        <option value="draft">Draft</option>
+                        <option
+                            value="generated"
+                            selected
+                        >
+                            Generated
+                        </option>
+                        <option value="approved">
+                            Approved
+                        </option>
+                        <option value="published">
+                            Published
+                        </option>
+                        <option value="archived">
+                            Archived
+                        </option>
+                        <option value="failed">
+                            Failed
+                        </option>
+                    </select>
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="mime-type">
+                        MIME type
+                    </label>
+
+                    <input
+                        id="mime-type"
+                        name="mime_type"
+                        placeholder="image/webp or video/mp4"
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="file-path">
+                        Relative file path
+                    </label>
+
+                    <input
+                        id="file-path"
+                        name="file_path"
+                        placeholder="assets/athlete/generated/..."
+                        required
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="width">Width</label>
+
+                    <input
+                        id="width"
+                        name="width"
+                        type="number"
+                        min="1"
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="height">Height</label>
+
+                    <input
+                        id="height"
+                        name="height"
+                        type="number"
+                        min="1"
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="duration-seconds">
+                        Duration in seconds
+                    </label>
+
+                    <input
+                        id="duration-seconds"
+                        name="duration_seconds"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label>
+                        <input
+                            name="is_final"
+                            type="checkbox"
+                        >
+                        Final version
+                    </label>
+                </div>
+
+                <div class="content-studio-field full">
+                    <label for="prompt">Prompt</label>
+
+                    <textarea
+                        id="prompt"
+                        name="prompt"
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="content-studio-field full">
+                    <label for="negative-prompt">
+                        Negative prompt
+                    </label>
+
+                    <textarea
+                        id="negative-prompt"
+                        name="negative_prompt"
+                    ></textarea>
+                </div>
+
+                <div class="content-studio-field full">
+                    <label for="notes">Notes</label>
+
+                    <textarea
+                        id="notes"
+                        name="notes"
+                    ></textarea>
+                </div>
+
+            </div>
+
+            <div class="content-studio-actions">
+                <button type="submit">
+                    Register media
+                </button>
+
+                <p id="media-form-message"></p>
+            </div>
+        </form>
+    </section>
+
+    <section class="content-studio-panel">
+        <h2>Filters</h2>
+
+        <form id="media-filter-form">
+            <div class="content-studio-filter-grid">
+
+                <div class="content-studio-field">
+                    <label for="filter-type">Type</label>
+
+                    <select id="filter-type">
+                        <option value="">All</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="thumbnail">
+                            Thumbnail
+                        </option>
+                        <option value="social">
+                            Social
+                        </option>
+                    </select>
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="filter-scene">
+                        Scene
+                    </label>
+
+                    <input
+                        id="filter-scene"
+                        placeholder="HOME_HERO"
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="filter-character">
+                        Character
+                    </label>
+
+                    <input
+                        id="filter-character"
+                        placeholder="athlete"
+                    >
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="filter-status">
+                        Status
+                    </label>
+
+                    <select id="filter-status">
+                        <option value="">All</option>
+                        <option value="draft">Draft</option>
+                        <option value="generated">
+                            Generated
+                        </option>
+                        <option value="approved">
+                            Approved
+                        </option>
+                        <option value="published">
+                            Published
+                        </option>
+                        <option value="archived">
+                            Archived
+                        </option>
+                        <option value="failed">
+                            Failed
+                        </option>
+                    </select>
+                </div>
+
+                <div class="content-studio-field">
+                    <label for="filter-final">
+                        Final
+                    </label>
+
+                    <select id="filter-final">
+                        <option value="">All</option>
+                        <option value="true">
+                            Final only
+                        </option>
+                        <option value="false">
+                            Non-final only
+                        </option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="content-studio-actions">
+                <button type="submit">
+                    Apply filters
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section>
+        <div id="media-list" class="content-media-grid">
+            <p class="content-studio-message">
+                Loading media...
+            </p>
+        </div>
+    </section>
+
+</div>
+
+<script
+    src="{{ url_for(
+        'static',
+        filename='js/content_studio.js'
+    ) }}"
+></script>
+
+{% endblock %}

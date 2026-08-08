@@ -3332,3 +3332,120 @@ CONTACT PAGE
         width:100%;
     }
 }
+/* =========================================================
+   CoreLabTech – grafika w panelu HERO
+   ========================================================= */
+
+.home-hero-visual {
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    background:
+        radial-gradient(
+            circle at 50% 20%,
+            rgba(14, 165, 233, 0.12),
+            transparent 60%
+        ),
+        rgba(3, 12, 24, 0.65);
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.28),
+        0 0 40px rgba(14, 165, 233, 0.08);
+}
+
+.home-hero-visual img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 430px;
+    object-fit: cover;
+    object-position: center;
+    transition:
+        transform 0.5s ease,
+        filter 0.5s ease;
+}
+
+.home-hero-visual:hover img {
+    transform: scale(1.015);
+    filter: brightness(1.04);
+}
+
+/* Delikatne przyciemnienie dołu grafiki */
+.home-hero-visual::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        to bottom,
+        transparent 65%,
+        rgba(2, 8, 20, 0.3) 100%
+    );
+}
+
+/* Panel po prawej stronie */
+.home-hero-panel {
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Komputer */
+@media (min-width: 1100px) {
+    .home-hero {
+        grid-template-columns:
+            minmax(0, 0.9fr)
+            minmax(500px, 1.1fr);
+        gap: clamp(32px, 5vw, 72px);
+        align-items: center;
+    }
+}
+
+/* Tablet */
+@media (max-width: 1099px) {
+    .home-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .home-hero-panel {
+        width: 100%;
+        max-width: 900px;
+        margin-inline: auto;
+    }
+
+    .home-hero-visual img {
+        max-height: none;
+        object-fit: contain;
+    }
+}
+
+/* Telefon */
+@media (max-width: 640px) {
+    .home-hero-visual {
+        margin-bottom: 14px;
+        border-radius: 12px;
+    }
+
+    .home-hero-visual img {
+        width: 100%;
+        max-height: none;
+    }
+
+    .home-signal-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Form-based logout keeps session termination CSRF-protected while preserving
+   the existing navigation and profile action appearance. */
+.nav-logout-form,
+.profile-logout-form {
+    margin: 0;
+}
+
+.nav-logout-form .nav-danger,
+.profile-logout-form .profile-danger-action {
+    font: inherit;
+    cursor: pointer;
+}

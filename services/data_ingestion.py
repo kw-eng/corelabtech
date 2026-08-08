@@ -16,6 +16,7 @@ from core.telemetry.contract import (
     SCHEMA_VERSION,
     pulse_oximeter_metadata,
 )
+from core.telemetry.capability_scanner import scan_telemetry_rows
 from services.hrv_pipeline import annotate_hrv_rmssd_timeline
 from core.telemetry.device_catalog import resolve_device_capability, resolve_fit_device
 from services.importers.registry import get_importer
@@ -165,6 +166,20 @@ def preview_telemetry_file(
         hrv_status = "not_available"
 
     first_timestamp, last_timestamp = get_timestamp_range(valid_rows)
+    source_type = (
+        "pulse_oximetry" if import_type == "csv"
+        else "wearable_telemetry" if import_type == "fit"
+        else "external_telemetry"
+    )
+    telemetry_intelligence = scan_telemetry_rows(
+        valid_rows,
+        file_type=import_type,
+        source_type=source_type,
+    )
+    telemetry_intelligence["file"].update({
+        "first_timestamp": first_timestamp,
+        "last_timestamp": last_timestamp,
+    })
     return {
         "status": "ready",
         "import_type": import_type,
@@ -180,6 +195,7 @@ def preview_telemetry_file(
         "signal_quality": capability.get("signal_quality", "unknown"),
         "signals": signals,
         "hrv_status": hrv_status,
+        "telemetry_intelligence": telemetry_intelligence,
     }
 
 

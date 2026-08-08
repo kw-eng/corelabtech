@@ -67,6 +67,20 @@ WELLNESS_DISCLAIMER = (
     "Not intended to diagnose, treat, cure, or prevent disease."
 )
 
+FINDING_TRANSLATION_KEYS = {
+    "spo2_low_threshold": "analysis.spo2_low_threshold",
+    "spo2_below_preferred": "analysis.spo2_below_preferred",
+    "spo2_stable_expected": "analysis.spo2_stable_expected",
+    "hrv_below_threshold": "analysis.hrv_below_threshold",
+    "heart_rate_high_threshold": "analysis.hr_high_threshold",
+}
+
+
+def translate_finding(code: str) -> str:
+    """Render a stable deterministic finding code in the active locale."""
+
+    return translate(FINDING_TRANSLATION_KEYS[code])
+
 
 def get_analysis_model_manifest() -> dict[str, Any]:
     """Return the admin-facing, versioned description of the active rules."""
@@ -405,35 +419,25 @@ def analyze_measurements(
     )
 
     score = 100
-    reasons = []
-    positive_findings = []
+    reason_codes = []
+    positive_finding_codes = []
 
     if hypoxia_detected:
         score -= 40
-        reasons.append(
-            "SpO2 dropped below the configured low oxygenation threshold"
-        )
+        reason_codes.append("spo2_low_threshold")
     elif min_spo2 is not None and min_spo2 < 94:
         score -= 15
-        reasons.append(
-            "SpO2 was below the preferred wellness range"
-        )
-    else:
-        positive_findings.append(
-            "SpO2 remained stable and within the expected range"
-        )
+        reason_codes.append("spo2_below_preferred")
+    elif spo2_values:
+        positive_finding_codes.append("spo2_stable_expected")
 
     if stress_detected:
         score -= 20
-        reasons.append(
-            "Average HRV was below the configured recovery threshold"
-        )
+        reason_codes.append("hrv_below_threshold")
 
     if cardiovascular_warning:
         score -= 15
-        reasons.append(
-            "Heart rate exceeded the configured high-load threshold"
-        )
+        reason_codes.append("heart_rate_high_threshold")
 
     score = max(0, min(score, 100))
 
@@ -553,8 +557,8 @@ def analyze_measurements(
     )
 
     summary = build_research_summary(
-        reasons=reasons,
-        positive_findings=positive_findings,
+        reason_codes=reason_codes,
+        positive_finding_codes=positive_finding_codes,
         sensor_mismatch=sensor_mismatch,
         max_difference=max_difference,
         features=features,
@@ -621,7 +625,7 @@ def analyze_measurements(
 
         "summary": (
             summary
-            or "No significant deviations detected."
+            or translate("analysis.no_significant_deviations")
         ),
 
         "recommendations": recommendations,
@@ -633,15 +637,27 @@ def analyze_measurements(
             for row in measurements
         ],
 
-        "reasons": reasons,
-        "positive_findings": positive_findings,
+        "finding_items": [
+            {"code": code, "kind": "warning"}
+            for code in reason_codes
+        ] + ([{"code": "sensor_mismatch", "kind": "warning"}] if sensor_mismatch else []) + [
+            {"code": code, "kind": "positive"}
+            for code in positive_finding_codes
+        ],
+        "reason_codes": reason_codes,
+        "positive_finding_codes": positive_finding_codes,
+        "reasons": [translate_finding(code) for code in reason_codes],
+        "positive_findings": [
+            translate_finding(code)
+            for code in positive_finding_codes
+        ],
 
         "model_name": MODEL_NAME,
         "model_version": MODEL_VERSION,
 
         "research_only": True,
-        "medical_disclaimer": WELLNESS_DISCLAIMER,
-        "wellness_disclaimer": WELLNESS_DISCLAIMER,
+        "medical_disclaimer": translate("analysis.wellness_educational_disclaimer"),
+        "wellness_disclaimer": translate("analysis.wellness_educational_disclaimer"),
     }
 
     return result
@@ -885,8 +901,8 @@ def calculate_analysis_confidence(
 
 def build_research_summary(
     *,
-    reasons: list[str],
-    positive_findings: list[str],
+    reason_codes: list[str],
+    positive_finding_codes: list[str],
     sensor_mismatch: bool,
     max_difference: float | None,
     features: dict[str, Any] | None = None,
@@ -898,9 +914,12 @@ def build_research_summary(
     context_features = context_features or {}
     sentences = []
 
-    if positive_findings:
+    if positive_finding_codes:
         sentences.append(
-            ". ".join(positive_findings) + "."
+            ". ".join(
+                translate_finding(code)
+                for code in positive_finding_codes
+            ) + "."
         )
 
     physiology_sentence = build_physiology_summary_sentence(features)
@@ -912,31 +931,31 @@ def build_research_summary(
         sentences.append(context_sentence)
 
     if sensor_mismatch:
-        detail = (
-            f" The maximum observed difference was {max_difference:.1f} bpm."
-            if max_difference is not None
-            else ""
-        )
-
-        sentences.append(
-            "A notable discrepancy was detected between wearable heart rate "
-            "and pulse oximeter pulse, which may indicate sensor alignment, "
-            f"time alignment issues, or signal artifact.{detail}"
-        )
+        if max_difference is not None:
+            sentences.append(
+                translate(
+                    "analysis.sensor_mismatch_with_difference",
+                    difference=format_summary_number(
+                        max_difference,
+                        1,
+                    ),
+                )
+            )
+        else:
+            sentences.append(translate("analysis.sensor_mismatch"))
 
     other_reasons = [
-        reason
-        for reason in reasons
-        if not reason.startswith(
-            "Notable discrepancy between wearable heart rate"
-        )
+        translate_finding(code)
+        for code in reason_codes
+        if code != "sensor_mismatch"
     ]
 
     if other_reasons:
         sentences.append(
-            "Additional wellness findings: "
-            + "; ".join(other_reasons)
-            + "."
+            translate(
+                "analysis.additional_findings",
+                details="; ".join(other_reasons),
+            )
         )
 
     return " ".join(sentences)
@@ -1076,33 +1095,21 @@ def build_recommendations(
     context_features = context_features or {}
 
     if sensor_mismatch:
-        return (
-            "Review the synchronized timeline, sensor placement, and time "
-            "alignment before interpreting HR/pulse trends."
-        )
+        return translate("analysis.recommend_sensor_alignment")
 
     if context_features.get("poor_sleep"):
-        return (
-            "Sleep context suggests reduced recovery readiness. Consider an "
-            "easier day and compare tomorrow's HRV/resting response."
-        )
+        return translate("analysis.recommend_sleep_context")
 
     if context_features.get("high_training_load"):
-        return (
-            "Recent training load may influence HR/HRV response. Treat this "
-            "session as recovery support and watch the next baseline reading."
-        )
+        return translate("analysis.recommend_training_context")
 
     if context_features.get("high_stress_or_fatigue"):
-        return (
-            "Reported stress or fatigue is elevated. Prioritize recovery and "
-            "repeat measurement under calmer conditions."
-        )
+        return translate("analysis.recommend_stress_context")
 
     if anomaly_detected:
-        return "Review the synchronized timeline, raw signals, and recovery context."
+        return translate("analysis.recommend_review_signals")
 
-    return "No additional wellness action indicated."
+    return translate("analysis.recommend_none")
 
 
 def load_session_context(

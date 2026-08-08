@@ -28,6 +28,17 @@
         </div>
 
         <div class="home-hero-panel">
+            <div class="home-hero-visual">
+                <img
+                    src="{{ url_for('static', filename='img/hero.png') }}"
+                    alt="CoreLabTech recovery analysis visualization with HR, HRV and SpO2 data"
+                    width="1536"
+                    height="1024"
+                    loading="eager"
+                    fetchpriority="high"
+                >
+            </div>
+
             <div class="home-signal-row">
                 <span>{{ t('public.home.pipeline') }}</span>
                 <strong>{{ t('public.home.pipeline_value') }}</strong>

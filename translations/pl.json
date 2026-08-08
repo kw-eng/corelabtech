@@ -1119,6 +1119,16 @@
 
   "analysis.context_none": "Dane z ankiety check-in nie wskazują na istotne zaburzenia snu, zwiększony stres, zmęczenie ani podwyższone obciążenie treningowe.",
 
-  "analysis.context_prefix": "Kontekst check-in:"
+  "analysis.context_prefix": "Kontekst check-in:",
+  "analysis.sensor_mismatch": "Wykryto istotną rozbieżność między tętnem z urządzenia ubieralnego a pulsem z pulsoksymetru. Może to wskazywać na różnice między czujnikami, problemy z synchronizacją czasu lub jakością sygnału.",
+  "analysis.sensor_mismatch_with_difference": "Wykryto istotną rozbieżność między tętnem z urządzenia ubieralnego a pulsem z pulsoksymetru. Może to wskazywać na różnice między czujnikami, problemy z synchronizacją czasu lub jakością sygnału. Maksymalna zaobserwowana różnica wyniosła {difference} ud./min.",
+  "analysis.additional_findings": "Dodatkowe obserwacje wellness: {details}.",
+  "analysis.recommend_sensor_alignment": "Przed interpretacją trendów tętna i pulsu sprawdź zsynchronizowaną oś czasu, ułożenie sensorów oraz synchronizację czasu.",
+  "analysis.recommend_sleep_context": "Kontekst snu wskazuje na ograniczoną gotowość do regeneracji. Rozważ spokojniejszy dzień i porównaj jutrzejsze HRV oraz tętno spoczynkowe.",
+  "analysis.recommend_training_context": "Niedawne obciążenie treningowe może wpływać na odpowiedź HR i HRV. Traktuj sesję jako wsparcie regeneracji i sprawdź kolejny odczyt bazowy.",
+  "analysis.recommend_stress_context": "Zgłoszony stres lub zmęczenie są podwyższone. Priorytetem jest regeneracja; powtórz pomiar w spokojniejszych warunkach.",
+  "analysis.recommend_review_signals": "Sprawdź zsynchronizowaną oś czasu, surowe sygnały i kontekst regeneracji.",
+  "analysis.recommend_none": "Nie wskazano dodatkowego działania wellness.",
+  "analysis.hr_high_threshold": "Tętno przekroczyło skonfigurowany próg wysokiego obciążenia"
 }
 

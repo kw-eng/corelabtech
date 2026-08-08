@@ -1119,5 +1119,15 @@
 
   "analysis.context_none": "No elevated sleep, fatigue, stress or recent activity context was identified in the available check-in data.",
 
-  "analysis.context_prefix": "Check-in context:"
+  "analysis.context_prefix": "Check-in context:",
+  "analysis.sensor_mismatch": "A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse. This may indicate sensor alignment, time alignment or signal-quality issues.",
+  "analysis.sensor_mismatch_with_difference": "A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse. This may indicate sensor alignment, time alignment or signal-quality issues. The maximum observed difference was {difference} bpm.",
+  "analysis.additional_findings": "Additional wellness findings: {details}.",
+  "analysis.recommend_sensor_alignment": "Review the synchronized timeline, sensor placement and time alignment before interpreting heart-rate and pulse trends.",
+  "analysis.recommend_sleep_context": "Sleep context suggests reduced recovery readiness. Consider an easier day and compare tomorrow's HRV and resting response.",
+  "analysis.recommend_training_context": "Recent training load may influence the HR and HRV response. Treat this session as recovery support and review the next baseline reading.",
+  "analysis.recommend_stress_context": "Reported stress or fatigue is elevated. Prioritize recovery and repeat measurement under calmer conditions.",
+  "analysis.recommend_review_signals": "Review the synchronized timeline, raw signals and recovery context.",
+  "analysis.recommend_none": "No additional wellness action indicated.",
+  "analysis.hr_high_threshold": "Heart rate exceeded the configured high-load threshold"
 }

@@ -1,0 +1,138 @@
+<aside class="studio-sidebar">
+
+    <div class="studio-sidebar-brand">
+        <a
+            class="studio-sidebar-brand-link"
+            href="{{ url_for('content_studio.content_studio_page') }}"
+        >
+            <span class="studio-sidebar-brand-mark">CL</span>
+
+            <span class="studio-sidebar-brand-copy">
+                <strong>AI Content Studio</strong>
+                <small>CoreLabTech</small>
+            </span>
+        </a>
+    </div>
+
+    <nav
+        class="studio-sidebar-nav"
+        aria-label="AI Content Studio navigation"
+    >
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.content_studio_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.content_studio_page') }}"
+        >
+            <span class="studio-sidebar-icon">⌂</span>
+            <span>Dashboard</span>
+        </a>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint in [
+                    'content_studio.characters_page',
+                    'content_studio.character_details_page'
+                ] %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.characters_page') }}"
+        >
+            <span class="studio-sidebar-icon">◉</span>
+            <span>Characters</span>
+        </a>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.scenes_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.scenes_page') }}"
+        >
+            <span class="studio-sidebar-icon">▦</span>
+            <span>Scene Library</span>
+        </a>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.prompt_builder_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.prompt_builder_page') }}"
+        >
+            <span class="studio-sidebar-icon">✦</span>
+            <span>Prompt Builder</span>
+        </a>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.storyboards_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.storyboards_page') }}"
+        >
+            <span class="studio-sidebar-icon">☷</span>
+            <span>Storyboards</span>
+        </a>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.generate_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.generate_page') }}"
+        >
+            <span class="studio-sidebar-icon">▶</span>
+            <span>Generate</span>
+        </a>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.media_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.media_page') }}"
+        >
+            <span class="studio-sidebar-icon">▣</span>
+            <span>Generated Media</span>
+        </a>
+
+        <div class="studio-sidebar-divider"></div>
+
+        <a
+            class="studio-sidebar-link
+                {% if request.endpoint == 'content_studio.settings_page' %}
+                    active
+                {% endif %}
+            "
+            href="{{ url_for('content_studio.settings_page') }}"
+        >
+            <span class="studio-sidebar-icon">⚙</span>
+            <span>Settings</span>
+        </a>
+
+    </nav>
+
+    <div class="studio-sidebar-footer">
+
+        <div class="studio-sidebar-status">
+            <span class="studio-sidebar-status-dot"></span>
+
+            <div>
+                <strong>Studio ready</strong>
+                <small>Local development</small>
+            </div>
+        </div>
+
+    </div>
+
+</aside>

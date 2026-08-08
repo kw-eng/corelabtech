@@ -1,0 +1,108 @@
+{% extends "content_studio/base.html" %}
+
+{% block studio_title %}
+Generated Media
+{% endblock %}
+
+{% block studio_subtitle %}
+Browse every generated image and video.
+{% endblock %}
+
+{% block studio_content %}
+
+<div class="toolbar">
+
+    <select>
+
+        <option>All</option>
+        <option>Images</option>
+        <option>Videos</option>
+
+    </select>
+
+    <select>
+
+        <option>Athlete</option>
+        <option>Doctor</option>
+
+    </select>
+
+    <select>
+
+        <option>Newest</option>
+        <option>Oldest</option>
+
+    </select>
+
+</div>
+
+<div id="mediaGrid" class="media-grid">
+
+{% for media in media_list %}
+
+<div class="media-card">
+
+    {% if media.media_type == "image" %}
+
+        <img src="{{ media.url }}">
+
+    {% else %}
+
+        <video controls>
+
+            <source
+                src="{{ media.url }}"
+                type="{{ media.mime_type }}"
+            >
+
+        </video>
+
+    {% endif %}
+
+    <div class="media-info">
+
+        <h3>
+
+            {{ media.scene_id }}
+
+        </h3>
+
+        <p>
+
+            {{ media.character }}
+
+        </p>
+
+        <p>
+
+            {{ media.provider }}
+
+        </p>
+
+        <p>
+
+            {{ media.version }}
+
+        </p>
+
+        <button>
+
+            Download
+
+        </button>
+
+        <button>
+
+            Open
+
+        </button>
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endblock %}

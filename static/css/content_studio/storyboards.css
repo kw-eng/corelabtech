@@ -1,0 +1,169 @@
+/* ==========================================================
+   CoreLabTech AI Content Studio
+   Storyboards
+   ========================================================== */
+
+.storyboard-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.storyboard-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.storyboard-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    min-width: 0;
+
+    padding: 22px;
+
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius);
+
+    background: var(--studio-panel);
+
+    box-shadow: var(--studio-shadow);
+
+    transition:
+        transform var(--transition-normal),
+        border-color var(--transition-normal);
+}
+
+.storyboard-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--studio-border-hover);
+}
+
+.storyboard-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.storyboard-card h2 {
+    margin: 0;
+}
+
+.storyboard-card p {
+    margin: 0;
+    color: var(--studio-text-light);
+}
+
+.storyboard-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.storyboard-meta span {
+    padding: 5px 9px;
+
+    border-radius: 999px;
+
+    color: var(--studio-text-muted);
+    background: rgba(148, 163, 184, 0.08);
+
+    font-size: 0.72rem;
+}
+
+.storyboard-scenes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.storyboard-scene {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+
+    padding: 12px;
+
+    border: 1px solid var(--studio-border);
+    border-radius: 12px;
+
+    background: rgba(2, 7, 18, 0.32);
+}
+
+.storyboard-scene-index {
+    display: grid;
+    place-items: center;
+
+    width: 34px;
+    height: 34px;
+
+    border-radius: 10px;
+
+    color: var(--studio-secondary);
+    background: rgba(22, 167, 255, 0.08);
+
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.storyboard-scene-title {
+    min-width: 0;
+}
+
+.storyboard-scene-title strong,
+.storyboard-scene-title span {
+    display: block;
+}
+
+.storyboard-scene-title span {
+    margin-top: 2px;
+    color: var(--studio-text-muted);
+    font-size: 0.75rem;
+}
+
+.storyboard-duration {
+    color: var(--studio-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.storyboard-total {
+    display: flex;
+    justify-content: space-between;
+
+    padding-top: 14px;
+
+    border-top: 1px solid var(--studio-border);
+
+    color: var(--studio-text-light);
+}
+
+.storyboard-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+
+    margin-top: auto;
+}
+
+@media (max-width: 950px) {
+    .storyboard-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .storyboard-scene {
+        grid-template-columns: 36px minmax(0, 1fr);
+    }
+
+    .storyboard-duration {
+        grid-column: 2;
+    }
+}

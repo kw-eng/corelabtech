@@ -1,0 +1,1174 @@
+/* ==========================================================
+   CoreLabTech
+   AI Content Studio
+   Base Styles
+   Version: 1.0
+   ========================================================== */
+
+
+/* ==========================================================
+   1. ROOT VARIABLES
+   ========================================================== */
+
+:root {
+
+    --studio-bg: #020712;
+
+    --studio-panel: #071a2d;
+
+    --studio-panel-light: #0b2440;
+
+    --studio-border: rgba(56, 189, 248, 0.14);
+
+    --studio-border-hover: rgba(22, 167, 255, 0.45);
+
+    --studio-primary: #16a7ff;
+
+    --studio-secondary: #3cd5ff;
+
+    --studio-success: #4ade80;
+
+    --studio-warning: #fbbf24;
+
+    --studio-danger: #ef4444;
+
+    --studio-text: #f8fafc;
+
+    --studio-text-light: rgba(226,232,240,.75);
+
+    --studio-text-muted: rgba(148,163,184,.65);
+
+    --studio-radius: 18px;
+
+    --studio-radius-small: 10px;
+
+    --studio-shadow:
+
+        0 18px 50px rgba(0,0,0,.25);
+
+}
+
+
+/* ==========================================================
+   2. GLOBAL
+   ========================================================== */
+
+.studio-shell{
+
+    display:flex;
+
+    min-height:calc(100vh - 110px);
+
+    background:var(--studio-bg);
+
+    color:var(--studio-text);
+
+}
+
+
+/* ==========================================================
+   SIDEBAR
+   ========================================================== */
+
+.studio-sidebar-wrapper{
+
+    width:280px;
+
+    flex-shrink:0;
+
+}
+
+.studio-sidebar{
+
+    display:flex;
+
+    flex-direction:column;
+
+    height:100%;
+
+    background:linear-gradient(
+        180deg,
+        #071a2d,
+        #020712
+    );
+
+    border-right:1px solid var(--studio-border);
+
+}
+
+
+/* ==========================================================
+   BRAND
+   ========================================================== */
+
+.studio-sidebar-brand{
+
+    padding:28px;
+
+    border-bottom:1px solid var(--studio-border);
+
+}
+
+.studio-sidebar-brand-link{
+
+    display:flex;
+
+    gap:18px;
+
+    text-decoration:none;
+
+    color:inherit;
+
+}
+
+.studio-sidebar-brand-mark{
+
+    width:54px;
+
+    height:54px;
+
+    display:grid;
+
+    place-items:center;
+
+    border-radius:50%;
+
+    background:linear-gradient(
+        135deg,
+        var(--studio-primary),
+        var(--studio-secondary)
+    );
+
+    color:white;
+
+    font-weight:700;
+
+    font-size:20px;
+
+}
+
+.studio-sidebar-brand-copy{
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+}
+
+.studio-sidebar-brand-copy strong{
+
+    font-size:18px;
+
+}
+
+.studio-sidebar-brand-copy small{
+
+    color:var(--studio-text-muted);
+
+}
+
+
+/* ==========================================================
+   NAVIGATION
+   ========================================================== */
+
+.studio-sidebar-nav{
+
+    display:flex;
+
+    flex-direction:column;
+
+    padding:20px 12px;
+
+    gap:6px;
+
+    flex:1;
+
+}
+
+.studio-sidebar-link{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:14px;
+
+    padding:12px 16px;
+
+    border-radius:12px;
+
+    text-decoration:none;
+
+    color:var(--studio-text-light);
+
+    transition:.2s;
+
+}
+
+.studio-sidebar-link:hover{
+
+    background:rgba(22,167,255,.08);
+
+    color:white;
+
+}
+
+.studio-sidebar-link.active{
+
+    background:rgba(22,167,255,.15);
+
+    border:1px solid rgba(22,167,255,.25);
+
+    color:white;
+
+}
+
+.studio-sidebar-icon{
+
+    width:22px;
+
+    text-align:center;
+
+}
+
+.studio-sidebar-divider{
+
+    margin:14px 10px;
+
+    border-top:1px solid var(--studio-border);
+
+}
+
+
+/* ==========================================================
+   SIDEBAR FOOTER
+   ========================================================== */
+
+.studio-sidebar-footer{
+
+    padding:20px;
+
+    border-top:1px solid var(--studio-border);
+
+}
+
+.studio-sidebar-status{
+
+    display:flex;
+
+    gap:12px;
+
+    align-items:center;
+
+}
+
+.studio-sidebar-status-dot{
+
+    width:10px;
+
+    height:10px;
+
+    border-radius:50%;
+
+    background:var(--studio-success);
+
+    box-shadow:
+        0 0 12px var(--studio-success);
+
+}
+
+.studio-sidebar-status strong{
+
+    display:block;
+
+    font-size:13px;
+
+}
+
+.studio-sidebar-status small{
+
+    color:var(--studio-text-muted);
+
+}
+
+
+/* ==========================================================
+   WORKSPACE
+   ========================================================== */
+
+.studio-workspace{
+
+    display:flex;
+
+    flex-direction:column;
+
+    flex:1;
+
+}
+
+
+/* ==========================================================
+   TOPBAR
+   ========================================================== */
+
+.studio-topbar{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:20px 30px;
+
+    border-bottom:1px solid var(--studio-border);
+
+    background:rgba(7,26,45,.95);
+
+    backdrop-filter:blur(10px);
+
+}
+
+.studio-topbar-left{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:18px;
+
+}
+
+.studio-mobile-menu-button{
+
+    display:none;
+
+    border:none;
+
+    background:none;
+
+    color:white;
+
+    font-size:24px;
+
+    cursor:pointer;
+
+}
+
+.studio-topbar-label{
+
+    display:block;
+
+    font-size:12px;
+
+    color:var(--studio-text-muted);
+
+    text-transform:uppercase;
+
+    letter-spacing:.1em;
+
+}
+
+.studio-topbar-project{
+
+    font-size:20px;
+
+}
+
+.studio-topbar-user{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+}
+
+.studio-topbar-user-role{
+
+    color:var(--studio-secondary);
+
+    font-size:13px;
+
+}
+
+.studio-topbar-user-link{
+
+    color:white;
+
+    text-decoration:none;
+
+}
+
+
+/* ==========================================================
+   MAIN
+   ========================================================== */
+
+.studio-main{
+
+    display:flex;
+
+    flex-direction:column;
+
+    flex:1;
+
+    padding:28px;
+
+}
+
+.studio-content{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:24px;
+
+}
+
+
+/* ==========================================================
+   BREADCRUMBS
+   ========================================================== */
+
+.studio-breadcrumbs{
+
+    margin-bottom:18px;
+
+}
+
+.studio-breadcrumbs-list{
+
+    display:flex;
+
+    gap:10px;
+
+    list-style:none;
+
+    padding:0;
+
+    margin:0;
+
+}
+
+.studio-breadcrumbs a{
+
+    color:var(--studio-secondary);
+
+    text-decoration:none;
+
+}
+
+.studio-breadcrumb-separator{
+
+    color:var(--studio-text-muted);
+
+}
+/* ==========================================================
+   PAGE HEADER
+   ========================================================== */
+
+.studio-page-header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-start;
+
+    gap:24px;
+
+    margin-bottom:28px;
+
+}
+
+.studio-page-header-copy{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:8px;
+
+}
+
+.studio-page-eyebrow{
+
+    color:var(--studio-secondary);
+
+    text-transform:uppercase;
+
+    letter-spacing:.12em;
+
+    font-size:12px;
+
+    font-weight:700;
+
+}
+
+.studio-page-title{
+
+    margin:0;
+
+    font-size:34px;
+
+    font-weight:700;
+
+}
+
+.studio-page-subtitle{
+
+    margin:0;
+
+    color:var(--studio-text-light);
+
+    line-height:1.6;
+
+}
+
+.studio-page-header-actions{
+
+    display:flex;
+
+    gap:12px;
+
+    flex-wrap:wrap;
+
+}
+
+
+/* ==========================================================
+   BUTTONS
+   ========================================================== */
+
+.studio-action-button,
+button.primary{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:8px;
+
+    padding:12px 18px;
+
+    border-radius:12px;
+
+    border:none;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    font-weight:600;
+
+    text-decoration:none;
+
+}
+
+.studio-action-button{
+
+    background:#162235;
+
+    color:white;
+
+}
+
+.studio-action-button:hover{
+
+    background:#1d3048;
+
+}
+
+.studio-action-button.primary,
+button.primary{
+
+    background:linear-gradient(
+        135deg,
+        var(--studio-primary),
+        var(--studio-secondary)
+    );
+
+    color:white;
+
+}
+
+.studio-action-button.primary:hover,
+button.primary:hover{
+
+    transform:translateY(-2px);
+
+    box-shadow:
+        0 8px 24px rgba(22,167,255,.30);
+
+}
+
+
+/* ==========================================================
+   CARDS
+   ========================================================== */
+
+.studio-card{
+
+    background:var(--studio-panel);
+
+    border:1px solid var(--studio-border);
+
+    border-radius:var(--studio-radius);
+
+    padding:24px;
+
+    box-shadow:var(--studio-shadow);
+
+}
+
+.studio-card h2{
+
+    margin-top:0;
+
+    margin-bottom:12px;
+
+}
+
+.studio-card p{
+
+    color:var(--studio-text-light);
+
+    line-height:1.6;
+
+}
+
+
+/* ==========================================================
+   DASHBOARD GRID
+   ========================================================== */
+
+.dashboard-grid{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(auto-fill,minmax(320px,1fr));
+
+    gap:24px;
+
+}
+
+
+/* ==========================================================
+   FORMS
+   ========================================================== */
+
+label{
+
+    display:block;
+
+    margin-bottom:8px;
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+input,
+textarea,
+select{
+
+    width:100%;
+
+    padding:12px 14px;
+
+    border-radius:10px;
+
+    border:1px solid var(--studio-border);
+
+    background:#081624;
+
+    color:white;
+
+    font-size:14px;
+
+    transition:.2s;
+
+}
+
+input:focus,
+textarea:focus,
+select:focus{
+
+    outline:none;
+
+    border-color:var(--studio-primary);
+
+    box-shadow:
+        0 0 0 4px rgba(22,167,255,.12);
+
+}
+
+textarea{
+
+    resize:vertical;
+
+}
+
+
+/* ==========================================================
+   TABLES
+   ========================================================== */
+
+table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+th{
+
+    text-align:left;
+
+    color:var(--studio-secondary);
+
+    font-weight:600;
+
+    padding:12px;
+
+}
+
+td{
+
+    padding:12px;
+
+    border-top:1px solid var(--studio-border);
+
+}
+
+
+/* ==========================================================
+   TOOLBAR
+   ========================================================== */
+
+.toolbar{
+
+    display:flex;
+
+    gap:12px;
+
+    flex-wrap:wrap;
+
+    margin-bottom:24px;
+
+}
+
+
+/* ==========================================================
+   GENERATE
+   ========================================================== */
+
+.generate-layout{
+
+    display:grid;
+
+    grid-template-columns:
+        380px 1fr;
+
+    gap:24px;
+
+}
+
+.generate-left{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:20px;
+
+}
+
+.generate-right{
+
+    display:flex;
+
+}
+
+
+/* ==========================================================
+   CHARACTER GRID
+   ========================================================== */
+
+.character-grid{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(auto-fill,minmax(300px,1fr));
+
+    gap:24px;
+
+}
+
+
+/* ==========================================================
+   SCENE GRID
+   ========================================================== */
+
+.scene-grid{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(auto-fill,minmax(300px,1fr));
+
+    gap:24px;
+
+}
+
+
+/* ==========================================================
+   MEDIA GRID
+   ========================================================== */
+
+.media-grid{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(auto-fill,minmax(340px,1fr));
+
+    gap:24px;
+
+}
+
+
+/* ==========================================================
+   MEDIA CARD
+   ========================================================== */
+
+.media-card{
+
+    overflow:hidden;
+
+    border-radius:18px;
+
+    border:1px solid var(--studio-border);
+
+    background:var(--studio-panel);
+
+}
+
+.media-card img,
+.media-card video{
+
+    width:100%;
+
+    display:block;
+
+}
+
+.media-info{
+
+    padding:18px;
+
+}
+
+
+/* ==========================================================
+   STATUS BADGES
+   ========================================================== */
+
+.badge{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    padding:4px 10px;
+
+    border-radius:999px;
+
+    font-size:12px;
+
+    font-weight:700;
+
+}
+
+.badge.success{
+
+    background:rgba(74,222,128,.16);
+
+    color:#4ade80;
+
+}
+
+.badge.warning{
+
+    background:rgba(251,191,36,.15);
+
+    color:#fbbf24;
+
+}
+
+.badge.error{
+
+    background:rgba(239,68,68,.15);
+
+    color:#ef4444;
+
+}
+
+
+/* ==========================================================
+   EMPTY STATE
+   ========================================================== */
+
+.empty-state{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:18px;
+
+    padding:80px 20px;
+
+    text-align:center;
+
+}
+
+.empty-state h2{
+
+    margin:0;
+
+}
+
+.empty-state p{
+
+    color:var(--studio-text-light);
+
+}
+
+
+/* ==========================================================
+   MODAL
+   ========================================================== */
+
+.studio-modal{
+
+    position:fixed;
+
+    inset:0;
+
+    display:none;
+
+    align-items:center;
+
+    justify-content:center;
+
+    background:rgba(0,0,0,.60);
+
+    z-index:9999;
+
+}
+
+.studio-modal.is-visible{
+
+    display:flex;
+
+}
+
+.studio-modal-content{
+
+    width:min(900px,92vw);
+
+    background:var(--studio-panel);
+
+    border-radius:20px;
+
+    padding:30px;
+
+}
+
+
+/* ==========================================================
+   PAGINATION
+   ========================================================== */
+
+.pagination{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:10px;
+
+    margin-top:30px;
+
+}
+
+.pagination a{
+
+    padding:10px 16px;
+
+    border-radius:10px;
+
+    background:#0d1f33;
+
+    color:white;
+
+    text-decoration:none;
+
+}
+
+.pagination a.active{
+
+    background:var(--studio-primary);
+
+}
+
+
+/* ==========================================================
+   UTILITIES
+   ========================================================== */
+
+.mt-0{margin-top:0!important;}
+.mt-1{margin-top:8px!important;}
+.mt-2{margin-top:16px!important;}
+.mt-3{margin-top:24px!important;}
+
+.mb-0{margin-bottom:0!important;}
+.mb-1{margin-bottom:8px!important;}
+.mb-2{margin-bottom:16px!important;}
+.mb-3{margin-bottom:24px!important;}
+
+.text-center{text-align:center;}
+.text-right{text-align:right;}
+
+.hidden{
+    display:none!important;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width:1100px){
+
+    .generate-layout{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
+
+
+@media (max-width:900px){
+
+    .studio-sidebar-wrapper{
+
+        position:fixed;
+
+        inset:0 auto 0 0;
+
+        z-index:999;
+
+        transform:translateX(-100%);
+
+        transition:.25s;
+
+    }
+
+    .studio-sidebar-wrapper.is-open{
+
+        transform:translateX(0);
+
+    }
+
+    .studio-mobile-menu-button{
+
+        display:block;
+
+    }
+
+    .studio-main{
+
+        padding:20px;
+
+    }
+
+}
+
+
+@media (max-width:700px){
+
+    .studio-page-header{
+
+        flex-direction:column;
+
+    }
+
+    .dashboard-grid{
+
+        grid-template-columns:1fr;
+
+    }
+
+    .character-grid{
+
+        grid-template-columns:1fr;
+
+    }
+
+    .scene-grid{
+
+        grid-template-columns:1fr;
+
+    }
+
+    .media-grid{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
+
+
+/* ==========================================================
+   SCROLLBAR
+   ========================================================== */
+
+::-webkit-scrollbar{
+
+    width:10px;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:#16324d;
+
+    border-radius:20px;
+
+}
+
+::-webkit-scrollbar-thumb:hover{
+
+    background:var(--studio-primary);
+
+}

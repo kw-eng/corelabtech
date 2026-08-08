@@ -1,0 +1,91 @@
+/* ==========================================================
+   Tables
+   ========================================================== */
+
+.studio-table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+.studio-table th{
+
+    text-align:left;
+
+    padding:16px;
+
+    color:var(--studio-secondary);
+
+    border-bottom:1px solid var(--studio-border);
+
+    font-weight:600;
+
+}
+
+.studio-table td{
+
+    padding:16px;
+
+    border-bottom:1px solid rgba(255,255,255,.05);
+
+}
+
+.studio-table tbody tr{
+
+    transition:.18s;
+
+}
+
+.studio-table tbody tr:hover{
+
+    background:rgba(22,167,255,.05);
+
+}
+
+.table-actions{
+
+    display:flex;
+
+    gap:8px;
+
+}
+
+.pagination{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:10px;
+
+    margin-top:30px;
+
+}
+
+.pagination a{
+
+    display:grid;
+
+    place-items:center;
+
+    width:42px;
+
+    height:42px;
+
+    border-radius:12px;
+
+    background:var(--studio-panel);
+
+    color:white;
+
+    text-decoration:none;
+
+}
+
+.pagination a.active{
+
+    background:var(--studio-primary);
+
+}
