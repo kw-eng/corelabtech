@@ -28,3 +28,24 @@ class SeriesReportLocalizationTests(unittest.TestCase):
             self.assertIn(key, pl)
             self.assertIn(key, en)
         self.assertEqual(pl["report.table_recovery"], "REGENERACJA")
+
+    def test_polish_catalog_translates_manual_validation_values(self):
+        pl = json.loads(Path("translations/pl.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            pl["report.warning_sensor_alignment_warning"],
+            "Ostrzeżenie dotyczące zgodności sensorów",
+        )
+        self.assertEqual(pl["report.status_as_planned"], "Ukończona zgodnie z planem")
+        self.assertEqual(pl["report.phase_compression"], "Kompresja")
+        self.assertEqual(pl["report.confidence_medium"], "Średnia")
+
+    def test_report_builder_uses_localized_deterministic_text_not_stored_narration(self):
+        source = Path("services/session_service.py").read_text(encoding="utf-8")
+        self.assertIn("localized_session_interpretation(", source)
+        self.assertIn("localized_operator_review(", source)
+        self.assertIn("localized_warning_names(catalog, warnings)", source)
+        self.assertNotIn('escape_text(analysis.get("summary"))', source)
+
+    def test_dashboard_forwards_active_locale_to_both_report_downloads(self):
+        source = Path("templates/research_dashboard.html").read_text(encoding="utf-8")
+        self.assertEqual(source.count("window.CORELABTECH_LOCALE"), 2)

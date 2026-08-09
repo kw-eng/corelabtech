@@ -747,7 +747,7 @@ def localized_series_findings(
     if warnings:
         findings.append(report_text(
             catalog, "report.finding_quality_warning",
-            warnings=", ".join(str(key).replace("_", " ") for key in warnings),
+            warnings=localized_warning_names(catalog, warnings),
         ))
     if series_data.get("records", 0) < 10:
         findings.append(report_text(catalog, "report.finding_more_sessions"))
@@ -810,6 +810,57 @@ def localized_warning_list(catalog: dict[str, str], values: Any) -> str:
         report_text(catalog, f"report.warning_{str(value)}")
         for value in values
     )
+
+
+def localized_warning_names(catalog: dict[str, str], warnings: dict[str, Any]) -> str:
+    """List translated warning names without exposing persistence codes."""
+
+    return ", ".join(
+        report_text(catalog, f"report.warning_{str(code)}")
+        for code in warnings
+    )
+
+
+def localized_session_interpretation(
+    catalog: dict[str, str], analysis: dict[str, Any], analysis_result: dict[str, Any]
+) -> str:
+    """Use locale-neutral stored facts rather than persisted narration text."""
+
+    return report_text(
+        catalog,
+        "report.session_interpretation_text",
+        score=format_score(analysis.get("overall_score")),
+        quality=format_score(analysis.get("data_quality_score")),
+        status=report_text(
+            catalog,
+            f"report.wellness_status_{analysis_result.get('wellness_status') or 'unknown'}",
+        ),
+    )
+
+
+def localized_operator_review(
+    catalog: dict[str, str], quality_warnings: Any
+) -> str:
+    if quality_warnings:
+        return report_text(
+            catalog,
+            "report.operator_review_warnings",
+            warnings=localized_warning_list(catalog, quality_warnings),
+        )
+    return report_text(catalog, "report.operator_review_clear")
+
+
+def localized_phase(catalog: dict[str, str], value: Any) -> str:
+    phase = str(value or "").strip().lower()
+    return report_text(catalog, f"report.phase_{phase}")
+
+
+def localized_report_enum(catalog: dict[str, str], prefix: str, value: Any) -> str:
+    if value in (None, ""):
+        return "-"
+    key = f"{prefix}_{str(value).strip().lower()}"
+    translated = report_text(catalog, key)
+    return translated if translated != key else str(value)
 
 
 def localized_report_status(catalog: dict[str, str], value: Any) -> str:
@@ -1316,7 +1367,9 @@ def build_pdf_report(
                         ),
                         Spacer(1, 2),
                         Paragraph(
-                            escape_text(analysis.get("summary")),
+                            escape_text(localized_session_interpretation(
+                                catalog, analysis, analysis_result
+                            )),
                             styles["BodyText"],
                         ),
                     ]
@@ -1329,7 +1382,9 @@ def build_pdf_report(
                         ),
                         Spacer(1, 2),
                         Paragraph(
-                            escape_text(analysis.get("recommendations")),
+                            escape_text(localized_operator_review(
+                                catalog, quality_warnings
+                            )),
                             styles["BodyText"],
                         ),
                     ]
@@ -1421,7 +1476,7 @@ def build_pdf_report(
                             [
                                 (report_text(catalog, "report.research_fact_sheet"), research_summary.get("fact_sheet_version")),
                                 (report_text(catalog, "report.research_narration"), research_narration.get("narration_version")),
-                                (report_text(catalog, "report.research_narration_source"), research_narration.get("source")),
+                                (report_text(catalog, "report.research_narration_source"), localized_report_enum(catalog, "report.narration_source", research_narration.get("source"))),
                                 (report_text(catalog, "report.research_analysis_model"), research_facts["analysis"].get("model_version")),
                                 (report_text(catalog, "report.research_hrv_algorithm"), research_facts["measurements"].get("hrv_algorithm_version")),
                                 (report_text(catalog, "report.research_hrv_window"), format_measurement(research_facts["measurements"].get("hrv_window_seconds"), " s", 0)),
@@ -1468,10 +1523,10 @@ def build_pdf_report(
                         [
                             (
                                 f"{segment.get('sequence_no')}. "
-                                f"{str(segment.get('phase') or '').replace('_', ' ').title()}",
+                                f"{localized_phase(catalog, segment.get('phase'))}",
                                 (
                                     f"{format_measurement(segment.get('actual_duration_min'), ' min', 0)}"
-                                    f" at {format_measurement(segment.get('actual_ata'), ' ATA', 2)}"
+                                    f" {report_text(catalog, 'report.label_at')} {format_measurement(segment.get('actual_ata'), ' ATA', 2)}"
                                     + (
                                         f" - {segment.get('note')}"
                                         if segment.get("note")

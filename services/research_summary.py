@@ -91,8 +91,8 @@ def build_research_summary(
             rmssd=measurements.get("rmssd") or unavailable),
         "interpretation": _text(locale, "report.research_content_interpretation"),
         "limitations": _text(locale, "report.research_content_limitations",
-            confidence=facts["analysis"].get("analysis_confidence") or unavailable,
-            signal_quality=limitations.get("signal_quality") or unavailable,
+            confidence=_enum(locale, "report.confidence", facts["analysis"].get("analysis_confidence"), unavailable),
+            signal_quality=_enum(locale, "report.confidence", limitations.get("signal_quality"), unavailable),
             warnings=len(limitations.get("quality_warnings") or [])),
         "future_data_required": _text(locale, "report.research_content_future_data"),
     }
@@ -113,6 +113,14 @@ def _text(locale: str | None, key: str, **params: Any) -> str:
     # always pass their explicit report locale.
     text = catalog_for(normalize_locale(locale or "pl")).get(key, key)
     return text.format(**params) if params else text
+
+
+def _enum(locale: str | None, prefix: str, value: Any, fallback: str) -> str:
+    if value in (None, ""):
+        return fallback
+    key = f"{prefix}_{str(value).strip().lower()}"
+    translated = _text(locale, key)
+    return translated if translated != key else str(value)
 
 
 def narrate_research_fact_sheet(

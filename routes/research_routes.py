@@ -104,6 +104,7 @@ from services.series_service import get_user_series_trends
 from services.trend_narration import build_trend_ai_view
 from services.research_summary import build_research_summary
 from services.traceability_service import get_session_traceability
+from services.i18n_service import current_locale
 from services.research_dashboard_projection import (
     DASHBOARD_VIEW,
     build_research_dashboard_projection,
@@ -2932,6 +2933,7 @@ def series_report(user_id: str):
             requesting_organization_id=current_user.organization_id,
             protocol_id=parse_optional_int(request.args.get("protocol_id")),
             trend_limit=trend_limit,
+            locale=request.args.get("lang") or current_locale(),
         )
 
         write_audit_event(
@@ -2982,6 +2984,7 @@ def report(session_id: str):
             requesting_user_id=get_current_user_id(),
             requesting_role=current_user.role,
             requesting_organization_id=current_user.organization_id,
+            locale=request.args.get("lang") or current_locale(),
         )
 
         write_audit_event(
