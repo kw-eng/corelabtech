@@ -1043,7 +1043,7 @@
   "report.no_analysis": "Analiza wellness nie jest jeszcze dostępna dla tej sesji.",
   "report.no_analyzed_sessions": "Brak przeanalizowanych sesji",
   "report.operator_review": "Ocena operatora",
-  "report.personal_baseline": "Baseline klienta",
+  "report.personal_baseline": "Poziom bazowy klienta",
   "report.platform": "Platforma wellness, fizjologii i badań",
   "report.review_ok": "OK",
   "report.review_required": "Do oceny",
@@ -1057,12 +1057,12 @@
   "report.session_overview": "Podsumowanie sesji",
   "report.session_status": "Status sesji",
   "report.session_timeline": "Przebieg sesji",
-  "report.table_check_in": "CHECK-IN",
+  "report.table_check_in": "PRZED SESJĄ",
   "report.table_date": "DATA",
   "report.table_metric": "METRYKA",
   "report.table_pulse": "PULS",
   "report.table_quality": "JAKOŚĆ",
-  "report.table_recovery": "RECOVERY",
+  "report.table_recovery": "REGENERACJA",
   "report.table_review": "OCENA",
   "report.table_score": "WYNIK",
   "report.table_session": "SESJA",
@@ -1166,7 +1166,7 @@
   "report.comparison_first_last": "Pierwsze {count} dostępne sesje vs ostatnie {count} dostępne sesje",
   "report.quality_confidence": "Jakość danych określa pewność pomiarów i obliczeń; nie jest oceną zdrowia.",
   "report.finding_evidence": "Dostępnych jest {count} przeanalizowanych sesji; dowody podłużne są na poziomie: {evidence}.",
-  "report.finding_stable": "HR, HRV i SpO2 są stabilne w dostępnych sesjach; nie ustalono wyraźnej poprawy ani pogorszenia.",
+  "report.finding_stable": "Dostępny wynik wellness jest stabilny w sesjach; nie ustalono wyraźnej poprawy ani pogorszenia. Porównanie zmierzonych HR, HRV i SpO2 należy oceniać razem z jakością danych.",
   "report.finding_change": "W dostępnych pomiarach widoczna jest zmiana kierunkowa, ale należy interpretować ją z uwzględnieniem poziomu dowodów i jakości danych.",
   "report.finding_quality_warning": "Ostrzeżenia dotyczące jakości danych ograniczają pewność: {warnings}. Przed mocniejszymi wnioskami sprawdź zgodność sensorów i synchronizację.",
   "report.finding_more_sessions": "Potrzebne są dodatkowe sesje przed sformułowaniem silniejszego wniosku podłużnego."
@@ -1175,5 +1175,72 @@
   ,"report.warning_low_coverage": "Niskie pokrycie sensorów"
   ,"report.warning_sync_quality_warning": "Ostrzeżenie jakości synchronizacji"
   ,"report.warning_spo2_range_warning": "Ostrzeżenie zakresu SpO2"
+  ,"report.label_date": "Data"
+  ,"report.label_program": "Program"
+  ,"report.label_location": "Lokalizacja"
+  ,"report.label_pressure": "Ciśnienie"
+  ,"report.label_duration": "Czas trwania"
+  ,"report.label_target": "cel"
+  ,"report.label_data_quality_score": "Wynik jakości danych"
+  ,"report.label_coverage": "Pokrycie"
+  ,"report.label_sync_quality": "Jakość synchronizacji"
+  ,"report.label_hr_pulse_alignment": "Zgodność HR / pulsu"
+  ,"report.label_spo2_range": "Zakres SpO2"
+  ,"report.label_quality_notes": "Uwagi dotyczące jakości"
+  ,"report.label_check_in_recovery": "Check-in i regeneracja"
+  ,"report.label_check_in_context": "Kontekst check-in"
+  ,"report.label_recovery_context": "Kontekst regeneracji"
+  ,"report.label_oxygen_flow": "Przepływ tlenu"
+  ,"report.label_estimated_mask_oxygen": "Szacowany tlen w masce"
+  ,"report.label_chamber_temperature": "Temperatura komory"
+  ,"report.label_pressure_deviation": "Odchylenie ciśnienia"
+  ,"report.label_hr_hrv_samples": "Próbki HR / HRV"
+  ,"report.label_spo2_pulse_samples": "Próbki SpO2 / pulsu"
+  ,"report.label_synchronized_samples": "Zsynchronizowane próbki"
+  ,"report.label_baseline_status": "Status baseline"
+  ,"report.label_sessions_last_30_days": "Sesje z ostatnich 30 dni"
+  ,"report.label_rmssd_7_days": "RMSSD - 7 dni"
+  ,"report.label_spo2_average": "Średnie SpO2"
+  ,"report.label_spo2_minimum": "Minimalne SpO2"
+  ,"report.label_baseline_data_quality": "Bazowa jakość danych"
+  ,"report.label_timeline": "Przebieg"
+  ,"report.label_no_segment_data": "Brak danych o segmentach"
+  ,"report.label_session_number": "Sesja {number}"
+  ,"report.status_active": "Aktywna"
+  ,"report.status_as_planned": "Ukończona zgodnie z planem"
+  ,"report.status_baseline": "Budowanie baseline"
+  ,"report.status_completed": "Ukończona"
+  ,"report.status_modified": "Ukończona ze zmianami"
+  ,"report.status_paused": "Wstrzymana"
+  ,"report.status_cancelled": "Anulowana"
+  ,"report.quality_alignment_review": "Zalecana ocena operatora"
+  ,"report.quality_no_alignment_warning": "Brak ostrzeżenia zgodności"
+  ,"report.quality_no_range_warning": "Brak ostrzeżenia zakresu"
+  ,"report.research_ai": "AI badań"
+  ,"report.research_methods_versions": "Metody i wersje"
+  ,"report.research_fact_sheet": "Arkusz faktów"
+  ,"report.research_narration": "Narracja badawcza"
+  ,"report.research_narration_source": "Źródło narracji"
+  ,"report.research_analysis_model": "Model analizy"
+  ,"report.research_hrv_algorithm": "Algorytm HRV"
+  ,"report.research_hrv_window": "Okno HRV"
+  ,"report.research_abstract": "Streszczenie"
+  ,"report.research_methods": "Metody"
+  ,"report.research_observations": "Obserwacje"
+  ,"report.research_interpretation": "Interpretacja"
+  ,"report.research_limitations": "Ograniczenia"
+  ,"report.research_future_data": "Wymagane dalsze dane"
+  ,"report.research_content_disclaimer": "Podsumowanie badawcze opisuje dane obserwacyjne jednej sesji wellness i nie stanowi diagnozy medycznej."
+  ,"report.research_content_unavailable": "Brak danych"
+  ,"report.research_content_abstract": "Opis obserwacyjny pojedynczej sesji wellness oparty na zsynchronizowanych danych i wersjonowanym modelu analizy."
+  ,"report.research_content_methods": "Model: {model}; zsynchronizowane próbki: {synchronized}/{total}; protokół: {protocol}; HRV: {hrv}."
+  ,"report.research_content_observations": "Średnie/minimalne SpO2: {avg_spo2}/{min_spo2}; referencyjne HR: {heart_rate}; RMSSD: {rmssd}."
+  ,"report.research_content_interpretation": "Wyniki opisują wyłącznie zaobserwowane pomiary i ich jakość danych w kontekście tej sesji."
+  ,"report.research_content_limitations": "Pewność analizy: {confidence}; jakość sygnału: {signal_quality}; ostrzeżenia jakości danych: {warnings}."
+  ,"report.research_content_future_data": "Dodatkowe sesje o porównywalnym protokole i jakości danych są potrzebne do wniosków podłużnych."
+  ,"report.executive_summary": "Podsumowanie wykonawcze"
+  ,"report.executive_summary_text": "Dostępnych jest {sessions} sesji, z czego przeanalizowano {analyzed}. Poziom dowodów: {evidence}; zaobserwowany kierunek wyniku wellness: {trend}. Średnia jakość danych wynosi {quality}. {limitation}"
+  ,"report.executive_summary_warning": "{count} ostrzeżenie(a) jakości danych ogranicza pewność interpretacji."
+  ,"report.executive_summary_no_warning": "Nie stwierdzono powtarzających się ostrzeżeń jakości danych."
 }
 

@@ -754,12 +754,82 @@ def localized_series_findings(
     return findings[:5]
 
 
+def localized_series_executive_summary(
+    catalog: dict[str, str], series_data: dict[str, Any], warnings: dict[str, Any]
+) -> str:
+    """Summarize evidence and data confidence without medical interpretation."""
+
+    evidence = report_text(
+        catalog, f"report.evidence_{series_data.get('evidence_level') or 'insufficient'}"
+    )
+    trend = report_text(
+        catalog, f"report.trend_{series_data.get('trend_direction') or 'insufficient'}"
+    )
+    limitation = (
+        report_text(catalog, "report.executive_summary_warning", count=sum(warnings.values()))
+        if warnings
+        else report_text(catalog, "report.executive_summary_no_warning")
+    )
+    return report_text(
+        catalog,
+        "report.executive_summary_text",
+        sessions=series_data.get("session_count", 0),
+        analyzed=series_data.get("records", 0),
+        evidence=evidence,
+        trend=trend,
+        quality=format_score(series_data.get("avg_data_quality")),
+        limitation=limitation,
+    )
+
+
 def localized_warning_summary(catalog: dict[str, str], warnings: dict[str, Any]) -> str:
     if not warnings:
         return report_text(catalog, "report.warning_none")
     return ", ".join(
         f"{report_text(catalog, f'report.warning_{key}', code=str(key).replace('_', ' '))}: {value}"
         for key, value in warnings.items()
+    )
+
+
+def localized_report_status(catalog: dict[str, str], value: Any) -> str:
+    """Render persisted execution state without leaking English enum labels."""
+
+    if value in (None, ""):
+        return "-"
+    key = str(value).strip().lower()
+    aliases = {"collecting": "baseline"}
+    return report_text(catalog, f"report.status_{aliases.get(key, key)}")
+
+
+def localized_warning_list(catalog: dict[str, str], values: Any) -> str:
+    if not values:
+        return report_text(catalog, "report.warning_none")
+    if not isinstance(values, (list, tuple, set)):
+        values = [values]
+    return "; ".join(
+        report_text(catalog, f"report.warning_{str(value)}")
+        for value in values
+    )
+
+
+def localized_report_status(catalog: dict[str, str], value: Any) -> str:
+    """Render persisted execution state without leaking English enum labels."""
+
+    if value in (None, ""):
+        return "-"
+    key = str(value).strip().lower()
+    aliases = {"collecting": "baseline"}
+    return report_text(catalog, f"report.status_{aliases.get(key, key)}")
+
+
+def localized_warning_list(catalog: dict[str, str], values: Any) -> str:
+    if not values:
+        return report_text(catalog, "report.warning_none")
+    if not isinstance(values, (list, tuple, set)):
+        values = [values]
+    return "; ".join(
+        report_text(catalog, f"report.warning_{str(value)}")
+        for value in values
     )
 
 
@@ -1127,14 +1197,14 @@ def build_pdf_report(
         "model_name": analysis_result.get("model_name") or analysis.get("model_name"),
         "model_version": analysis_result.get("model_version") or analysis.get("model_version"),
     }
-    research_summary = build_research_summary(research_input) if analysis else None
+    research_summary = build_research_summary(research_input, locale=locale) if analysis else None
     client_session_number = session_config.get("client_session_number") or "-"
-    program_name = session_config.get("program_name") or "Single session"
+    program_name = session_config.get("program_name") or report_text(catalog, "report.comparison_single")
     program_progress = (
         f"{session_config.get('program_completed_sessions')} of "
         f"{session_config.get('program_total_sessions')}"
         if session_config.get("program_name")
-        else "Not enrolled"
+        else "-"
     )
     synchronized_samples = int(report_data.get("merged_samples") or 0)
     source_samples = max(
@@ -1185,16 +1255,16 @@ def build_pdf_report(
                 ),
                 make_table(
                     [
-                        ("Client", subject.get("user_id")),
+                        (report_text(catalog, "report.label_client"), subject.get("user_id")),
                         (
                             report_text(catalog, "report.client_session"),
-                            f"Session {client_session_number}",
+                            report_text(catalog, "report.label_session_number", number=client_session_number),
                         ),
-                        ("Date", format_report_datetime(session.get("created_at"))),
-                        ("Program", f"{program_name} - {program_progress}"),
-                        ("Protocol", session.get("protocol_name")),
+                        (report_text(catalog, "report.label_date"), format_report_datetime(session.get("created_at"), catalog=catalog)),
+                        (report_text(catalog, "report.label_program"), f"{program_name} - {program_progress}"),
+                        (report_text(catalog, "report.label_protocol"), session.get("protocol_name")),
                         (
-                            "Location",
+                            report_text(catalog, "report.label_location"),
                             " / ".join(
                                 value
                                 for value in (
@@ -1205,14 +1275,14 @@ def build_pdf_report(
                             ),
                         ),
                         (
-                            "Pressure",
+                            report_text(catalog, "report.label_pressure"),
                             (
                                 f"{format_measurement(session.get('actual_ata'), ' ATA', 2)} "
-                                f"(target {format_measurement(session.get('target_ata'), ' ATA', 2)})"
+                                f"({report_text(catalog, 'report.label_target')} {format_measurement(session.get('target_ata'), ' ATA', 2)})"
                             ),
                         ),
                         (
-                            "Duration",
+                            report_text(catalog, "report.label_duration"),
                             format_measurement(
                                 session.get("total_duration_min"),
                                 " min",
@@ -1221,7 +1291,7 @@ def build_pdf_report(
                         ),
                         (
                             report_text(catalog, "report.session_status"),
-                            format_report_status(
+                            localized_report_status(catalog,
                                 session.get("execution_status")
                                 or session.get("status")
                             ),
@@ -1290,39 +1360,39 @@ def build_pdf_report(
                 make_table(
                     [
                         (
-                            "Data quality score",
+                            report_text(catalog, "report.label_data_quality_score"),
                             format_score(analysis.get("data_quality_score")),
                         ),
                         (
-                            "Coverage",
+                            report_text(catalog, "report.label_coverage"),
                             format_percent(features.get("coverage_percent")),
                         ),
                         (
-                            "Synchronization quality",
+                            report_text(catalog, "report.label_sync_quality"),
                             format_percent(features.get("match_rate")),
                         ),
-                        ("Missing samples", missing_samples),
+                        (report_text(catalog, "report.label_missing_samples"), missing_samples),
                         (
-                            "HR / pulse alignment",
+                            report_text(catalog, "report.label_hr_pulse_alignment"),
                             (
-                                "Operator review recommended"
+                                report_text(catalog, "report.quality_alignment_review")
                                 if wellness_flags.get(
                                     "sensor_alignment_warning"
                                 )
-                                else "No alignment warning"
+                                else report_text(catalog, "report.quality_no_alignment_warning")
                             ),
                         ),
                         (
-                            "SpO2 range",
+                            report_text(catalog, "report.label_spo2_range"),
                             (
-                                "Operator review recommended"
+                                report_text(catalog, "report.quality_alignment_review")
                                 if wellness_flags.get("oxygenation_drop")
-                                else "No range warning"
+                                else report_text(catalog, "report.quality_no_range_warning")
                             ),
                         ),
                         (
-                            "Quality notes",
-                            format_warning_list(quality_warnings),
+                            report_text(catalog, "report.label_quality_notes"),
+                            localized_warning_list(catalog, quality_warnings),
                         ),
                     ]
                 ),
@@ -1342,19 +1412,19 @@ def build_pdf_report(
         story.extend(
             [
                 PageBreak(),
-                make_page_header("Research AI", styles),
+                make_page_header(report_text(catalog, "report.research_ai"), styles),
                 Spacer(1, 6),
                 KeepTogether(
                     [
-                        Paragraph("Methods and versions", styles["ReportSection"]),
+                        Paragraph(report_text(catalog, "report.research_methods_versions"), styles["ReportSection"]),
                         make_table(
                             [
-                                ("Fact sheet", research_summary.get("fact_sheet_version")),
-                                ("Research narration", research_narration.get("narration_version")),
-                                ("Narration source", research_narration.get("source")),
-                                ("Analysis model", research_facts["analysis"].get("model_version")),
-                                ("HRV algorithm", research_facts["measurements"].get("hrv_algorithm_version")),
-                                ("HRV window", format_measurement(research_facts["measurements"].get("hrv_window_seconds"), " s", 0)),
+                                (report_text(catalog, "report.research_fact_sheet"), research_summary.get("fact_sheet_version")),
+                                (report_text(catalog, "report.research_narration"), research_narration.get("narration_version")),
+                                (report_text(catalog, "report.research_narration_source"), research_narration.get("source")),
+                                (report_text(catalog, "report.research_analysis_model"), research_facts["analysis"].get("model_version")),
+                                (report_text(catalog, "report.research_hrv_algorithm"), research_facts["measurements"].get("hrv_algorithm_version")),
+                                (report_text(catalog, "report.research_hrv_window"), format_measurement(research_facts["measurements"].get("hrv_window_seconds"), " s", 0)),
                             ]
                         ),
                     ]
@@ -1367,12 +1437,12 @@ def build_pdf_report(
                         ]
                     )
                     for key, title in (
-                        ("abstract", "Abstract"),
-                        ("methods", "Methods"),
-                        ("observations", "Observations"),
-                        ("interpretation", "Interpretation"),
-                        ("limitations", "Limitations"),
-                        ("future_data_required", "Future data required"),
+                        ("abstract", report_text(catalog, "report.research_abstract")),
+                        ("methods", report_text(catalog, "report.research_methods")),
+                        ("observations", report_text(catalog, "report.research_observations")),
+                        ("interpretation", report_text(catalog, "report.research_interpretation")),
+                        ("limitations", report_text(catalog, "report.research_limitations")),
+                        ("future_data_required", report_text(catalog, "report.research_future_data")),
                     )
                 ],
                 Spacer(1, 5),
@@ -1411,14 +1481,17 @@ def build_pdf_report(
                             )
                             for segment in session.get("segments") or []
                         ]
-                        or [("Timeline", "No segment data available")]
+                        or [(
+                            report_text(catalog, "report.label_timeline"),
+                            report_text(catalog, "report.label_no_segment_data"),
+                        )]
                     ),
                 ]
             ),
             KeepTogether(
                 [
                     Paragraph(
-                        "Check-in and Recovery",
+                        report_text(catalog, "report.label_check_in_recovery"),
                         styles["ReportSection"],
                     ),
                     make_comparison_table(
@@ -1490,11 +1563,12 @@ def build_pdf_report(
                                     1,
                                 ),
                             ),
-                        ]
+                        ],
+                        catalog=catalog,
                     ),
                     Spacer(1, 5),
                     Paragraph(
-                        "<b>Check-in context:</b> "
+                        "<b>" + escape_text(report_text(catalog, "report.label_check_in_context")) + ":</b> "
                         + escape_text(
                             format_context(
                                 phase_metric(
@@ -1506,7 +1580,7 @@ def build_pdf_report(
                         styles["NoticeText"],
                     ),
                     Paragraph(
-                        "<b>Recovery context:</b> "
+                        "<b>" + escape_text(report_text(catalog, "report.label_recovery_context")) + ":</b> "
                         + escape_text(
                             format_context(
                                 phase_metric(
@@ -1528,7 +1602,7 @@ def build_pdf_report(
                     make_table(
                         [
                             (
-                                "Oxygen flow",
+                                report_text(catalog, "report.label_oxygen_flow"),
                                 format_measurement(
                                     phase_metric(
                                         session.get("during"),
@@ -1539,7 +1613,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "Estimated mask O2",
+                                report_text(catalog, "report.label_estimated_mask_oxygen"),
                                 format_measurement(
                                     phase_metric(
                                         session.get("during"),
@@ -1551,7 +1625,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "Chamber temperature",
+                                report_text(catalog, "report.label_chamber_temperature"),
                                 format_measurement(
                                     phase_metric(
                                         session.get("during"),
@@ -1563,7 +1637,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "Pressure deviation",
+                                report_text(catalog, "report.label_pressure_deviation"),
                                 format_measurement(
                                     session.get("pressure_deviation"),
                                     " ATA",
@@ -1583,15 +1657,15 @@ def build_pdf_report(
                     make_table(
                         [
                             (
-                                "HR / HRV samples",
+                                report_text(catalog, "report.label_hr_hrv_samples"),
                                 report_data.get("fit_samples"),
                             ),
                             (
-                                "SpO2 / pulse samples",
+                                report_text(catalog, "report.label_spo2_pulse_samples"),
                                 report_data.get("csv_samples"),
                             ),
                             (
-                                "Synchronized samples",
+                                report_text(catalog, "report.label_synchronized_samples"),
                                 report_data.get("merged_samples"),
                             ),
                         ]
@@ -1607,19 +1681,19 @@ def build_pdf_report(
                     make_table(
                         [
                             (
-                                "Baseline status",
-                                format_report_status(
+                                report_text(catalog, "report.label_baseline_status"),
+                                localized_report_status(catalog,
                                     wellness_history.get(
                                         "baseline_confidence"
                                     )
                                 ),
                             ),
                             (
-                                "Sessions in last 30 days",
+                                report_text(catalog, "report.label_sessions_last_30_days"),
                                 wellness_history.get("unique_sessions_30d"),
                             ),
                             (
-                                "RMSSD - 7 days",
+                                report_text(catalog, "report.label_rmssd_7_days"),
                                 format_measurement(
                                     baseline.get("rmssd_7d"),
                                     " ms",
@@ -1627,7 +1701,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "SpO2 average",
+                                report_text(catalog, "report.label_spo2_average"),
                                 format_measurement(
                                     baseline.get("spo2_avg"),
                                     "%",
@@ -1635,7 +1709,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "SpO2 minimum",
+                                report_text(catalog, "report.label_spo2_minimum"),
                                 format_measurement(
                                     baseline.get("spo2_min"),
                                     "%",
@@ -1643,7 +1717,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "Baseline data quality",
+                                report_text(catalog, "report.label_baseline_data_quality"),
                                 format_score(
                                     baseline.get("data_quality_score")
                                 ),
@@ -1887,6 +1961,15 @@ def build_series_pdf_report(
         ),
         KeepTogether(
             [
+                Paragraph(report_text(catalog, "report.executive_summary"), styles["ReportSection"]),
+                Paragraph(
+                    escape_text(localized_series_executive_summary(catalog, series_data, warnings)),
+                    styles["BodyText"],
+                ),
+            ]
+        ),
+        KeepTogether(
+            [
                 Paragraph(report_text(catalog, "report.key_findings"), styles["ReportSection"]),
                 *[
                     Paragraph("• " + escape_text(finding), styles["BodyText"])
@@ -2049,9 +2132,9 @@ def make_report_header(
                     styles["BrandSubtitle"],
                 ),
                 Paragraph(
-                    f"Session {escape_text(session_number)}"
-                    f" &nbsp; | &nbsp; "
-                    f"{escape_text(format_report_datetime(session.get('created_at')))}",
+                    report_text(catalog, "report.label_session_number", number=escape_text(session_number))
+                    + " &nbsp; | &nbsp; "
+                    f"{escape_text(format_report_datetime(session.get('created_at'), catalog=catalog))}",
                     ParagraphStyle(
                         "HeaderMeta",
                         parent=styles["BrandSubtitle"],
@@ -2139,7 +2222,9 @@ def make_page_header(title: str, styles) -> Table:
     return table
 
 
-def make_comparison_table(rows: list[tuple[str, Any, Any]]) -> Table:
+def make_comparison_table(
+    rows: list[tuple[str, Any, Any]], *, catalog: dict[str, str]
+) -> Table:
     """Create a check-in versus recovery comparison table."""
 
     body_style = getSampleStyleSheet()["BodyText"]
@@ -2153,9 +2238,9 @@ def make_comparison_table(rows: list[tuple[str, Any, Any]]) -> Table:
     )
     table_data = [
         [
-            Paragraph("METRIC", header_style),
-            Paragraph("CHECK-IN", header_style),
-            Paragraph("RECOVERY", header_style),
+            Paragraph(report_text(catalog, "report.table_metric"), header_style),
+            Paragraph(report_text(catalog, "report.table_check_in"), header_style),
+            Paragraph(report_text(catalog, "report.table_recovery"), header_style),
         ],
         *[
             [
@@ -2228,7 +2313,7 @@ def make_series_session_table(
                     ),
                     body_style,
                 ),
-                Paragraph(escape_text(format_report_datetime(row.get("created_at"))), body_style),
+                Paragraph(escape_text(format_report_datetime(row.get("created_at"), catalog=catalog)), body_style),
                 Paragraph(escape_text(format_score(row.get("overall_score"))), body_style),
                 Paragraph(escape_text(format_score(row.get("data_quality_score"))), body_style),
                 Paragraph(escape_text(format_measurement(row.get("avg_reference_heart_rate"), " bpm", 0)), body_style),
@@ -2453,7 +2538,9 @@ def format_measurement(
     return f"{text}{suffix}"
 
 
-def format_report_datetime(value: Any) -> str:
+def format_report_datetime(
+    value: Any, *, catalog: dict[str, str] | None = None
+) -> str:
     """Format ISO timestamps for a human-facing report."""
 
     if value in (None, ""):
@@ -2467,6 +2554,12 @@ def format_report_datetime(value: Any) -> str:
         except ValueError:
             return str(value)
 
+    if catalog and catalog.get("report.page", "").startswith("Strona"):
+        months = (
+            "sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie",
+            "wrz", "paź", "lis", "gru",
+        )
+        return f"{parsed.day:02d} {months[parsed.month - 1]} {parsed.year}, {parsed:%H:%M}"
     return parsed.strftime("%d %b %Y, %H:%M")
 
 

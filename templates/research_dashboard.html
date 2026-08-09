@@ -728,7 +728,7 @@ async function loadDashboardSession(){
 
     try{
         const res = await fetch(
-            `/api/analysis/${encodeURIComponent(sessionId)}/latest?timeline_sample=${MAX_CHART_POINTS}`,
+            `/api/analysis/${encodeURIComponent(sessionId)}/latest?view=research_dashboard&timeline_sample=${MAX_CHART_POINTS}`,
             {
                 credentials: "same-origin"
             }

@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import Any
 
 from services.llm_observability import record_llm_event
+from services.i18n_service import catalog_for, normalize_locale
 
 
 RESEARCH_FACT_SHEET_VERSION = "research-fact-sheet-v1"
@@ -17,7 +18,9 @@ RESEARCH_DEFAULT_MODEL = "gpt-5-mini"
 RESEARCH_MAX_NARRATION_CHARACTERS = 1600
 
 
-def build_research_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
+def build_research_fact_sheet(
+    analysis: dict[str, Any], *, locale: str | None = None
+) -> dict[str, Any]:
     """Minimize an analysis to reproducible, non-identifying research facts."""
 
     features = analysis.get("features") or {}
@@ -59,52 +62,39 @@ def build_research_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
             "hrv_confidence": features.get("hrv_confidence"),
             "quality_warnings": analysis.get("quality_warnings") or [],
         },
-        "disclaimer": (
-            "Podsumowanie badawcze opisuje dane obserwacyjne jednej sesji wellness "
-            "i nie stanowi diagnozy medycznej."
-        ),
+        "disclaimer": _text(locale, "report.research_content_disclaimer"),
     }
 
 
-def build_research_summary(analysis: dict[str, Any]) -> dict[str, Any]:
+def build_research_summary(
+    analysis: dict[str, Any], *, locale: str | None = None
+) -> dict[str, Any]:
     """Return deterministic sections plus optional LLM narration over the fact sheet."""
 
-    facts = build_research_fact_sheet(analysis)
+    facts = build_research_fact_sheet(analysis, locale=locale)
     protocol = facts["protocol"]
     measurements = facts["measurements"]
     limitations = facts["limitations"]
-    unavailable = "Brak danych."
+    unavailable = _text(locale, "report.research_content_unavailable")
     sections = {
-        "abstract": (
-            "Opis obserwacyjny pojedynczej sesji wellness oparty na "
-            "zsynchronizowanych danych i wersjonowanym modelu analizy."
-        ),
-        "methods": (
-            f"Model: {facts['analysis'].get('model_version') or unavailable}; "
-            f"probki: {measurements.get('samples_synchronized') or 0}/"
-            f"{measurements.get('samples_total') or 0}; "
-            f"protokol: {protocol.get('code') or unavailable}; "
-            f"HRV: {measurements.get('hrv_algorithm_version') or unavailable}."
-        ),
-        "observations": (
-            f"SpO2 srednie/minimum: {measurements.get('avg_spo2') or unavailable}/"
-            f"{measurements.get('min_spo2') or unavailable}; "
-            f"HR referencyjne: {measurements.get('avg_reference_heart_rate') or unavailable}; "
-            f"RMSSD: {measurements.get('rmssd') or unavailable}."
-        ),
-        "interpretation": (
-            "Wyniki opisuja wylacznie zaobserwowane parametry i ich jakosc "
-            "w kontekscie sesji."
-        ),
-        "limitations": (
-            f"Pewnosc analizy: {facts['analysis'].get('analysis_confidence') or unavailable}; "
-            f"jakosc sygnalu: {limitations.get('signal_quality') or unavailable}; "
-            f"ostrzezenia: {', '.join(limitations.get('quality_warnings') or []) or unavailable}."
-        ),
-        "future_data_required": (
-            "Dodatkowe sesje o porownywalnym protokole i jakosci danych sa potrzebne "
-            "do wnioskow podluznych."
-        ),
+        "abstract": _text(locale, "report.research_content_abstract"),
+        "methods": _text(locale, "report.research_content_methods",
+            model=facts["analysis"].get("model_version") or unavailable,
+            synchronized=measurements.get("samples_synchronized") or 0,
+            total=measurements.get("samples_total") or 0,
+            protocol=protocol.get("code") or unavailable,
+            hrv=measurements.get("hrv_algorithm_version") or unavailable),
+        "observations": _text(locale, "report.research_content_observations",
+            avg_spo2=measurements.get("avg_spo2") or unavailable,
+            min_spo2=measurements.get("min_spo2") or unavailable,
+            heart_rate=measurements.get("avg_reference_heart_rate") or unavailable,
+            rmssd=measurements.get("rmssd") or unavailable),
+        "interpretation": _text(locale, "report.research_content_interpretation"),
+        "limitations": _text(locale, "report.research_content_limitations",
+            confidence=facts["analysis"].get("analysis_confidence") or unavailable,
+            signal_quality=limitations.get("signal_quality") or unavailable,
+            warnings=len(limitations.get("quality_warnings") or [])),
+        "future_data_required": _text(locale, "report.research_content_future_data"),
     }
     narration = narrate_research_fact_sheet(facts, sections)
     return {
@@ -116,6 +106,13 @@ def build_research_summary(analysis: dict[str, Any]) -> dict[str, Any]:
         "narration": narration,
         "disclaimer": facts["disclaimer"],
     }
+
+
+def _text(locale: str | None, key: str, **params: Any) -> str:
+    # Preserve the existing Polish default for non-report callers. PDF callers
+    # always pass their explicit report locale.
+    text = catalog_for(normalize_locale(locale or "pl")).get(key, key)
+    return text.format(**params) if params else text
 
 
 def narrate_research_fact_sheet(

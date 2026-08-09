@@ -104,6 +104,11 @@ from services.series_service import get_user_series_trends
 from services.trend_narration import build_trend_ai_view
 from services.research_summary import build_research_summary
 from services.traceability_service import get_session_traceability
+from services.research_dashboard_projection import (
+    DASHBOARD_VIEW,
+    build_research_dashboard_projection,
+    serialized_field_sizes,
+)
 
 
 #------------------------------
@@ -2555,10 +2560,12 @@ def run_analysis():
 def latest_analysis(session_id: str):
     """Return the newest analysis result for a session."""
 
+    started_at = time.perf_counter()
     connection = db()
     cursor = connection.cursor()
 
     try:
+        query_started_at = time.perf_counter()
         result = get_latest_ai_result(
             cursor,
             session_id=session_id,
@@ -2578,12 +2585,21 @@ def latest_analysis(session_id: str):
         ):
             return error_response("forbidden", 403)
 
+        query_duration_ms = round((time.perf_counter() - query_started_at) * 1000)
         timeline_sample = request.args.get(
             "timeline_sample",
             type=int,
         )
 
-        if timeline_sample and timeline_sample > 1:
+        view = request.args.get("view")
+        projection_started_at = time.perf_counter()
+        if view == DASHBOARD_VIEW:
+            payload = build_research_dashboard_projection(
+                result,
+                timeline_sample=timeline_sample,
+            )
+        elif timeline_sample and timeline_sample > 1:
+            payload = result
             analysis_result = result.get("result") or {}
             timeline = analysis_result.get("timeline")
 
@@ -2604,11 +2620,30 @@ def latest_analysis(session_id: str):
                     "timeline_total": len(timeline),
                     "timeline_sampled": len(sampled_timeline),
                 }
+        else:
+            payload = result
 
-        return jsonify({
+        response = jsonify({
             "status": "ok",
-            **result,
+            **payload,
         })
+        payload_bytes = len(response.get_data())
+        response.headers["X-Analysis-Query-Ms"] = str(query_duration_ms)
+        response.headers["X-Analysis-Projection-Ms"] = str(
+            round((time.perf_counter() - projection_started_at) * 1000)
+        )
+        response.headers["X-Analysis-Payload-Bytes"] = str(payload_bytes)
+        response.headers["X-Analysis-Total-Ms"] = str(
+            round((time.perf_counter() - started_at) * 1000)
+        )
+        if current_app.debug and view == DASHBOARD_VIEW:
+            current_app.logger.debug(
+                "research_dashboard_payload session_id=%s bytes=%s fields=%s",
+                session_id,
+                payload_bytes,
+                serialized_field_sizes(payload),
+            )
+        return response
 
     finally:
         cursor.close()
