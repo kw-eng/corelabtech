@@ -114,3 +114,9 @@ button.primary{
     cursor:not-allowed;
 
 }
+
+.studio-button:focus-visible,
+.studio-action-button:focus-visible {
+    outline: 3px solid #67e8f9;
+    outline-offset: 3px;
+}

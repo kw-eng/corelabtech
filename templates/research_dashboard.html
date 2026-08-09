@@ -19,12 +19,13 @@
 
             <div class="mission-toolbar">
                 <select id="sessionSelect" aria-label="{{ t('mission.select_session') }}"></select>
+                <button id="retrySessionLoad" type="button" hidden onclick="loadSessions()">Retry session loading</button>
                 <button type="button" onclick="loadDashboardSession()">{{ t('mission.load_session') }}</button>
                 <button type="button" onclick="runSelectedAI()">{{ t('mission.run_ai_analysis') }}</button>
                 <button type="button" onclick="loadUserTrend()">{{ t('mission.load_series') }}</button>
-                <button type="button" onclick="generateSeriesReport()">{{ t('mission.series_report') }}</button>
+                <button type="button" onclick="generateSeriesReport(this)">{{ t('mission.series_report') }}</button>
                 {% if current_user.role in ["researcher", "admin"] %}
-                <button type="button" onclick="generateResearchReport()">{{ t('mission.generate_report') }}</button>
+                <button type="button" onclick="generateResearchReport(this)">{{ t('mission.generate_report') }}</button>
                 {% endif %}
             </div>
         </div>
@@ -471,8 +472,16 @@ function setText(id, value){
 }
 
 async function loadSessions(){
+    const select = document.getElementById("sessionSelect")
+    const retry = document.getElementById("retrySessionLoad")
+    if(select){
+        select.disabled = true
+        select.innerHTML = `<option value="">Loading sessions…</option>`
+    }
+    retry?.setAttribute("hidden", "hidden")
+    setText("analysisStatus", "Loading sessions…")
     try{
-        const res = await fetch("/api/sessions", {
+        const res = await fetch("/api/sessions?limit=100", {
             credentials: "same-origin"
         })
 
@@ -483,8 +492,6 @@ async function loadSessions(){
             : Array.isArray(data.sessions)
                 ? data.sessions
                 : []
-
-        const select = document.getElementById("sessionSelect")
 
         if(!select){
             return
@@ -534,6 +541,11 @@ async function loadSessions(){
         console.error("loadSessions error:", err)
         setText("analysisStatus", tr("mission.load_failed"))
         setText("rawOutput", tr("mission.cannot_load_sessions", {error: err}))
+        retry?.removeAttribute("hidden")
+    } finally {
+        if(select){
+            select.disabled = false
+        }
     }
 }
 
@@ -2071,7 +2083,67 @@ async function loadUserTrend(options = {}){
     }
 }
 
-async function generateResearchReport(){
+async function downloadReport(url, button, pendingMessage){
+    if(button?.disabled) return
+
+    const originalLabel = button?.textContent
+    if(button){
+        button.disabled = true
+        button.setAttribute("aria-busy", "true")
+        button.textContent = "Generating report..."
+    }
+
+    setText("rawOutput", pendingMessage)
+
+    try{
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            headers: {"Accept": "application/pdf"},
+        })
+
+        if(!response.ok){
+            let detail = ""
+            try{
+                const body = await response.json()
+                detail = body.error || body.message || ""
+            }catch(_error){
+                detail = await response.text()
+            }
+            throw new Error(detail || `Report generation failed (HTTP ${response.status}).`)
+        }
+
+        const reportBlob = await response.blob()
+        if(!reportBlob.size){
+            throw new Error("Report generation returned an empty file.")
+        }
+
+        const disposition = response.headers.get("content-disposition") || ""
+        const filenameMatch = disposition.match(/filename="?([^";]+)"?/i)
+        const filename = filenameMatch?.[1] || "corelabtech_report.pdf"
+        const downloadUrl = URL.createObjectURL(reportBlob)
+        const link = document.createElement("a")
+        link.href = downloadUrl
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(downloadUrl)
+
+        const duration = response.headers.get("X-Report-Generation-Ms")
+        setText("rawOutput", duration ? `Report ready to download (${duration} ms).` : "Report ready to download.")
+    }catch(error){
+        console.error("Report generation failed", error)
+        setText("rawOutput", `Report generation failed: ${error.message || error}`)
+    }finally{
+        if(button){
+            button.disabled = false
+            button.removeAttribute("aria-busy")
+            button.textContent = originalLabel
+        }
+    }
+}
+
+async function generateResearchReport(button){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
@@ -2081,10 +2153,14 @@ async function generateResearchReport(){
 
     setText("rawOutput", tr("mission.opening_pdf_report", {session: sessionId}))
 
-    window.location.href = `/report/${encodeURIComponent(sessionId)}`
+    await downloadReport(
+        `/report/${encodeURIComponent(sessionId)}`,
+        button,
+        tr("mission.opening_pdf_report", {session: sessionId})
+    )
 }
 
-function generateSeriesReport(){
+async function generateSeriesReport(button){
     const selected = getSelectedSession()
     const limit = getSelectedTrendLimit()
 
@@ -2093,8 +2169,11 @@ function generateSeriesReport(){
         return
     }
 
-    setText("rawOutput", tr("mission.opening_series_report", {client: selected.user_id}))
-    window.location.href = `/report/series/${encodeURIComponent(selected.user_id)}?limit=${limit}`
+    await downloadReport(
+        `/report/series/${encodeURIComponent(selected.user_id)}?limit=${limit}`,
+        button,
+        tr("mission.opening_series_report", {client: selected.user_id})
+    )
 }
 </script>
 

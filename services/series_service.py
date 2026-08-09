@@ -131,6 +131,7 @@ def get_user_series_trends(
         else None,
         "avg_data_quality": average_or_none(aggregates["data_quality_values"]),
         "avg_coverage": average_or_none(aggregates["coverage_values"]),
+        "avg_heart_rate": average_or_none(aggregates["heart_rate_values"]),
         "latest_data_quality": (
             aggregates["data_quality_values"][-1]
             if aggregates["data_quality_values"]
@@ -143,6 +144,7 @@ def get_user_series_trends(
         "avg_spo2": average_or_none(aggregates["spo2_values"]),
         "avg_pulse": average_or_none(aggregates["pulse_values"]),
         "avg_hrv": average_or_none(aggregates["hrv_values"]),
+        "avg_duration_min": average_or_none(aggregates["duration_values"]),
         "anomaly_count": sum(
             1 for row in analyses if row["anomaly_detected"]
         ),
@@ -150,6 +152,7 @@ def get_user_series_trends(
             1 for row in analyses if row["session_flagged"]
         ),
         "trend_direction": calculate_trend_direction(aggregates["scores"]),
+        "evidence_level": series_evidence_level(len(analyses)),
         "data_quality_trend": calculate_trend_direction(
             aggregates["data_quality_values"]
         ),
@@ -169,9 +172,11 @@ def build_series_analyses(rows) -> tuple[list[dict[str, Any]], dict[str, list[fl
     analyses = []
     aggregates = {
         "scores": [],
+        "heart_rate_values": [],
         "hrv_values": [],
         "spo2_values": [],
         "pulse_values": [],
+        "duration_values": [],
         "data_quality_values": [],
         "coverage_values": [],
         "match_rate_values": [],
@@ -211,9 +216,11 @@ def build_series_analyses(rows) -> tuple[list[dict[str, Any]], dict[str, list[fl
             quality_warnings = []
 
         append_numeric(aggregates["scores"], score)
+        append_numeric(aggregates["heart_rate_values"], avg_reference_heart_rate)
         append_numeric(aggregates["hrv_values"], avg_hrv)
         append_numeric(aggregates["spo2_values"], avg_spo2)
         append_numeric(aggregates["pulse_values"], avg_pulse)
+        append_numeric(aggregates["duration_values"], timing.get("total_duration_min"))
         append_numeric(aggregates["data_quality_values"], data_quality_score)
         append_numeric(aggregates["coverage_values"], coverage_percent)
         append_numeric(aggregates["match_rate_values"], match_rate)
@@ -328,21 +335,48 @@ def average_series_field(rows: list[dict], field: str) -> float | None:
 def compare_session_windows(analyses: list[dict], window_size: int = 5) -> dict:
     if not analyses:
         return {
-            "window_size": window_size,
+            "window_size": 0,
             "available": False,
             "message": "No analyzed sessions available.",
+            "label": "No session comparison available",
         }
 
-    first_window = analyses[:window_size]
-    last_window = analyses[-window_size:]
+    count = len(analyses)
+    if count == 1:
+        return {
+            "window_size": 1,
+            "available": False,
+            "message": "One analyzed session is available; a longitudinal comparison requires at least two sessions.",
+            "label": "Single-session summary",
+            "first_count": 1,
+            "last_count": 1,
+        }
+
+    if count < 5:
+        effective_window_size = 1
+        label = "First available session vs latest available session"
+    elif count < 10:
+        effective_window_size = max(2, count // 2)
+        label = (
+            f"First {effective_window_size} available sessions vs latest "
+            f"{effective_window_size} available sessions"
+        )
+    else:
+        effective_window_size = window_size
+        label = f"First {window_size} vs last {window_size} sessions"
+
+    first_window = analyses[:effective_window_size]
+    last_window = analyses[-effective_window_size:]
     first_score = average_series_field(first_window, "overall_score")
     last_score = average_series_field(last_window, "overall_score")
     first_quality = average_series_field(first_window, "data_quality_score")
     last_quality = average_series_field(last_window, "data_quality_score")
 
     return {
-        "window_size": window_size,
-        "available": len(analyses) >= 2,
+        "window_size": effective_window_size,
+        "available": True,
+        "label": label,
+        "message": None,
         "first_count": len(first_window),
         "last_count": len(last_window),
         "first_avg_score": first_score,
@@ -351,6 +385,24 @@ def compare_session_windows(analyses: list[dict], window_size: int = 5) -> dict:
         "first_avg_data_quality": first_quality,
         "last_avg_data_quality": last_quality,
         "data_quality_delta": calculate_delta(first_quality, last_quality),
+        "first_avg_heart_rate": average_series_field(first_window, "avg_reference_heart_rate"),
+        "last_avg_heart_rate": average_series_field(last_window, "avg_reference_heart_rate"),
+        "heart_rate_delta": calculate_delta(
+            average_series_field(first_window, "avg_reference_heart_rate"),
+            average_series_field(last_window, "avg_reference_heart_rate"),
+        ),
+        "first_avg_hrv": average_series_field(first_window, "avg_hrv"),
+        "last_avg_hrv": average_series_field(last_window, "avg_hrv"),
+        "hrv_delta": calculate_delta(
+            average_series_field(first_window, "avg_hrv"),
+            average_series_field(last_window, "avg_hrv"),
+        ),
+        "first_avg_spo2": average_series_field(first_window, "avg_spo2"),
+        "last_avg_spo2": average_series_field(last_window, "avg_spo2"),
+        "spo2_delta": calculate_delta(
+            average_series_field(first_window, "avg_spo2"),
+            average_series_field(last_window, "avg_spo2"),
+        ),
     }
 
 
@@ -450,6 +502,7 @@ def build_series_wellness_interpretation(
 
     trend = calculate_trend_direction(scores)
     quality_trend = calculate_trend_direction(data_quality_values)
+    evidence = series_evidence_level(len(analyses))
 
     if not data_quality_values or average_or_none(data_quality_values) < 60:
         return (
@@ -458,7 +511,16 @@ def build_series_wellness_interpretation(
             "the trend for wellness coaching."
         )
 
-    if trend == "improving":
+    if len(analyses) == 1:
+        trend_text = "One analyzed session is available. It describes this session only and cannot establish a longitudinal trend."
+    elif evidence == "preliminary":
+        trend_text = "Only a small number of analyzed sessions is available, so longitudinal interpretation is preliminary. "
+        trend_text += (
+            "The measured values are currently stable across the available sessions."
+            if trend == "stable" else
+            "A possible directional change is visible, but additional sessions are needed before treating it as an established trend."
+        )
+    elif trend == "improving":
         trend_text = "The wellness response trend is improving across the selected series."
     elif trend == "declining":
         trend_text = (
@@ -480,6 +542,16 @@ def build_series_wellness_interpretation(
         )
 
     return trend_text + quality_text
+
+
+def series_evidence_level(session_count: int) -> str:
+    if session_count <= 1:
+        return "insufficient"
+    if session_count <= 4:
+        return "preliminary"
+    if session_count <= 9:
+        return "emerging"
+    return "established"
 
 
 def calculate_trend_direction(values: list[float]) -> str:

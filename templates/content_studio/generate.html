@@ -191,6 +191,8 @@
             <div
                 id="generation-progress"
                 class="generate-progress"
+                role="status"
+                aria-live="polite"
             >
 
                 <div class="generate-progress-track">
@@ -220,7 +222,12 @@
             <p
                 id="generation-message"
                 class="prompt-builder-message"
+                role="status"
+                aria-live="polite"
             ></p>
+            <a id="generation-media-link" class="studio-button secondary" href="/content-studio/media" hidden>
+                View Generated Media
+            </a>
 
         </div>
 

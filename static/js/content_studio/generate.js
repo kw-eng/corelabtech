@@ -39,6 +39,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const message =
         document.getElementById("generation-message");
 
+    const mediaLink =
+        document.getElementById("generation-media-link");
+
+    const providerCapabilities = {
+        mock: { supported_output_types: ["image"] },
+    };
+
 
     if (
         !form ||
@@ -126,10 +133,26 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    provider.addEventListener(
-        "change",
-        refreshPrompt
-    );
+    function applyProviderCapabilities() {
+        const supported = providerCapabilities[provider.value]
+            ?.supported_output_types || [];
+
+        Array.from(outputType.options).forEach((option) => {
+            const supportedByProvider = supported.includes(option.value);
+            option.disabled = !supportedByProvider;
+            option.textContent = supportedByProvider
+                ? option.value.charAt(0).toUpperCase() + option.value.slice(1)
+                : option.value.charAt(0).toUpperCase() + option.value.slice(1)
+                    + " — unavailable for this provider";
+        });
+
+        if (!supported.includes(outputType.value)) {
+            outputType.value = supported[0] || "";
+        }
+        refreshPrompt();
+    }
+
+    provider.addEventListener("change", applyProviderCapabilities);
 
     outputType.addEventListener(
         "change",
@@ -153,6 +176,8 @@ document.addEventListener("DOMContentLoaded", function () {
             refreshPrompt
         );
     }
+
+    applyProviderCapabilities();
 
 
     // ======================================================
@@ -465,11 +490,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                 setMessage(
-                    "Generation job #" +
-                    data.job.id +
-                    " created successfully.",
+                    "Mock Provider created and registered a deterministic development artifact (job #" +
+                    data.job.id + ").",
                     "success"
                 );
+
+                if (mediaLink && data.media?.id) {
+                    mediaLink.hidden = false;
+                    mediaLink.href = "/content-studio/media";
+                }
 
 
                 console.log(

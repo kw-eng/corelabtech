@@ -1,108 +1,39 @@
 {% extends "content_studio/base.html" %}
+{% from "content_studio/components/layout/page_header.html" import page_header %}
 
-{% block studio_title %}
-Generated Media
-{% endblock %}
-
-{% block studio_subtitle %}
-Browse every generated image and video.
+{% block content_studio_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/content_studio/generated_media.css') }}">
 {% endblock %}
 
 {% block studio_content %}
+{{ page_header(
+    title="Generated Media",
+    subtitle="Review mock and generated assets before they are used in CoreLabTech content.",
+    eyebrow="Media Library",
+    actions=[{"label": "Generate asset", "href": url_for("content_studio.generate_page"), "primary": True}]
+) }}
 
-<div class="toolbar">
+<form id="media-filter-form" class="media-library-toolbar" aria-label="Generated media filters">
+    <label class="media-filter">Type
+        <select id="filter-type" class="studio-select">
+            <option value="">All media</option><option value="image">Images</option><option value="video">Videos</option>
+        </select>
+    </label>
+    <label class="media-filter">Status
+        <select id="filter-status" class="studio-select">
+            <option value="">All states</option><option value="generated">Generated</option><option value="approved">Approved</option><option value="archived">Archived</option><option value="failed">Failed</option>
+        </select>
+    </label>
+    <label class="media-filter">Scene <input id="filter-scene" class="studio-input" type="search"></label>
+    <label class="media-filter">Character <input id="filter-character" class="studio-input" type="search"></label>
+    <button class="studio-button secondary" type="submit">Apply filters</button>
+</form>
 
-    <select>
+<section id="media-list" class="media-grid" aria-live="polite" aria-busy="true">
+    <p class="media-library-empty">Loading generated media…</p>
+</section>
+{% endblock %}
 
-        <option>All</option>
-        <option>Images</option>
-        <option>Videos</option>
-
-    </select>
-
-    <select>
-
-        <option>Athlete</option>
-        <option>Doctor</option>
-
-    </select>
-
-    <select>
-
-        <option>Newest</option>
-        <option>Oldest</option>
-
-    </select>
-
-</div>
-
-<div id="mediaGrid" class="media-grid">
-
-{% for media in media_list %}
-
-<div class="media-card">
-
-    {% if media.media_type == "image" %}
-
-        <img src="{{ media.url }}">
-
-    {% else %}
-
-        <video controls>
-
-            <source
-                src="{{ media.url }}"
-                type="{{ media.mime_type }}"
-            >
-
-        </video>
-
-    {% endif %}
-
-    <div class="media-info">
-
-        <h3>
-
-            {{ media.scene_id }}
-
-        </h3>
-
-        <p>
-
-            {{ media.character }}
-
-        </p>
-
-        <p>
-
-            {{ media.provider }}
-
-        </p>
-
-        <p>
-
-            {{ media.version }}
-
-        </p>
-
-        <button>
-
-            Download
-
-        </button>
-
-        <button>
-
-            Open
-
-        </button>
-
-    </div>
-
-</div>
-
-{% endfor %}
-
-</div>
-
+{% block content_studio_scripts %}
+<script src="{{ url_for('static', filename='js/content_studio.js') }}"></script>
 {% endblock %}

@@ -38,6 +38,8 @@ MIGRATIONS = [
     ROOT / "migrations" / "024_add_telemetry_import_type.py",
     ROOT / "migrations" / "025_create_realtime_telemetry_events.py",
     ROOT / "migrations" / "026_create_llm_observability_events.py",
+    ROOT / "migrations" / "027_create_generated_media.py",
+    ROOT / "migrations" / "028_add_session_report_export_audit_index.py",
 ]
 
 

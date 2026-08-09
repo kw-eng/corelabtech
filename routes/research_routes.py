@@ -7,6 +7,7 @@ admin compatibility endpoints and public research pages.
 
 import hashlib
 import os
+import time
 import traceback
 import uuid
 from datetime import datetime, timezone
@@ -2323,18 +2324,30 @@ def save_full_session():
 def sessions():
     """List sessions available to the authenticated user."""
 
+    started_at = time.perf_counter()
     try:
+        limit = parse_preview_limit(
+            request.args.get("limit"),
+            default=100,
+            maximum=200,
+        )
         rows = list_research_sessions(
             requesting_user_id=get_current_user_id(),
             requesting_role=current_user.role,
             requesting_organization_id=current_user.organization_id,
+            limit=limit,
         )
 
-        return jsonify({
+        response = jsonify({
             "status": "ok",
             "count": len(rows),
+            "limit": limit,
             "sessions": rows,
         })
+        response.headers["X-Session-List-Ms"] = str(
+            round((time.perf_counter() - started_at) * 1000)
+        )
+        return response
 
     except Exception as exc:
         traceback.print_exc()
@@ -2866,6 +2879,7 @@ def series_report(user_id: str):
     """Generate and download a PDF report for a client's session series."""
 
     subject_id = clean_value(user_id)
+    started_at = time.perf_counter()
 
     if not subject_id:
         return error_response("missing user_id", 400)
@@ -2894,11 +2908,15 @@ def series_report(user_id: str):
             details=export.audit_details,
         )
 
-        return send_file(
+        response = send_file(
             export.path,
             as_attachment=True,
             download_name=export.download_name,
         )
+        response.headers["X-Report-Generation-Ms"] = str(
+            round((time.perf_counter() - started_at) * 1000)
+        )
+        return response
 
     except PermissionError as exc:
         return error_response(str(exc), 403)
@@ -2922,6 +2940,7 @@ def series_report(user_id: str):
 def report(session_id: str):
     """Generate and download a PDF report for a session."""
 
+    started_at = time.perf_counter()
     try:
         export = generate_report_for_session(
             session_id=session_id,
@@ -2939,11 +2958,15 @@ def report(session_id: str):
             details=export.audit_details,
         )
 
-        return send_file(
+        response = send_file(
             export.path,
             as_attachment=True,
             download_name=export.download_name,
         )
+        response.headers["X-Report-Generation-Ms"] = str(
+            round((time.perf_counter() - started_at) * 1000)
+        )
+        return response
 
     except FileNotFoundError as exc:
         return error_response(str(exc), 404)

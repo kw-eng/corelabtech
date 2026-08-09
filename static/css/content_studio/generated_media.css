@@ -201,3 +201,53 @@
         width: 100%;
     }
 }
+
+/* Dynamic library cards rendered by content_studio.js. */
+.content-media-card {
+    overflow: hidden;
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius);
+    background: var(--studio-panel);
+    box-shadow: var(--studio-shadow);
+}
+
+.content-media-preview-wrap {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: #020712;
+}
+
+.content-media-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.content-media-preview-unavailable {
+    display: grid;
+    min-height: 100%;
+    place-items: center;
+    padding: 1rem;
+    color: var(--studio-text-muted, #cbd5e1);
+    font-size: .9rem;
+    text-align: center;
+}
+
+.content-media-body { padding: 16px; }
+.content-media-title-row { display: flex; gap: 10px; justify-content: space-between; align-items: start; }
+.content-media-title-row h3 { margin: 0; font-size: 0.95rem; overflow-wrap: anywhere; }
+.content-media-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.content-media-meta div { min-width: 0; }
+.content-media-meta dt { color: var(--studio-text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .05em; }
+.content-media-meta dd { margin: 3px 0 0; color: var(--studio-text-light); overflow-wrap: anywhere; }
+.content-media-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 12px; border-top: 1px solid var(--studio-border); }
+.content-media-actions .studio-button { padding: 8px 10px; font-size: .78rem; }
+.media-badge { border-radius: 999px; padding: 4px 7px; font-size: .65rem; font-weight: 800; background: #164e63; color: #cffafe; }
+.media-badge.final { background: #14532d; color: #dcfce7; }
+.media-type-badge { position: absolute; top: 12px; left: 12px; text-transform: uppercase; }
+.media-status-badge { position: absolute; right: 12px; bottom: 12px; background: rgba(2, 7, 18, .82); color: #e2e8f0; text-transform: capitalize; }
+.content-media-details { color: var(--studio-text-muted); font-size: .82rem; margin-bottom: 12px; }
+.content-media-details code { display: block; overflow-wrap: anywhere; }

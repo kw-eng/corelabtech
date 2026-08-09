@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from flask import (
     Blueprint,
@@ -18,8 +19,13 @@ from services.generated_media_service import (
     get_generated_media,
     list_generated_media,
     register_generated_media,
+    create_mock_generated_media,
     resolve_media_path,
     update_generated_media_status,
+)
+from services.content_provider_capabilities import (
+    public_provider_capabilities,
+    supports_output_type,
 )
 
 
@@ -148,6 +154,14 @@ def settings_page():
 # ==========================================================
 
 
+@content_studio_bp.get("/api/provider-capabilities")
+@login_required
+def get_provider_capabilities():
+    """Return the output types the currently configured providers can create."""
+
+    return jsonify({"status": "success", "providers": public_provider_capabilities()})
+
+
 @content_studio_bp.post(
     "/api/generation-jobs"
 )
@@ -188,12 +202,33 @@ def create_generation_job():
             ),
         }), 400
 
+    if not supports_output_type(provider, payload["output_type"]):
+        return jsonify({
+            "status": "error",
+            "error": "The selected provider does not support this output type.",
+        }), 400
+
+    job_id = str(uuid.uuid4())
+    try:
+        media = create_mock_generated_media(
+            GeneratedMediaInput(
+                media_type="image",
+                scene_id=payload["scene_id"],
+                character_id=payload["character_id"],
+                version="mock",
+                ai_provider="mock",
+                prompt=payload["prompt"],
+                file_path="assets/athlete/generated/development/pending.svg",
+                created_by=getattr(current_user, "id", None),
+            ),
+            generation_job_id=job_id,
+        )
+    except Exception:
+        logger.exception("Mock generation failed")
+        return jsonify({"status": "error", "error": "Mock media generation failed."}), 500
+
     job = {
-        "id": int(
-            datetime.now(
-                timezone.utc
-            ).timestamp()
-        ),
+        "id": job_id,
         "provider": provider,
         "output_type": payload[
             "output_type"
@@ -206,6 +241,8 @@ def create_generation_job():
         ],
         "status": "completed",
         "progress_percent": 100,
+        "kind": "synchronous_development_mock",
+        "media_id": media["id"],
     }
 
     logger.info(
@@ -216,6 +253,7 @@ def create_generation_job():
     return jsonify({
         "status": "success",
         "job": job,
+        "media": media,
     }), 201
 
 # ==========================================================
@@ -237,6 +275,7 @@ def list_media():
             is_final=_parse_optional_boolean(
                 request.args.get("is_final")
             ),
+            created_by=getattr(current_user, "id", None),
             limit=request.args.get(
                 "limit",
                 100,
@@ -400,6 +439,7 @@ def update_media_record(
                 if "is_final" in payload
                 else None
             ),
+            created_by=getattr(current_user, "id", None),
             notes=(
                 payload.get("notes")
                 if "notes" in payload
@@ -445,7 +485,8 @@ def serve_media_file(
     media_id: int,
 ):
     media = get_generated_media(
-        media_id
+        media_id,
+        created_by=getattr(current_user, "id", None),
     )
 
     if media is None:

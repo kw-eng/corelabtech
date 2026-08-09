@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import mimetypes
+from dataclasses import replace
+from html import escape as escape_xml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -277,6 +279,46 @@ def register_generated_media(
         connection.close()
 
 
+def create_mock_generated_media(
+    data: GeneratedMediaInput,
+    *,
+    generation_job_id: str,
+) -> dict[str, Any]:
+    """Create a clearly labelled deterministic development artifact and register it."""
+
+    artifact_dir = PROJECT_ROOT / "assets" / "athlete" / "generated" / "development"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"mock-{generation_job_id}.svg"
+    artifact_path = artifact_dir / filename
+    artifact_path.write_text(
+        """<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1600\" height=\"900\" viewBox=\"0 0 1600 900\">
+<rect width=\"1600\" height=\"900\" fill=\"#061526\"/><rect x=\"80\" y=\"80\" width=\"1440\" height=\"740\" rx=\"32\" fill=\"#0b263d\" stroke=\"#22d3ee\" stroke-width=\"3\"/>
+<text x=\"160\" y=\"280\" fill=\"#67e8f9\" font-family=\"Arial\" font-size=\"72\" font-weight=\"bold\">CoreLabTech</text>
+<text x=\"160\" y=\"390\" fill=\"#ffffff\" font-family=\"Arial\" font-size=\"46\">Mock Provider Development Artifact</text>
+<text x=\"160\" y=\"500\" fill=\"#cbd5e1\" font-family=\"Arial\" font-size=\"32\">Character: %s</text>
+<text x=\"160\" y=\"555\" fill=\"#cbd5e1\" font-family=\"Arial\" font-size=\"32\">Scene: %s</text>
+<text x=\"160\" y=\"670\" fill=\"#94a3b8\" font-family=\"Arial\" font-size=\"26\">This deterministic artifact is not AI-generated media.</text></svg>"""
+        % (escape_xml(data.character_id), escape_xml(data.scene_id)),
+        encoding="utf-8",
+    )
+    try:
+        return register_generated_media(
+            replace(
+                data,
+                media_type="image",
+                version=f"mock-{generation_job_id[:8]}",
+                file_path=f"assets/athlete/generated/development/{filename}",
+                mime_type="image/svg+xml",
+                width=1600,
+                height=900,
+                notes=f"Mock Provider development artifact; generation job {generation_job_id}",
+            )
+        )
+    except Exception:
+        artifact_path.unlink(missing_ok=True)
+        raise
+
+
 def list_generated_media(
     *,
     media_type: str | None = None,
@@ -284,6 +326,7 @@ def list_generated_media(
     character_id: str | None = None,
     status: str | None = None,
     is_final: bool | None = None,
+    created_by: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -322,6 +365,10 @@ def list_generated_media(
     if is_final is not None:
         conditions.append("is_final = %s")
         params.append(is_final)
+
+    if created_by is not None:
+        conditions.append("created_by = %s")
+        params.append(created_by)
 
     where_clause = ""
 
@@ -386,6 +433,8 @@ def list_generated_media(
 
 def get_generated_media(
     media_id: int,
+    *,
+    created_by: int | None = None,
 ) -> dict[str, Any] | None:
     connection = db()
     cursor = connection.cursor()
@@ -417,8 +466,9 @@ def get_generated_media(
                 updated_at
             FROM generated_media
             WHERE id = %s
+              AND (%s IS NULL OR created_by = %s)
             """,
-            (media_id,),
+            (media_id, created_by, created_by),
         )
 
         row = cursor.fetchone()
@@ -439,6 +489,7 @@ def update_generated_media_status(
     status: str,
     is_final: bool | None = None,
     notes: str | None = None,
+    created_by: int | None = None,
 ) -> dict[str, Any] | None:
     if status not in ALLOWED_STATUSES:
         raise ValueError(
@@ -459,7 +510,7 @@ def update_generated_media_status(
         assignments.append("notes = %s")
         params.append(notes.strip() or None)
 
-    params.append(media_id)
+    params.extend([media_id, created_by, created_by])
 
     connection = db()
     cursor = connection.cursor()
@@ -470,6 +521,7 @@ def update_generated_media_status(
             UPDATE generated_media
             SET {", ".join(assignments)}
             WHERE id = %s
+              AND (%s IS NULL OR created_by = %s)
             RETURNING
                 id,
                 media_type,

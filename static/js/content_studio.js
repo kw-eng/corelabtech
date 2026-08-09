@@ -221,6 +221,7 @@ const ContentStudio = (() => {
                     src="${fileUrl}"
                     alt="${escapeHtml(item.file_name)}"
                     loading="lazy"
+                    data-preview-media-id="${item.id}"
                 >
             `;
         }
@@ -231,6 +232,7 @@ const ContentStudio = (() => {
                     class="content-media-preview"
                     controls
                     preload="metadata"
+                    data-preview-media-id="${item.id}"
                 >
                     <source
                         src="${fileUrl}"
@@ -254,6 +256,8 @@ const ContentStudio = (() => {
         const finalBadge = item.is_final
             ? '<span class="media-badge final">FINAL</span>'
             : "";
+        const mediaType = escapeHtml(item.media_type || "media");
+        const status = escapeHtml(item.status || "unknown");
 
         return `
             <article
@@ -262,6 +266,8 @@ const ContentStudio = (() => {
             >
                 <div class="content-media-preview-wrap">
                     ${buildPreview(item)}
+                    <span class="media-badge media-type-badge">${mediaType}</span>
+                    <span class="media-badge media-status-badge">${status}</span>
                 </div>
 
                 <div class="content-media-body">
@@ -295,11 +301,6 @@ const ContentStudio = (() => {
                         </div>
 
                         <div>
-                            <dt>Status</dt>
-                            <dd>${escapeHtml(item.status)}</dd>
-                        </div>
-
-                        <div>
                             <dt>Size</dt>
                             <dd>
                                 ${formatBytes(item.file_size_bytes)}
@@ -325,6 +326,23 @@ const ContentStudio = (() => {
                     </details>
 
                     <div class="content-media-actions">
+                        <a
+                            class="studio-button outline"
+                            href="${fileUrlFor(item.id)}"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            Open
+                        </a>
+
+                        <a
+                            class="studio-button outline"
+                            href="${fileUrlFor(item.id)}"
+                            download="${escapeHtml(item.file_name)}"
+                        >
+                            Download
+                        </a>
+
                         <select
                             class="media-status-select"
                             aria-label="Media status"
@@ -351,6 +369,24 @@ const ContentStudio = (() => {
                 </div>
             </article>
         `;
+    }
+
+    function showPreviewUnavailable(element) {
+        const wrapper = element.closest(".content-media-preview-wrap");
+        if (!wrapper || wrapper.querySelector(".content-media-preview-unavailable")) {
+            return;
+        }
+
+        element.remove();
+        const fallback = document.createElement("div");
+        fallback.className = "content-media-preview-unavailable";
+        fallback.setAttribute("role", "status");
+        fallback.textContent = "Preview unavailable";
+        wrapper.prepend(fallback);
+    }
+
+    function fileUrlFor(mediaId) {
+        return `${API_URL}/${mediaId}/file`;
     }
 
 
@@ -393,6 +429,7 @@ const ContentStudio = (() => {
                 Loading media...
             </p>
         `;
+        container.setAttribute("aria-busy", "true");
 
         try {
             state.media = await fetchMedia(
@@ -418,6 +455,8 @@ const ContentStudio = (() => {
                     ${escapeHtml(error.message)}
                 </p>
             `;
+        } finally {
+            container.setAttribute("aria-busy", "false");
         }
     }
 
@@ -619,6 +658,13 @@ const ContentStudio = (() => {
             "click",
             handleMediaAction
         );
+
+        mediaList?.addEventListener("error", (event) => {
+            const preview = event.target.closest(".content-media-preview");
+            if (preview) {
+                showPreviewUnavailable(preview);
+            }
+        }, true);
 
         renderMediaList();
     }
