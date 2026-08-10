@@ -31,6 +31,7 @@ from services.llm_narration import (
     narrate_fact_sheet,
     narration_instructions,
 )
+from services.wellness_response import build_session_response
 from services.insight_views import (
     build_operator_report,
     build_recovery_coach,
@@ -469,6 +470,13 @@ def analyze_measurements(
         match_rate=match_rate,
         quality_warnings=quality_warnings,
     )
+    analysis_confidence = calculate_analysis_confidence(
+        data_quality_score=data_quality_score,
+        has_reference_hr=hr_source_type == "chest_hrm",
+        has_rr=hrv_metrics["hrv_usable_for_scoring"],
+        time_alignment_quality=time_alignment_quality,
+        signal_quality=telemetry_quality["signal_quality"],
+    )
 
     context_features = summarize_session_context(session_context)
 
@@ -555,6 +563,13 @@ def analyze_measurements(
         )
         )
     )
+    session_response = build_session_response(
+        session_context=session_context,
+        features=features,
+        data_quality_score=data_quality_score,
+        analysis_confidence=analysis_confidence,
+        quality_warnings=quality_warnings,
+    )
 
     summary = build_research_summary(
         reason_codes=reason_codes,
@@ -592,13 +607,7 @@ def analyze_measurements(
             else None
         ),
         "data_quality_score": data_quality_score,
-        "analysis_confidence": calculate_analysis_confidence(
-            data_quality_score=data_quality_score,
-            has_reference_hr=hr_source_type == "chest_hrm",
-            has_rr=hrv_metrics["hrv_usable_for_scoring"],
-            time_alignment_quality=time_alignment_quality,
-            signal_quality=telemetry_quality["signal_quality"],
-        ),
+        "analysis_confidence": analysis_confidence,
 
         "anomaly_detected": anomaly_detected,
         "stress_detected": stress_detected,
@@ -622,6 +631,7 @@ def analyze_measurements(
         "quality_warnings": quality_warnings,
         "session_context": session_context,
         "context_features": context_features,
+        "session_response": session_response,
 
         "summary": (
             summary

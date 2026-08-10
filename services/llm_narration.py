@@ -9,9 +9,10 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from services.llm_observability import record_llm_event
+from services.wellness_response import build_session_response
 
 
-FACT_SHEET_VERSION = "wellness-fact-sheet-v2"
+FACT_SHEET_VERSION = "wellness-fact-sheet-v3"
 NARRATION_VERSION = "llm-narration-v2"
 DEFAULT_MODEL = "gpt-5-mini"
 MAX_NARRATION_CHARACTERS = 1200
@@ -64,6 +65,13 @@ def build_session_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
     )
     protocol = analysis.get("protocol") or {}
     timing = context.get("session_timing") or {}
+    session_response = analysis.get("session_response") or build_session_response(
+        session_context=context,
+        features=features,
+        data_quality_score=analysis.get("data_quality_score"),
+        analysis_confidence=analysis.get("analysis_confidence"),
+        quality_warnings=analysis.get("quality_warnings") or [],
+    )
     return {
         "schema_version": FACT_SHEET_VERSION,
         "analysis_model": {
@@ -94,6 +102,7 @@ def build_session_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
         },
         "check_in": pre_check_in,
         "check_out": post_check_out,
+        "session_response": session_response,
         "protocol": {
             "code": protocol.get("code"),
             "name": protocol.get("name"),
