@@ -636,9 +636,14 @@ function renderRecoveryCoach(recoveryCoach){
     const historyText = history.available_entries
         ? tr("mission.recovery_history_entries", {count: history.available_entries})
         : tr("mission.recovery_history_unavailable")
+    const recoverySummary = {
+        follow_up_complete: tr("mission.recovery_summary_complete"),
+        follow_up_recorded: tr("mission.recovery_summary_recorded"),
+        follow_up_pending: tr("mission.recovery_summary_pending")
+    }[recoveryCoach.status] || tr("mission.recovery_follow_up_saved")
 
     box.innerHTML = `
-        <strong>${escapeHtml(recoveryCoach.summary || tr("mission.recovery_follow_up_saved"))}</strong>
+        <strong>${escapeHtml(recoverySummary)}</strong>
         <div class="mission-recovery-windows">
             ${recoveryWindow("one_hour", tr("mission.follow_up_one_hour"))}
             ${recoveryWindow("next_day", tr("mission.follow_up_next_day"))}
@@ -1001,7 +1006,8 @@ async function loadResearchSummary(options = {}){
     }
     box.innerText = tr("mission.loading")
     try{
-        const res = await fetch(`/api/analysis/${encodeURIComponent(sessionId)}/research-summary`, {
+        const locale = encodeURIComponent(window.CORELABTECH_LOCALE || "en")
+        const res = await fetch(`/api/analysis/${encodeURIComponent(sessionId)}/research-summary?lang=${locale}`, {
             credentials: "same-origin"
         })
         const data = await parseJsonResponse(res, "RESEARCH SUMMARY")

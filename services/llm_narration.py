@@ -53,10 +53,13 @@ def build_session_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
     history = analysis.get("wellness_history") or {}
     pre_check_in = select_fields(
         context.get("pre_check_in") or {},
-        "sleep_hours", "sleep_quality", "training_load_24h", "stress_level", "fatigue_level",
+        "spo2", "avg_spo2", "pulse", "heart_rate_bpm", "heart_rate",
+        "sleep_hours", "sleep_quality", "training_load_24h", "stress_level",
+        "fatigue_level", "session_goal",
     )
     post_check_out = select_fields(
         context.get("post_check_out") or {},
+        "spo2", "avg_spo2", "pulse", "heart_rate_bpm", "heart_rate",
         "energy_level", "relaxation_level", "fatigue_level", "discomfort",
     )
     protocol = analysis.get("protocol") or {}
@@ -253,6 +256,102 @@ def deterministic_fallback(fact_sheet: dict[str, Any]) -> str:
             f"Jakosc sesji\n{quality.get('signal_quality') or 'unknown'}.",
             str(fact_sheet.get("disclaimer") or ""),
         ]
+    ).strip()
+
+
+def localized_deterministic_summary(
+    fact_sheet: dict[str, Any], catalog: dict[str, str]
+) -> str:
+    """Render dashboard narration from current facts in the active locale.
+
+    Persisted LLM/fallback narration has no locale contract.  The dashboard uses
+    this renderer so its deterministic text is reproducible from the selected
+    locale and cannot reuse a Polish summary in an English session.
+    """
+
+    def text(key: str, **params: Any) -> str:
+        value = catalog.get(key, key)
+        return value.format(**params) if params else value
+
+    def enum(value: Any) -> str:
+        if value in (None, ""):
+            return text("report.session_summary_unavailable")
+        raw = str(value).strip().lower()
+        return catalog.get(f"report.context_value_{raw}", str(value))
+
+    def measurement(value: Any, unit: str = "") -> str:
+        return f"{value}{unit}" if value not in (None, "") else ""
+
+    def context_values(values: dict[str, Any], fields: tuple[tuple[str, str, str], ...]) -> str:
+        rendered = []
+        for field, label_key, unit in fields:
+            value = values.get(field)
+            if value in (None, ""):
+                continue
+            display = measurement(value, unit) if unit else enum(value)
+            rendered.append(f"{text(label_key)}: {display}")
+        return "; ".join(rendered) or text("report.session_summary_unavailable")
+
+    quality = fact_sheet.get("data_quality") or {}
+    limitations = quality.get("limitations") or quality.get("quality_reasons") or []
+    limitation_text = ", ".join(
+        catalog.get(f"report.warning_{item}", str(item)) for item in limitations
+    ) or text("report.session_summary_no_limitations")
+    check_in = context_values(
+        fact_sheet.get("check_in") or {},
+        (
+            ("spo2", "report.context_spo2", "%"),
+            ("avg_spo2", "report.context_spo2", "%"),
+            ("pulse", "report.context_pulse_hr", " bpm"),
+            ("heart_rate_bpm", "report.context_pulse_hr", " bpm"),
+            ("heart_rate", "report.context_pulse_hr", " bpm"),
+            ("sleep_hours", "report.context_sleep_hours", " h"),
+            ("sleep_quality", "report.context_sleep_quality", ""),
+            ("stress_level", "report.context_stress_level", ""),
+            ("training_load_24h", "report.context_training_load_24h", ""),
+            ("fatigue_level", "report.context_fatigue_level", ""),
+            ("session_goal", "report.context_session_goal", ""),
+        ),
+    )
+    check_out = context_values(
+        fact_sheet.get("check_out") or {},
+        (
+            ("spo2", "report.context_spo2", "%"),
+            ("avg_spo2", "report.context_spo2", "%"),
+            ("pulse", "report.context_pulse_hr", " bpm"),
+            ("heart_rate_bpm", "report.context_pulse_hr", " bpm"),
+            ("heart_rate", "report.context_pulse_hr", " bpm"),
+            ("energy_level", "report.context_energy_level", ""),
+            ("relaxation_level", "report.context_relaxation_level", ""),
+            ("fatigue_level", "report.context_fatigue_level", ""),
+            ("discomfort", "report.context_discomfort", ""),
+        ),
+    )
+    timing = (fact_sheet.get("protocol") or {}).get("timing") or {}
+    phases = []
+    for field, label_key in (
+        ("compression_time_min", "report.phase_compression"),
+        ("exposure_time_min", "report.phase_exposure"),
+        ("decompression_time_min", "report.phase_decompression"),
+        ("total_duration_min", "report.label_duration"),
+    ):
+        if timing.get(field) not in (None, ""):
+            phases.append(f"{text(label_key)}: {measurement(timing[field], ' min')}")
+    phase_text = "; ".join(phases) or text("report.session_summary_unavailable")
+    status = enum((fact_sheet.get("wellness") or {}).get("status"))
+    return "\n\n".join(
+        (
+            f"{text('report.session_summary_limitations')}\n{limitation_text}. "
+            f"{text('report.session_summary_confidence')}: {enum(quality.get('analysis_confidence'))}.",
+            f"{text('report.session_summary_overview')}\n"
+            f"{text('report.session_summary_wellness_status')}: {status}.",
+            f"{text('report.session_summary_check_in')}\n{check_in}",
+            f"{text('report.session_summary_during')}\n{phase_text}",
+            f"{text('report.session_summary_check_out')}\n{check_out}",
+            f"{text('report.session_summary_quality')}\n"
+            f"{text('report.session_summary_signal_quality')}: {enum(quality.get('signal_quality'))}.",
+            str(fact_sheet.get("disclaimer") or ""),
+        )
     ).strip()
 
 

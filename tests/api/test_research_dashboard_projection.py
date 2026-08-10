@@ -1,4 +1,6 @@
 import unittest
+import json
+from pathlib import Path
 
 from services.research_dashboard_projection import (
     build_research_dashboard_projection,
@@ -85,3 +87,23 @@ class ResearchDashboardProjectionTests(unittest.TestCase):
         original_timeline = list(result["result"]["timeline"])
         build_research_dashboard_projection(result, timeline_sample=2)
         self.assertEqual(result["result"]["timeline"], original_timeline)
+
+    def test_projection_rebuilds_locale_specific_summary_from_context(self):
+        result = result_with_timeline()
+        result["result"].update({
+            "wellness_status": "baseline",
+            "session_summary": {"content": "Ograniczenia danych\nStale Polish text"},
+        })
+        result["result"]["features"]["session_context"] = {
+            "pre_check_in": {"spo2": 97, "pulse": 70},
+            "post_check_out": {"spo2": 98, "pulse": 68},
+        }
+        catalog = json.loads(Path("translations/en.json").read_text(encoding="utf-8"))
+
+        projection = build_research_dashboard_projection(
+            result, timeline_sample=2, catalog=catalog
+        )
+
+        self.assertIn("Data limitations", projection["session_summary"]["content"])
+        self.assertIn("Check-in\nSpO2: 97%; Pulse / HR: 70 bpm", projection["session_summary"]["content"])
+        self.assertNotIn("Stale Polish text", projection["session_summary"]["content"])

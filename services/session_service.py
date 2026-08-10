@@ -831,9 +831,10 @@ def localized_session_interpretation(
         "report.session_interpretation_text",
         score=format_score(analysis.get("overall_score")),
         quality=format_score(analysis.get("data_quality_score")),
-        status=report_text(
+        status=localized_report_enum(
             catalog,
-            f"report.wellness_status_{analysis_result.get('wellness_status') or 'unknown'}",
+            "report.wellness_status",
+            analysis_result.get("wellness_status") or "unknown",
         ),
     )
 
@@ -1629,7 +1630,8 @@ def build_pdf_report(
                                 phase_metric(
                                     session.get("pre"),
                                     "check_in",
-                                )
+                                ),
+                                catalog=catalog,
                             )
                         ),
                         styles["NoticeText"],
@@ -1641,7 +1643,8 @@ def build_pdf_report(
                                 phase_metric(
                                     session.get("post"),
                                     "check_out",
-                                )
+                                ),
+                                catalog=catalog,
                             )
                         ),
                         styles["NoticeText"],
@@ -2660,7 +2663,7 @@ def format_warning_list(values: Any) -> str:
     )
 
 
-def format_context(value: Any) -> str:
+def format_context(value: Any, *, catalog: dict[str, str]) -> str:
     """Format optional check-in/check-out context for the PDF."""
 
     if not isinstance(value, dict):
@@ -2671,9 +2674,13 @@ def format_context(value: Any) -> str:
         if item in (None, ""):
             continue
 
-        label = key.replace("_", " ").title()
+        label = report_text(catalog, f"report.context_{key}")
+        if label == f"report.context_{key}":
+            label = key.replace("_", " ").title()
         if isinstance(item, bool):
-            item = "Yes" if item else "No"
+            item = report_text(catalog, "report.context_value_yes" if item else "report.context_value_no")
+        elif isinstance(item, str):
+            item = localized_report_enum(catalog, "report.context_value", item)
         pairs.append(f"{label}: {item}")
 
     return "; ".join(pairs) if pairs else "-"

@@ -104,7 +104,7 @@ from services.series_service import get_user_series_trends
 from services.trend_narration import build_trend_ai_view
 from services.research_summary import build_research_summary
 from services.traceability_service import get_session_traceability
-from services.i18n_service import current_locale
+from services.i18n_service import catalog_for, current_locale
 from services.research_dashboard_projection import (
     DASHBOARD_VIEW,
     build_research_dashboard_projection,
@@ -2598,6 +2598,7 @@ def latest_analysis(session_id: str):
             payload = build_research_dashboard_projection(
                 result,
                 timeline_sample=timeline_sample,
+                catalog=catalog_for(current_locale()),
             )
         elif timeline_sample and timeline_sample > 1:
             payload = result
@@ -2717,7 +2718,9 @@ def research_summary(session_id: str):
         return jsonify({
             "status": "ok",
             "session_id": session_id,
-            "research_summary": build_research_summary(research_input),
+            "research_summary": build_research_summary(
+                research_input, locale=current_locale()
+            ),
         })
     finally:
         cursor.close()

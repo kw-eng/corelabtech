@@ -5,6 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from services.llm_narration import (
+    build_session_fact_sheet,
+    localized_deterministic_summary,
+)
+
 
 DASHBOARD_VIEW = "research_dashboard"
 MAX_TIMELINE_SAMPLES = 2_000
@@ -41,7 +46,8 @@ def dashboard_timeline_point(row: Any) -> dict[str, Any]:
 
 
 def build_research_dashboard_projection(
-    result: dict[str, Any], *, timeline_sample: int | None
+    result: dict[str, Any], *, timeline_sample: int | None,
+    catalog: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Return only fields consumed by ``research_dashboard.html``.
 
@@ -79,7 +85,23 @@ def build_research_dashboard_projection(
         "timeline": [dashboard_timeline_point(row) for row in sampled],
         "timeline_total": total,
         "timeline_sampled": sample_count,
-        "session_summary": analysis.get("session_summary"),
+        # Stored narration can have been created in another locale.  Use the
+        # current analysis facts for a locale-specific deterministic dashboard
+        # summary instead of reusing that persisted text.
+        "session_summary": (
+            {
+                "content": localized_deterministic_summary(
+                    build_session_fact_sheet(analysis), catalog
+                ),
+                "source": "deterministic_fallback",
+                "analysis_confidence": analysis.get("analysis_confidence"),
+                "data_quality_score": analysis.get("data_quality_score"),
+                "limitations": analysis.get("quality_warnings") or [],
+                "disclaimer": analysis.get("wellness_disclaimer"),
+            }
+            if catalog is not None
+            else analysis.get("session_summary")
+        ),
         "session_comparison": analysis.get("session_comparison"),
         "recovery_coach": analysis.get("recovery_coach"),
         "reasons": analysis.get("reasons") or [],
