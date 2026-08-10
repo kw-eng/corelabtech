@@ -314,15 +314,12 @@ const ContentStudio = (() => {
                     </dl>
 
                     <details class="content-media-details">
-                        <summary>Prompt and path</summary>
+                        <summary>Generation details</summary>
 
                         <p class="content-media-prompt">
                             ${escapeHtml(item.prompt)}
                         </p>
 
-                        <code>
-                            ${escapeHtml(item.file_path)}
-                        </code>
                     </details>
 
                     <div class="content-media-actions">
@@ -366,6 +363,7 @@ const ContentStudio = (() => {
                             Save
                         </button>
                     </div>
+                    <p class="content-media-action-feedback" aria-live="polite"></p>
                 </div>
             </article>
         `;
@@ -425,9 +423,10 @@ const ContentStudio = (() => {
         }
 
         container.innerHTML = `
-            <p class="content-studio-message">
-                Loading media...
-            </p>
+            <div class="media-library-state" role="status">
+                <h2>Loading generated media</h2>
+                <p>Your accessible generated assets will appear here.</p>
+            </div>
         `;
         container.setAttribute("aria-busy", "true");
 
@@ -438,9 +437,11 @@ const ContentStudio = (() => {
 
             if (!state.media.length) {
                 container.innerHTML = `
-                    <p class="content-studio-message">
-                        No generated media found.
-                    </p>
+                    <div class="media-library-state">
+                        <h2>No generated media yet</h2>
+                        <p>Create a development artifact from Generate, then return here to review it.</p>
+                        <a class="studio-button primary" href="/content-studio/generate">Generate an asset</a>
+                    </div>
                 `;
                 return;
             }
@@ -451,9 +452,11 @@ const ContentStudio = (() => {
 
         } catch (error) {
             container.innerHTML = `
-                <p class="content-studio-error">
-                    ${escapeHtml(error.message)}
-                </p>
+                <div class="media-library-state" role="alert">
+                    <h2>Generated media could not be loaded</h2>
+                    <p>${escapeHtml(error.message || "Please try again.")}</p>
+                    <button type="button" class="studio-button secondary" data-retry-media>Try again</button>
+                </div>
             `;
         } finally {
             container.setAttribute("aria-busy", "false");
@@ -605,9 +608,14 @@ const ContentStudio = (() => {
         const isFinal = card.querySelector(
             ".media-final-checkbox"
         )?.checked || false;
+        const feedback = card.querySelector(".content-media-action-feedback");
 
         button.disabled = true;
         button.textContent = "Saving...";
+        if (feedback) {
+            feedback.textContent = "Saving review state...";
+            feedback.classList.remove("error");
+        }
 
         try {
             await updateMedia(mediaId, {
@@ -616,6 +624,9 @@ const ContentStudio = (() => {
             });
 
             button.textContent = "Saved";
+            if (feedback) {
+                feedback.textContent = "Review state saved.";
+            }
 
             setTimeout(() => {
                 button.textContent = "Save";
@@ -625,7 +636,10 @@ const ContentStudio = (() => {
 
         } catch (error) {
             button.textContent = "Error";
-            window.alert(error.message);
+            if (feedback) {
+                feedback.textContent = error.message || "Unable to save the review state.";
+                feedback.classList.add("error");
+            }
 
         } finally {
             button.disabled = false;
@@ -658,6 +672,12 @@ const ContentStudio = (() => {
             "click",
             handleMediaAction
         );
+
+        mediaList?.addEventListener("click", (event) => {
+            if (event.target.closest("[data-retry-media]")) {
+                renderMediaList();
+            }
+        });
 
         mediaList?.addEventListener("error", (event) => {
             const preview = event.target.closest(".content-media-preview");

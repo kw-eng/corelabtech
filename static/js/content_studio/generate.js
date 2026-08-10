@@ -42,9 +42,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const mediaLink =
         document.getElementById("generation-media-link");
 
-    const providerCapabilities = {
-        mock: { supported_output_types: ["image"] },
-    };
+    let providerCapabilities = {};
 
 
     if (
@@ -152,6 +150,42 @@ document.addEventListener("DOMContentLoaded", function () {
         refreshPrompt();
     }
 
+    async function loadProviderCapabilities() {
+        generateButton.disabled = true;
+        setMessage("Loading provider capabilities...", null);
+
+        try {
+            const response = await fetch(
+                "/content-studio/api/provider-capabilities",
+                { credentials: "same-origin", headers: { "Accept": "application/json" } }
+            );
+            const data = await parseResponse(response);
+            providerCapabilities = data.providers || {};
+
+            Array.from(provider.options).forEach((option) => {
+                const capability = providerCapabilities[option.value];
+                option.disabled = !capability;
+                option.textContent = capability
+                    ? (capability.label || option.value)
+                    : `${option.value} — not connected`;
+            });
+
+            if (!providerCapabilities[provider.value]) {
+                provider.value = Object.keys(providerCapabilities)[0] || "";
+            }
+
+            applyProviderCapabilities();
+            generateButton.disabled = !provider.value || !outputType.value;
+            setMessage("", null);
+        } catch (error) {
+            providerCapabilities = {};
+            applyProviderCapabilities();
+            generateButton.disabled = true;
+            setProgress(0, "Unavailable");
+            setMessage("Provider capabilities are unavailable. Generation is disabled until they can be loaded.", "error");
+        }
+    }
+
     provider.addEventListener("change", applyProviderCapabilities);
 
     outputType.addEventListener(
@@ -177,7 +211,7 @@ document.addEventListener("DOMContentLoaded", function () {
         );
     }
 
-    applyProviderCapabilities();
+    loadProviderCapabilities();
 
 
     // ======================================================
@@ -328,9 +362,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         throw new Error(
-            "Server returned HTTP " +
-            response.status +
-            " instead of JSON. Check Docker logs."
+            "The generation service returned an unexpected response (HTTP " +
+            response.status + ")."
         );
     }
 
@@ -369,7 +402,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                 setMessage(
-                    "CSRF token not found. Check layout.html.",
+                    "The security token is unavailable. Refresh the page and try again.",
                     "error"
                 );
 

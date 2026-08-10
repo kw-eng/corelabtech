@@ -13,6 +13,13 @@
     width: 100%;
 }
 
+.studio-library-notice {
+    margin: -10px 0 4px;
+    color: var(--studio-text-light);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
 
 /* ==========================================================
    CHARACTER GRID
@@ -729,4 +736,9 @@ a.character-card:hover
         font-size: 1.55rem;
     }
 
+}
+
+a.character-card:focus-visible {
+    outline: 3px solid #67e8f9;
+    outline-offset: 3px;
 }
