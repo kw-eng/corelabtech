@@ -1,0 +1,79 @@
+/* ==========================================================
+   Themes
+   ========================================================== */
+
+
+/* ---------- CoreLabTech ---------- */
+
+.theme-corelabtech{
+
+    --studio-primary:#16A7FF;
+
+    --studio-secondary:#3CD5FF;
+
+}
+
+
+/* ---------- CoreLabInvest ---------- */
+
+.theme-corelabinvest{
+
+    --studio-primary:#F59E0B;
+
+    --studio-secondary:#FACC15;
+
+}
+
+
+/* ---------- Wellness ---------- */
+
+.theme-wellness{
+
+    --studio-primary:#0EA5E9;
+
+    --studio-secondary:#67E8F9;
+
+}
+
+
+/* ---------- Research ---------- */
+
+.theme-research{
+
+    --studio-primary:#2563EB;
+
+    --studio-secondary:#60A5FA;
+
+}
+
+
+/* ---------- Dark ---------- */
+
+.theme-dark{
+
+    background:var(--studio-bg);
+
+    color:var(--studio-text);
+
+}
+
+
+/* ---------- Light (future) ---------- */
+
+.theme-light{
+
+    --studio-bg:#F4F7FB;
+
+    --studio-panel:#FFFFFF;
+
+    --studio-panel-light:#F8FAFC;
+
+    --studio-text:#111827;
+
+    --studio-text-light:#374151;
+
+    --studio-text-muted:#6B7280;
+
+    --studio-border:rgba(0,0,0,.08);
+
+}

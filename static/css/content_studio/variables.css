@@ -1,0 +1,95 @@
+/* ==========================================================
+   CoreLabTech AI Content Studio
+   Design Tokens
+   Kolory, typografia, odstępy, cienie, border-radius.
+   ========================================================== */
+
+:root {
+
+    /* ---------- Brand ---------- */
+
+    --studio-primary: #16A7FF;
+    --studio-secondary: #3CD5FF;
+
+    --studio-success: #4ADE80;
+    --studio-warning: #FBBF24;
+    --studio-danger: #EF4444;
+
+    /* ---------- Background ---------- */
+
+    --studio-bg: #020712;
+
+    --studio-panel: #071A2D;
+
+    --studio-panel-light: #0B2440;
+
+    --studio-panel-hover: #103050;
+
+    /* ---------- Typography ---------- */
+
+    --studio-text: #F8FAFC;
+
+    --studio-text-light: rgba(226,232,240,.75);
+
+    --studio-text-muted: rgba(148,163,184,.65);
+
+    /* ---------- Borders ---------- */
+
+    --studio-border: rgba(56,189,248,.14);
+
+    --studio-border-hover: rgba(22,167,255,.45);
+
+    /* ---------- Radius ---------- */
+
+    --studio-radius: 18px;
+
+    --studio-radius-small: 10px;
+
+    --studio-radius-round: 999px;
+
+    /* ---------- Shadows ---------- */
+
+    --studio-shadow:
+
+        0 18px 50px rgba(0,0,0,.22);
+
+    --studio-shadow-hover:
+
+        0 24px 60px rgba(0,0,0,.30);
+
+    /* ---------- Typography ---------- */
+
+    --font-family:
+
+        Inter,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+
+    --font-small: .80rem;
+
+    --font-normal: .95rem;
+
+    --font-large: 1.15rem;
+
+    --font-title: 2rem;
+
+    /* ---------- Layout ---------- */
+
+    --sidebar-width: 280px;
+
+    --topbar-height: 72px;
+
+    --content-max-width: 1600px;
+
+    /* ---------- Animation ---------- */
+
+    --transition-fast: .18s ease;
+
+    --transition-normal: .25s ease;
+
+    --transition-slow: .35s ease;
+
+}

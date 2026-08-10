@@ -1,0 +1,206 @@
+/* ==========================================================
+   CoreLabTech AI Content Studio
+   Settings
+   ========================================================== */
+
+.settings-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 24px;
+    align-items: start;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.settings-section.full {
+    grid-column: 1 / -1;
+}
+
+.settings-section-header {
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--studio-border);
+}
+
+.settings-section-header h2 {
+    margin: 0;
+}
+
+.settings-section-header p {
+    margin: 5px 0 0;
+    color: var(--studio-text-muted);
+    font-size: 0.8rem;
+}
+
+.settings-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: center;
+}
+
+.settings-row-copy strong,
+.settings-row-copy span {
+    display: block;
+}
+
+.settings-row-copy span {
+    margin-top: 3px;
+
+    color: var(--studio-text-muted);
+    font-size: 0.76rem;
+}
+
+.settings-provider-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-provider {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 15px;
+    align-items: center;
+
+    padding: 14px;
+
+    border: 1px solid var(--studio-border);
+    border-radius: 12px;
+
+    background: rgba(2, 7, 18, 0.26);
+}
+
+.settings-provider-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-provider-state {
+    width: 9px;
+    height: 9px;
+
+    border-radius: 50%;
+
+    background: var(--studio-text-muted);
+}
+
+.settings-provider-state.connected {
+    background: var(--studio-success);
+
+    box-shadow:
+        0 0 10px rgba(74, 222, 128, 0.5);
+}
+
+.settings-provider-state.disabled {
+    background: var(--studio-text-muted);
+}
+
+.settings-sidebar {
+    position: sticky;
+    top: 20px;
+}
+
+.settings-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.settings-summary-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+
+    padding-bottom: 12px;
+
+    border-bottom: 1px solid var(--studio-border);
+}
+
+.settings-summary-item:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.settings-summary-item span {
+    color: var(--studio-text-muted);
+}
+
+.settings-summary-item strong {
+    text-align: right;
+}
+
+.settings-save-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+
+    position: sticky;
+    bottom: 20px;
+
+    padding: 14px 18px;
+
+    border: 1px solid var(--studio-border);
+    border-radius: 14px;
+
+    background: rgba(7, 26, 45, 0.94);
+
+    backdrop-filter: blur(12px);
+
+    box-shadow: var(--studio-shadow);
+}
+
+.settings-message {
+    margin-right: auto;
+
+    color: var(--studio-text-muted);
+    font-size: 0.8rem;
+}
+
+.settings-message.success {
+    color: var(--studio-success);
+}
+
+.settings-message.error {
+    color: var(--studio-danger);
+}
+
+@media (max-width: 1000px) {
+    .settings-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-sidebar {
+        position: static;
+    }
+}
+
+@media (max-width: 750px) {
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .settings-section.full {
+        grid-column: auto;
+    }
+
+    .settings-save-bar {
+        flex-wrap: wrap;
+    }
+}

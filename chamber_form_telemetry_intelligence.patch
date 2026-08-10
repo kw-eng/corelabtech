@@ -1,0 +1,585 @@
+diff --git a/static/js/chamber_form.js b/static/js/chamber_form.js
+index 6efe2a5..9d637d8 100644
+--- a/static/js/chamber_form.js
++++ b/static/js/chamber_form.js
+@@ -21,7 +21,6 @@ const TABLE_PREVIEW_LIMIT = 5000
+ const TABLE_RENDER_CHUNK_SIZE = 100
+ const FIT_UPLOAD_TIMEOUT_MS = 120000
+ const GENERATED_SESSION_SUFFIX_PATTERN = /_\d{10,}$/
+-let compatibilityDevices = []
+ 
+ function i18n(key, params = null) {
+     if (typeof window !== "undefined" && typeof window.t === "function") {
+@@ -56,6 +55,92 @@ async function parseJsonResponse(res, label) {
+     }
+ }
+ 
++function getTelemetryIntelligenceReport(data) {
++    if (!data || typeof data !== "object") {
++        return null
++    }
++
++    return (
++        data.telemetry_intelligence ||
++        data.telemetry_report ||
++        (
++            data.signals && data.quality
++                ? data
++                : null
++        )
++    )
++}
++
++function renderTelemetryIntelligence(data) {
++    const report = getTelemetryIntelligenceReport(data)
++
++    if (!report || !window.TelemetryIntelligence) {
++        return
++    }
++
++    window.TelemetryIntelligence.render(report)
++}
++
++function renderTelemetryScanning() {
++    window.TelemetryIntelligence?.renderScanning()
++}
++
++function renderTelemetryError(error) {
++    if (!window.TelemetryIntelligence) {
++        return
++    }
++
++    window.TelemetryIntelligence.renderError(
++        error?.message || String(error || "Telemetry analysis failed")
++    )
++}
++
++function resetTelemetryIntelligence() {
++    window.TelemetryIntelligence?.renderPending()
++}
++
++function detectExternalImportType(file, selectedType) {
++    if (selectedType && selectedType !== "auto") {
++        return selectedType
++    }
++
++    const fileName = String(file?.name || "").toLowerCase()
++
++    if (fileName.endsWith(".csv")) return "csv"
++    if (fileName.endsWith(".xml")) return "xml"
++    if (fileName.endsWith(".json")) return "json"
++
++    return null
++}
++
++function sourceCapabilityLabel(source) {
++    if (
++        source.has_raw_rr ||
++        source.has_heart_rate ||
++        source.has_reported_hrv
++    ) {
++        return i18n("chamber.source_hr_rr_telemetry")
++    }
++
++    if (source.has_spo2 || source.has_pulse) {
++        return i18n("chamber.source_spo2_pulse_telemetry")
++    }
++
++    return i18n("chamber.source_external_telemetry")
++}
++
++function sourceHrvLabel(source) {
++    if (source.has_raw_rr) {
++        return i18n("chamber.source_hrv_from_rr")
++    }
++
++    if (source.has_reported_hrv) {
++        return i18n("chamber.source_hrv_reported")
++    }
++
++    return i18n("chamber.source_hrv_none")
++}
++
+ function waitForNextFrame() {
+     return new Promise(resolve => {
+         if (typeof requestAnimationFrame === "function") {
+@@ -236,7 +321,7 @@ window.onload = () => {
+ 
+     loadSubjects()
+ 
+-    loadDeviceCompatibility()
++    resetTelemetryIntelligence()
+ 
+     loadSessions()
+ 
+@@ -1472,6 +1557,7 @@ async function savePRE() {
+     } catch (err) {
+ 
+         console.error(err)
++        renderTelemetryError(err)
+ 
+         state.pre = null
+ 
+@@ -1523,13 +1609,10 @@ async function uploadFIT() {
+         getSelectedSubjectId()
+     )
+ 
+-    const selectedDevice = getSelectedCompatibilityDevice()
+-    if (selectedDevice) {
+-        fd.append("device_model", selectedDevice.model)
+-    }
+-
+     try {
+ 
++        renderTelemetryScanning()
++
+         if (uploadButton) {
+             uploadButton.disabled = true
+         }
+@@ -1620,6 +1703,8 @@ async function uploadFIT() {
+ 
+             loadFitChart(sessionId, data.import_id)
+         }
++
++        renderTelemetryIntelligence(data)
+         await loadSessionDataSources()
+ 
+     } catch (err) {
+@@ -1649,146 +1734,54 @@ async function uploadFIT() {
+     }
+ }
+ 
+-function getSelectedCompatibilityDevice() {
+-    const selectedId = document.getElementById("compatibilityDevice")?.value
+-    return compatibilityDevices.find(device => device.id === selectedId) || null
+-}
+-
+-function compatibilityDeviceLabel(device) {
+-    const manufacturer = String(device?.manufacturer || "").trim()
+-    const model = String(device?.model || "").trim()
+-    return model.toLowerCase().startsWith(manufacturer.toLowerCase())
+-        ? model
+-        : `${manufacturer} ${model}`.trim()
+-}
+-
+-function deviceAnalysisGuidance(role) {
+-    const key = {
+-        raw_rr_when_present_and_verified: "chamber.device_analysis_raw_rr",
+-        watch_trend_unless_external_hrm_is_verified: "chamber.device_analysis_watch",
+-        reported_hrv_and_trend_only: "chamber.device_analysis_reported",
+-        spo2_reference_pulse_auxiliary: "chamber.device_analysis_spo2",
+-    }[role]
+-    return key ? i18n(key) : role || "-"
+-}
+-
+-function applyDeviceCompatibility() {
+-    const selected = getSelectedCompatibilityDevice()
+-    const guidance = document.getElementById("compatibilityDeviceGuidance")
+-    const externalType = document.getElementById("externalTelemetryType")
+-    const deviceModel = document.getElementById("externalTelemetryDeviceModel")
+-
+-    if (!selected) {
+-        if (guidance) {
+-            guidance.textContent = i18n("chamber.device_guidance_empty")
+-        }
+-        return
+-    }
+-
+-    if (deviceModel) {
+-        deviceModel.value = compatibilityDeviceLabel(selected)
+-    }
+-
+-    const importTypes = Array.isArray(selected.import_types)
+-        ? selected.import_types
+-        : []
+-    const preferredExternalType = importTypes.find(type => (
+-        type !== "fit" && type !== "csv"
+-    ))
+-    if (externalType && preferredExternalType) {
+-        externalType.value = preferredExternalType
+-    }
+-
+-    if (!guidance) {
+-        return
+-    }
+-
+-    const importMessage = importTypes.length
+-        ? i18n("chamber.device_import_ready", {
+-            formats: (selected.formats || []).join(", "),
+-        })
+-        : i18n("chamber.device_import_planned")
+-    guidance.innerHTML = `
+-        <strong>${escapeHtml(compatibilityDeviceLabel(selected))}</strong>
+-        <small>${escapeHtml(importMessage)}</small>
+-        <small>${escapeHtml(i18n("chamber.device_raw_rr", {value: selected.raw_rr || "-"}))} · ${escapeHtml(i18n("chamber.device_reported_hrv", {value: selected.reported_hrv || "-"}))}</small>
+-        <small>${escapeHtml(i18n("chamber.device_analysis_role", {value: deviceAnalysisGuidance(selected.analysis_role)}))} · ${escapeHtml(i18n("chamber.device_cloud", {value: selected.cloud_account || "-"}))}</small>
+-    `
+-}
+-
+-async function loadDeviceCompatibility() {
+-    const select = document.getElementById("compatibilityDevice")
+-    if (!select) {
+-        return
+-    }
+-
+-    try {
+-        const response = await fetch("/api/device-catalog", {
+-            credentials: "same-origin",
+-        })
+-        const data = await parseJsonResponse(response, "LOAD DEVICE COMPATIBILITY")
+-        if (!response.ok || !Array.isArray(data.compatibility)) {
+-            throw new Error(data.error || "device catalog unavailable")
+-        }
+-
+-        compatibilityDevices = data.compatibility.slice().sort((left, right) => (
+-            `${left.manufacturer} ${left.model}`.localeCompare(
+-                `${right.manufacturer} ${right.model}`,
+-            )
+-        ))
+-        const selectedValue = select.value
+-        select.replaceChildren(new Option(
+-            i18n("chamber.select_device_placeholder"),
+-            "",
+-        ))
+-        compatibilityDevices.forEach(device => {
+-            select.add(new Option(
+-                `${device.manufacturer} ${device.model} · ${device.support_level}`,
+-                device.id,
+-            ))
+-        })
+-        select.value = selectedValue
+-        select.addEventListener("change", applyDeviceCompatibility)
+-    } catch (error) {
+-        console.error("Device compatibility unavailable", error)
+-    }
+-}
+-
+ async function uploadExternalTelemetry() {
+     const input = document.getElementById("externalTelemetryFile")
+-    const type = document.getElementById("externalTelemetryType")?.value
+-    const deviceModel = document.getElementById("externalTelemetryDeviceModel")?.value.trim()
++    const selectedType = document.getElementById("externalTelemetryType")?.value
+     const timezoneInput = document.getElementById("externalTelemetryTimezone")
+     const status = document.getElementById("externalTelemetryStatus")
+     const sessionId = document.getElementById("session_id")?.value.trim()
++    const file = input?.files?.[0]
+ 
+-    if (!input?.files.length || !type) {
++    if (!file) {
+         alert(i18n("chamber.select_external_telemetry"))
+         return
+     }
++
+     if (!sessionId) {
+         alert(i18n("chamber.generate_session_first"))
+         return
+     }
+ 
++    const importType = detectExternalImportType(file, selectedType)
++
++    if (!importType) {
++        alert(i18n("chamber.unsupported_file_format"))
++        return
++    }
++
+     const formData = new FormData()
+-    formData.append("file", input.files[0])
++    formData.append("file", file)
+     formData.append("session_id", sessionId)
+     formData.append("client_id", getSelectedSubjectId())
+-    formData.append("import_type", type)
++    formData.append("import_type", importType)
++
+     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+     const selectedTimezone = timezoneInput?.value || "browser"
+-    const sourceTimezone = selectedTimezone === "browser" ? browserTimezone : selectedTimezone
++    const sourceTimezone = selectedTimezone === "browser"
++        ? browserTimezone
++        : selectedTimezone
++
+     if (sourceTimezone && sourceTimezone !== "unknown") {
+         formData.append("source_timezone", sourceTimezone)
+     }
+-    if (deviceModel) {
+-        formData.append("device_model", deviceModel)
+-    }
++
+     if (status) {
+         status.innerHTML = `<div class="success-box">${escapeHtml(i18n("chamber.uploading_external_telemetry"))}</div>`
+     }
++
+     try {
++        renderTelemetryScanning()
++
+         const response = await fetch("/upload_telemetry", {
+             method: "POST",
+             credentials: "same-origin",
+@@ -1796,20 +1789,36 @@ async function uploadExternalTelemetry() {
+         })
+         const data = await parseJsonResponse(response, "UPLOAD EXTERNAL TELEMETRY")
+         const duplicate = response.status === 409 && data?.status === "duplicate"
++
+         if ((!response.ok && !duplicate) || (data.error && !duplicate)) {
+-            throw new Error(data.error || i18n("chamber.external_telemetry_upload_failed"))
++            throw new Error(
++                data.error || i18n("chamber.external_telemetry_upload_failed")
++            )
+         }
++
+         if (status) {
+-            status.innerHTML = `<div class="success-box">${escapeHtml(duplicate ? i18n("chamber.external_telemetry_already_imported") : i18n("chamber.external_telemetry_uploaded"))}<br>${escapeHtml(i18n("chamber.records_count", {count: data.records_saved || data.records || 0}))}</div>`
++            status.innerHTML = `<div class="success-box">${escapeHtml(
++                duplicate
++                    ? i18n("chamber.external_telemetry_already_imported")
++                    : i18n("chamber.external_telemetry_uploaded")
++            )}<br>${escapeHtml(i18n("chamber.records_count", {
++                count: data.records_saved || data.records || 0,
++            }))}</div>`
+         }
++
++        renderTelemetryIntelligence(data)
+         await loadFITTable(sessionId, data.import_id)
+         clearMergedPreview()
++
+         if (typeof loadFitChart === "function") {
+             loadFitChart(sessionId, data.import_id)
+         }
++
+         await loadSessionDataSources()
+     } catch (error) {
+         console.error("uploadExternalTelemetry failed", error)
++        renderTelemetryError(error)
++
+         if (status) {
+             status.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
+         }
+@@ -1818,15 +1827,28 @@ async function uploadExternalTelemetry() {
+ 
+ function preflightConfig(kind) {
+     if (kind === "fit") {
+-        return {input: "fitFile", output: "fitPreflight", importType: "fit"}
++        return {
++            input: "fitFile",
++            output: "fitPreflight",
++            importType: "fit",
++        }
+     }
++
+     if (kind === "csv") {
+-        return {input: "csvFile", output: "csvPreflight", importType: "csv"}
++        return {
++            input: "csvFile",
++            output: "csvPreflight",
++            importType: "csv",
++        }
+     }
++
++    const input = document.getElementById("externalTelemetryFile")
++    const selectedType = document.getElementById("externalTelemetryType")?.value
++
+     return {
+         input: "externalTelemetryFile",
+         output: "externalTelemetryPreflight",
+-        importType: document.getElementById("externalTelemetryType")?.value,
++        importType: detectExternalImportType(input?.files?.[0], selectedType),
+     }
+ }
+ 
+@@ -1845,32 +1867,67 @@ async function preflightTelemetry(kind) {
+     const config = preflightConfig(kind)
+     const input = document.getElementById(config.input)
+     const output = document.getElementById(config.output)
++
+     if (!input?.files.length || !config.importType) {
+-        if (output) output.innerHTML = `<div class="error-box">${escapeHtml(i18n("chamber.preflight_select_file"))}</div>`
++        if (output) {
++            output.innerHTML = `<div class="error-box">${escapeHtml(i18n("chamber.preflight_select_file"))}</div>`
++        }
+         return
+     }
++
+     const formData = new FormData()
+     formData.append("file", input.files[0])
+     formData.append("import_type", config.importType)
+-    const selected = getSelectedCompatibilityDevice()
+-    const model = kind === "external"
+-        ? document.getElementById("externalTelemetryDeviceModel")?.value.trim()
+-        : selected?.model
+-    if (model) formData.append("device_model", model)
+-    if (output) output.textContent = i18n("chamber.preflight_validating")
++
++    if (output) {
++        output.textContent = i18n("chamber.preflight_validating")
++    }
++
++    renderTelemetryScanning()
++
+     try {
+         const response = await fetch("/api/telemetry/preflight", {
+-            method: "POST", credentials: "same-origin", body: formData,
++            method: "POST",
++            credentials: "same-origin",
++            body: formData,
+         })
+         const data = await parseJsonResponse(response, "TELEMETRY PREFLIGHT")
+-        if (!response.ok || data.error) throw new Error(data.error || "Validation failed")
+-        const signals = Object.entries(data.signals || {})
+-            .filter(([, available]) => available)
+-            .map(([name]) => i18n(`chamber.signal_${name}`))
++
++        if (!response.ok || data.error) {
++            throw new Error(data.error || "Validation failed")
++        }
++
++        const report = getTelemetryIntelligenceReport(data)
++        renderTelemetryIntelligence(data)
++
++        const file = report?.file || {}
++        const quality = report?.quality || {}
++        const signals = Object.entries(report?.signals || data.signals || {})
++            .filter(([, available]) => Boolean(available))
++            .filter(([name]) => name !== "hrv")
++            .map(([name]) => {
++                const key = `chamber.signal_${name}`
++                const translated = i18n(key)
++                return translated === key ? name.replaceAll("_", " ") : translated
++            })
+             .join(", ") || i18n("chamber.preflight_signals_none")
+-        output.innerHTML = `<div class="preflight-ready"><strong>${escapeHtml(i18n("chamber.preflight_ready"))}</strong><small>${escapeHtml(i18n("chamber.preflight_records", {valid: data.records_valid, rejected: data.records_rejected}))}</small><small>${escapeHtml(i18n("chamber.preflight_range", {start: data.first_timestamp || "-", end: data.last_timestamp || "-"}))}</small><small>${escapeHtml(i18n("chamber.preflight_signals", {signals}))}</small><small>${escapeHtml(i18n("chamber.preflight_hrv_quality", {hrv: hrvStatusLabel(data.hrv_status), quality: telemetryValueLabel(data.signal_quality)}))}</small><small>${escapeHtml(i18n("chamber.preflight_parser", {version: data.parser_version}))}</small></div>`
++
++        if (output) {
++            output.innerHTML = `<div class="preflight-ready"><strong>${escapeHtml(i18n("chamber.preflight_ready"))}</strong><small>${escapeHtml(i18n("chamber.preflight_records", {
++                valid: data.records_valid ?? file.records ?? 0,
++                rejected: data.records_rejected ?? 0,
++            }))}</small><small>${escapeHtml(i18n("chamber.preflight_range", {
++                start: file.first_timestamp || data.first_timestamp || "-",
++                end: file.last_timestamp || data.last_timestamp || "-",
++            }))}</small><small>${escapeHtml(i18n("chamber.preflight_signals", {signals}))}</small><small>${escapeHtml(
++                `Quality: ${quality.score ?? "-"}% (${telemetryValueLabel(quality.level)})`
++            )}</small></div>`
++        }
+     } catch (error) {
+-        if (output) output.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
++        renderTelemetryError(error)
++        if (output) {
++            output.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
++        }
+     }
+ }
+ 
+@@ -1878,21 +1935,51 @@ async function loadSessionDataSources() {
+     const sessionId = document.getElementById("session_id")?.value.trim()
+     const clientId = getSelectedSubjectId()
+     const output = document.getElementById("sessionDataSources")
+-    if (!output || !sessionId || !clientId) return
++
++    if (!output || !sessionId || !clientId) {
++        return
++    }
++
+     try {
+-        const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/data-sources?client_id=${encodeURIComponent(clientId)}`, {credentials: "same-origin"})
++        const response = await fetch(
++            `/api/sessions/${encodeURIComponent(sessionId)}/data-sources?client_id=${encodeURIComponent(clientId)}`,
++            {credentials: "same-origin"}
++        )
+         const data = await parseJsonResponse(response, "SESSION DATA SOURCES")
+-        if (!response.ok || data.error) throw new Error(data.error || "Could not load sources")
++
++        if (!response.ok || data.error) {
++            throw new Error(data.error || "Could not load sources")
++        }
++
++        renderTelemetryIntelligence(data)
++
+         if (!data.sources?.length) {
+             output.textContent = i18n("chamber.session_data_sources_none")
+             return
+         }
++
+         output.innerHTML = `<div class="session-data-source-list">${data.sources.map(source => {
+-            const hrv = source.has_raw_rr ? i18n("chamber.source_hrv_from_rr") : (source.import_type === "apple_health_xml" || source.import_type === "health_connect_json" ? i18n("chamber.source_hrv_reported") : i18n("chamber.source_hrv_none"))
+-            const records = i18n("chamber.source_records", {start: source.first_timestamp || "-", end: source.last_timestamp || "-", count: source.records_saved || 0})
+-            const provenance = i18n("chamber.source_provenance", {hrv, parser: source.parser_version || "-", timezone: source.source_timezone || "unknown"})
+-            const audit = i18n("chamber.source_audit", {imported: source.imported_at || "-", hash: String(source.file_hash || "-").slice(0, 12)})
+-            return `<div class="session-data-source"><strong>${escapeHtml(source.device_model || source.import_type)}</strong><small>${escapeHtml(source.import_type)} | ${escapeHtml(source.measurement_method || "unknown")} | ${escapeHtml(source.device_type || "unknown")}</small><small>${escapeHtml(records)}</small><small>${escapeHtml(provenance)}</small><small>${escapeHtml(audit)}</small><small>${escapeHtml(i18n("chamber.source_reimport_required"))}</small></div>`
++            const label = sourceCapabilityLabel(source)
++            const hrv = sourceHrvLabel(source)
++            const records = i18n("chamber.source_records", {
++                start: source.first_timestamp || "-",
++                end: source.last_timestamp || "-",
++                count: source.records_saved || 0,
++            })
++            const provenance = i18n("chamber.source_provenance", {
++                hrv,
++                parser: source.parser_version || "-",
++                timezone: source.source_timezone || "unknown",
++            })
++            const audit = i18n("chamber.source_audit", {
++                imported: source.imported_at || "-",
++                hash: String(source.file_hash || "-").slice(0, 12),
++            })
++            const sourceFormat = String(
++                source.file_type || source.import_type || "telemetry"
++            ).toUpperCase()
++
++            return `<div class="session-data-source"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(sourceFormat)}</small><small>${escapeHtml(records)}</small><small>${escapeHtml(provenance)}</small><small>${escapeHtml(audit)}</small></div>`
+         }).join("")}</div>`
+     } catch (error) {
+         output.innerHTML = `<div class="error-box">${escapeHtml(error.message || error)}</div>`
+@@ -2049,6 +2136,8 @@ async function uploadCSV() {
+ 
+     try {
+ 
++        renderTelemetryScanning()
++
+ let res = await fetch(
+     "/upload_csv",
+     {
+@@ -2102,12 +2191,14 @@ let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
+             ).value,
+             data.import_id
+         )
++        renderTelemetryIntelligence(data)
+         await loadSessionDataSources()
+         clearMergedPreview()
+ 
+     } catch (err) {
+ 
+         console.error(err)
++        renderTelemetryError(err)
+ 
+         alert(i18n("chamber.spo2_upload_server_error"))
+     }
+@@ -2267,6 +2358,8 @@ async function mergeDuring() {
+             renderMergedChart(merged)
+         }
+ 
++        renderTelemetryIntelligence(data)
++
+         const status =
+             document.getElementById("mergeStatus")
+ 
+@@ -2292,6 +2385,7 @@ async function mergeDuring() {
+     } catch (err) {
+ 
+         console.error("mergeDuring crash:", err)
++        renderTelemetryError(err)
+         alert(i18n("chamber.merge_crashed"))
+         return []
+     }
+@@ -2339,10 +2433,10 @@ function renderMergedTable(rows) {
+         return `
+             <tr>
+                 <td>${r.timestamp || r.time || "-"}</td>
+-                <td>${r.hr || r.heart_rate || "-"}</td>
+-                <td>${r.pulse || "-"}</td>
+-                <td>${r.rr_interval || r.rr || "-"}</td>
+-                <td>${r.hrv || "-"}</td>
++                <td>${escapeHtml(String(displayValue(r.heart_rate, r.heart_rate_bpm, r.hr)))}</td>
++                <td>${escapeHtml(String(displayValue(r.pulse, r.pulse_rate_bpm)))}</td>
++                <td>${escapeHtml(String(displayValue(r.rr_interval, r.rr)))}</td>
++                <td>${escapeHtml(String(displayValue(r.hrv, r.rmssd)))}</td>
+                 <td>${spo2}</td>
+                 <td>${r.source || "merged"}</td>
+             </tr>

@@ -6,6 +6,7 @@ It is imported by Docker/Gunicorn and can also be run directly for local dev.
 
 import os
 import time
+from datetime import timedelta
 
 from flask import g, redirect, render_template, request, url_for
 from flask_login import LoginManager
@@ -41,6 +42,8 @@ from routes.publication_routes import pub_bp
 from routes.telemetry_routes import telemetry_bp
 from routes.performance_routes import performance_bp
 from routes.health_routes import health_bp
+from routes.content_studio_routes import content_studio_bp
+
 
 def ensure_runtime_directories():
     """Create folders that the app writes to at runtime.
@@ -134,6 +137,7 @@ app.register_blueprint(main_bp)
 app.register_blueprint(research_bp)
 app.register_blueprint(ai_bp)
 app.register_blueprint(pub_bp)
+app.register_blueprint(content_studio_bp)
 # app.register_blueprint(user_bp)
 app.register_blueprint(telemetry_bp)
 if app.config["INTERNAL_TOOLS_ENABLED"]:
@@ -145,6 +149,12 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SECURE"] = (
     os.getenv("SESSION_COOKIE_SECURE", "True" if IS_PRODUCTION else "False") == "True"
+)
+app.config["REMEMBER_COOKIE_SECURE"] = app.config["SESSION_COOKIE_SECURE"]
+app.config["SESSION_COOKIE_SAMESITE"] = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+app.config["REMEMBER_COOKIE_SAMESITE"] = os.getenv("REMEMBER_COOKIE_SAMESITE", "Lax")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
+    minutes=int(os.getenv("SESSION_LIFETIME_MINUTES", "480"))
 )
 app.register_blueprint(auth_bp)
 app.register_blueprint(health_bp)

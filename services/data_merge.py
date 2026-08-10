@@ -12,7 +12,9 @@ from typing import Any
 
 import pandas as pd
 
+from core.telemetry.contract import SCHEMA_VERSION
 from database_postgres import db
+from services.hrv_pipeline import annotate_hrv_rmssd_timeline
 
 from repositories.data_repository import (
     get_latest_completed_csv_import,
@@ -208,6 +210,18 @@ def merge_session_data(
                 f"matched_records={matched}; "
                 f"match_rate={match_rate}"
             ),
+            time_alignment_method=first_not_none(
+                *[
+                    row.get("time_alignment_method")
+                    for row in merged_rows
+                ],
+            ),
+            time_alignment_quality=first_not_none(
+                *[
+                    row.get("time_alignment_quality")
+                    for row in merged_rows
+                ],
+            ),
         )
 
         connection.commit()
@@ -254,10 +268,26 @@ def merge_fit_and_csv(
         fit_df["timestamp"],
         errors="coerce",
     )
+    fit_df["fit_timestamp_utc"] = pd.to_datetime(
+        fit_df.get(
+            "timestamp_utc",
+            pd.Series(index=fit_df.index, dtype="object"),
+        ),
+        errors="coerce",
+        utc=True,
+    )
 
     csv_df["csv_timestamp"] = pd.to_datetime(
         csv_df["timestamp"],
         errors="coerce",
+    )
+    csv_df["csv_timestamp_utc"] = pd.to_datetime(
+        csv_df.get(
+            "timestamp_utc",
+            pd.Series(index=csv_df.index, dtype="object"),
+        ),
+        errors="coerce",
+        utc=True,
     )
 
     fit_df = (
@@ -282,12 +312,28 @@ def merge_fit_and_csv(
             "No valid CSV timestamps"
         )
 
+    use_utc = (
+        fit_df["fit_timestamp_utc"].notna().all()
+        and csv_df["csv_timestamp_utc"].notna().all()
+    )
+    if use_utc:
+        fit_df["fit_timestamp"] = fit_df["fit_timestamp_utc"]
+        csv_df["csv_timestamp"] = csv_df["csv_timestamp_utc"]
+
+    if "rr_intervals" not in fit_df:
+        fit_df["rr_intervals"] = [[] for _ in range(len(fit_df))]
+
     fit_for_merge = fit_df[
         [
             "fit_timestamp",
             "heart_rate",
+            "heart_rate_bpm",
             "hrv",
             "rr_interval",
+            "rr_intervals",
+            "device_type",
+            "measurement_method",
+            "signal_quality",
         ]
     ].copy()
 
@@ -296,15 +342,22 @@ def merge_fit_and_csv(
             "csv_timestamp",
             "spo2",
             "pulse",
+            "pulse_rate_bpm",
             "motion",
+            "device_type",
+            "measurement_method",
+            "signal_quality",
         ]
     ].copy()
 
-    fit_time_offset = choose_fit_time_offset(
-        fit_for_merge=fit_for_merge,
-        csv_for_merge=csv_for_merge,
-        tolerance_ms=tolerance_ms,
-    )
+    fit_time_offset = 0
+    alignment_method = "utc_nearest" if use_utc else "offset_nearest"
+    if not use_utc:
+        fit_time_offset = choose_fit_time_offset(
+            fit_for_merge=fit_for_merge,
+            csv_for_merge=csv_for_merge,
+            tolerance_ms=tolerance_ms,
+        )
 
     if fit_time_offset:
         fit_for_merge["fit_timestamp"] = (
@@ -355,11 +408,17 @@ def merge_fit_and_csv(
                 "heart_rate": safe_value(
                     row.get("heart_rate")
                 ),
+                "heart_rate_bpm": safe_value(
+                    row.get("heart_rate_bpm")
+                ),
                 "hrv": safe_value(
                     row.get("hrv")
                 ),
                 "rr_interval": safe_value(
                     row.get("rr_interval")
+                ),
+                "rr_intervals": safe_list(
+                    row.get("rr_intervals")
                 ),
 
                 "spo2": safe_value(
@@ -368,8 +427,48 @@ def merge_fit_and_csv(
                 "pulse": safe_value(
                     row.get("pulse")
                 ),
+                "pulse_rate_bpm": safe_value(
+                    row.get("pulse_rate_bpm")
+                ),
                 "motion": safe_value(
                     row.get("motion")
+                ),
+
+                "hr_source_type": safe_value(
+                    row.get("device_type_y")
+                ) or "unknown",
+                "hr_measurement_method": safe_value(
+                    row.get("measurement_method_y")
+                ) or "unknown",
+                "hr_signal_quality": safe_value(
+                    row.get("signal_quality_y")
+                ) or "unknown",
+                "pulse_source_type": safe_value(
+                    row.get("device_type_x")
+                ) or "unknown",
+                "pulse_measurement_method": safe_value(
+                    row.get("measurement_method_x")
+                ) or "unknown",
+                "pulse_signal_quality": safe_value(
+                    row.get("signal_quality_x")
+                ) or "unknown",
+                "telemetry_schema_version": SCHEMA_VERSION,
+                "timestamp_utc": (
+                    csv_timestamp.to_pydatetime() if use_utc else None
+                ),
+                "fit_timestamp_utc": (
+                    fit_timestamp.to_pydatetime()
+                    if synchronized and use_utc
+                    else None
+                ),
+                "csv_timestamp_utc": (
+                    csv_timestamp.to_pydatetime() if use_utc else None
+                ),
+                "time_alignment_method": alignment_method,
+                "time_alignment_quality": (
+                    "high" if synchronized and use_utc
+                    else "medium" if synchronized
+                    else "low"
                 ),
 
                 "fit_timestamp": (
@@ -387,6 +486,11 @@ def merge_fit_and_csv(
             }
         )
 
+    # FIT-level rolling RMSSD is retained when available; recompute only when
+    # merging introduced a source classification unavailable at import time.
+    if not any(row.get("hrv") is not None for row in result):
+        annotate_hrv_rmssd_timeline(result)
+
     return result
 
 
@@ -403,12 +507,28 @@ def merge_csv_only(
 
         result.append({
             "timestamp": timestamp,
-            "heart_rate": row.get("heart_rate") or row.get("pulse"),
+            "heart_rate": row.get("heart_rate_bpm"),
+            "heart_rate_bpm": row.get("heart_rate_bpm"),
             "hrv": None,
             "rr_interval": None,
             "spo2": row.get("spo2"),
             "pulse": row.get("pulse"),
+            "pulse_rate_bpm": row.get("pulse_rate_bpm") or row.get("pulse"),
             "motion": row.get("motion"),
+            "hr_source_type": "unknown",
+            "hr_measurement_method": "unknown",
+            "hr_signal_quality": "unknown",
+            "pulse_source_type": row.get("device_type") or "unknown",
+            "pulse_measurement_method": (
+                row.get("measurement_method") or "unknown"
+            ),
+            "pulse_signal_quality": row.get("signal_quality") or "unknown",
+            "telemetry_schema_version": SCHEMA_VERSION,
+            "timestamp_utc": row.get("timestamp_utc"),
+            "fit_timestamp_utc": None,
+            "csv_timestamp_utc": row.get("timestamp_utc"),
+            "time_alignment_method": "single_source",
+            "time_alignment_quality": "high",
             "fit_timestamp": None,
             "csv_timestamp": timestamp,
             "delta_ms": None,
@@ -507,6 +627,24 @@ def safe_value(value):
         return value.item()
 
     return value
+
+
+def safe_list(value):
+    """Preserve list-like telemetry fields without applying scalar NaN rules."""
+
+    if value is None:
+        return []
+
+    if isinstance(value, (list, tuple)):
+        return list(value)
+
+    try:
+        if pd.isna(value):
+            return []
+    except (TypeError, ValueError):
+        return []
+
+    return []
 
 
 def first_not_none(*values):

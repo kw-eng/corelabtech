@@ -1,0 +1,107 @@
+/* ==========================================================
+   Cards
+   Karty dashboardu, postaci, scen i mediów
+   ========================================================== */
+
+.studio-card{
+
+    background:var(--studio-panel);
+
+    border:1px solid var(--studio-border);
+
+    border-radius:var(--studio-radius);
+
+    padding:24px;
+
+    box-shadow:var(--studio-shadow);
+
+    transition:all var(--transition-normal);
+
+}
+
+.studio-card:hover{
+
+    border-color:var(--studio-border-hover);
+
+    box-shadow:var(--studio-shadow-hover);
+
+}
+
+.dashboard-grid{
+
+    display:grid;
+
+    grid-template-columns:
+
+        repeat(auto-fill,minmax(320px,1fr));
+
+    gap:24px;
+
+}
+
+.stats-card{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:8px;
+
+}
+
+.stats-card-value{
+
+    font-size:34px;
+
+    font-weight:700;
+
+}
+
+.stats-card-label{
+
+    color:var(--studio-text-light);
+
+}
+
+.character-card,
+.scene-card,
+.media-card{
+
+    overflow:hidden;
+
+    border-radius:18px;
+
+    border:1px solid var(--studio-border);
+
+    background:var(--studio-panel);
+
+    transition:all var(--transition-normal);
+
+}
+
+.character-card:hover,
+.scene-card:hover,
+.media-card:hover{
+
+    transform:translateY(-4px);
+
+    border-color:var(--studio-primary);
+
+}
+
+.character-card img,
+.media-card img,
+.media-card video{
+
+    display:block;
+
+    width:100%;
+
+}
+
+.character-card-body,
+.media-info{
+
+    padding:18px;
+
+}

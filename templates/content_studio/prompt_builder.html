@@ -1,0 +1,114 @@
+{% extends "content_studio/base.html" %}
+
+{% block studio_title %}
+Prompt Builder
+{% endblock %}
+
+{% block studio_subtitle %}
+Build prompts automatically from CoreLabTech templates.
+{% endblock %}
+
+{% block studio_content %}
+
+<form id="promptBuilder">
+
+<div class="builder">
+
+<div class="left">
+
+<label>
+
+Character
+
+</label>
+
+<select>
+
+<option>Athlete</option>
+
+<option>Doctor</option>
+
+<option>Researcher</option>
+
+</select>
+
+<label>
+
+Scene
+
+</label>
+
+<select>
+
+<option>HOME_HERO</option>
+
+<option>RUNNING_TRACK</option>
+
+<option>HBOT</option>
+
+<option>RECOVERY</option>
+
+</select>
+
+<label>
+
+Style
+
+</label>
+
+<select>
+
+<option>Apple</option>
+
+<option>Garmin</option>
+
+<option>WHOOP</option>
+
+<option>CoreLabTech</option>
+
+</select>
+
+<label>
+
+Provider
+
+</label>
+
+<select>
+
+<option>GPT Image</option>
+
+<option>Kling</option>
+
+<option>Veo</option>
+
+<option>ComfyUI</option>
+
+</select>
+
+<button>
+
+Build Prompt
+
+</button>
+
+</div>
+
+<div class="right">
+
+<textarea
+id="generatedPrompt"
+rows="35"
+>
+
+Prompt appears here...
+
+</textarea>
+
+</div>
+
+</div>
+
+</form>
+
+{% endblock %}

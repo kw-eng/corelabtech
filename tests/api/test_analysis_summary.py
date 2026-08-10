@@ -23,14 +23,26 @@ sys.modules.setdefault(
 sys.modules.setdefault(
     "repositories.wellness_repository",
     types.SimpleNamespace(
+        get_wellness_summary=lambda *args, **kwargs: {},
         refresh_daily_baseline=lambda *args, **kwargs: None,
         upsert_session_features=lambda *args, **kwargs: None,
     ),
 )
-from services.analysis_service import analyze_measurements
+from services.analysis_service import (
+    analyze_measurements,
+    get_analysis_model_manifest,
+)
 
 
 class AnalysisSummaryTests(unittest.TestCase):
+    def test_admin_model_manifest_tracks_active_analysis_versions(self):
+        manifest = get_analysis_model_manifest()
+
+        self.assertEqual(manifest["version"], "wellness-rules-v2")
+        self.assertEqual(manifest["hrv_algorithm_version"], "rr-clean-v2")
+        self.assertEqual(len(manifest["layers"]), 4)
+        self.assertEqual(manifest["llm_narration"]["version"], "llm-narration-v2")
+
     def test_summary_mentions_pulse_hrv_and_check_in_context(self):
         measurements = [
             {
@@ -79,6 +91,9 @@ class AnalysisSummaryTests(unittest.TestCase):
                 "synchronized": True,
             },
         ]
+        for row in measurements:
+            row["hr_source_type"] = "chest_hrm"
+            row["hr_measurement_method"] = "ecg"
         session_context = {
             "pre_check_in": {
                 "sleep_hours": 5.5,
@@ -108,6 +123,59 @@ class AnalysisSummaryTests(unittest.TestCase):
         self.assertIn("reduced sleep quality", summary)
         self.assertIn("higher recent activity load", summary)
         self.assertIn("reported stress or fatigue", summary)
+
+    def test_sensor_divergence_reduces_confidence_not_wellness_score(self):
+        measurements = [
+            {
+                "timestamp": f"2026-07-29T10:01:{index * 5:02d}",
+                "spo2": 98,
+                "heart_rate_bpm": 70,
+                "pulse_rate_bpm": 40,
+                "rr_interval": 800 if index % 2 == 0 else 900,
+                "synchronized": True,
+                "time_alignment_quality": "high",
+                "hr_source_type": "chest_hrm",
+                "hr_measurement_method": "ecg",
+            }
+            for index in range(12)
+        ]
+
+        result = analyze_measurements(
+            measurements=measurements,
+            usable=measurements,
+        )
+
+        features = result["features"]
+        self.assertEqual(result["overall_score"], 100)
+        self.assertFalse(result["session_flagged"])
+        self.assertTrue(result["sensor_alignment_warning"])
+        self.assertEqual(result["analysis_confidence"], "low")
+        self.assertEqual(features["median_hr_pulse_difference_bpm"], 30.0)
+        self.assertEqual(features["hr_pulse_agreement_percent"], 0.0)
+        self.assertEqual(features["hr_pulse_divergence_duration_seconds"], 55.0)
+        self.assertEqual(features["synchronized_temporal_coverage_percent"], 100.0)
+        self.assertIn("low_hr_pulse_agreement", features["quality_reasons"])
+
+    def test_unknown_wearable_hr_is_not_used_for_wellness_scoring(self):
+        measurements = [
+            {
+                "timestamp": "2026-07-29T10:01:00",
+                "spo2": 98,
+                "heart_rate_bpm": 170,
+                "synchronized": True,
+                "hr_source_type": "wearable_fit",
+                "hr_measurement_method": "unknown",
+            }
+        ]
+
+        result = analyze_measurements(
+            measurements=measurements,
+            usable=measurements,
+        )
+
+        self.assertEqual(result["overall_score"], 100)
+        self.assertFalse(result["wellness_flags"]["elevated_load"])
+        self.assertEqual(result["features"]["max_reference_heart_rate"], None)
 
 
 if __name__ == "__main__":

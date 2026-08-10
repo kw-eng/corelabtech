@@ -54,6 +54,26 @@ services:
     networks:
       - private
 
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_DIR: /backups/postgres
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ../../backups:/backups
+      - ./backup/postgres_backup_loop.sh:/usr/local/bin/postgres_backup_loop.sh:ro
+    command: ["sh", "/usr/local/bin/postgres_backup_loop.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - private
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped

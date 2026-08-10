@@ -3,6 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <meta
+        name="csrf-token"
+        content="{{ csrf_token() }}"
+    >
 
     <title>CoreLabTech</title>
 
@@ -38,6 +44,7 @@
         <img
             src="{{ url_for('static', filename='img/logo.svg') }}?v=wellness-commercial-20260727"
             class="logo"
+            alt="CoreLabTech"
         >
 
         <div class="title">
@@ -80,15 +87,30 @@
             </div>
 
             {% if config.INTERNAL_TOOLS_ENABLED and current_user.role in ["researcher", "admin"] %}
-                <div class="nav-group nav-dropdown">
-                    <button type="button">{{ t('nav.ai_qa') }}</button>
-                    <div class="nav-menu">
-                        <a href="{{ url_for('ai.ai_lab') }}">{{ t('nav.ai_lab') }}</a>
-                        <a href="{{ url_for('ai_qa.ai_qa_lab') }}">{{ t('nav.ai_qa_lab') }}</a>
-                        <a href="{{ url_for('qa.qa_lab') }}">{{ t('nav.software_qa_lab') }}</a>
-                    </div>
-                </div>
-            {% endif %}
+    <div class="nav-group nav-dropdown">
+        <button type="button">
+            {{ t('nav.ai_qa') }}
+        </button>
+
+        <div class="nav-menu">
+            <a href="{{ url_for('ai.ai_lab') }}">
+                {{ t('nav.ai_lab') }}
+            </a>
+
+            <a href="{{ url_for('ai_qa.ai_qa_lab') }}">
+                {{ t('nav.ai_qa_lab') }}
+            </a>
+
+            <a href="{{ url_for('qa.qa_lab') }}">
+                {{ t('nav.software_qa_lab') }}
+            </a>
+
+            <a href="{{ url_for('content_studio.content_studio_page') }}">
+                AI Content Studio
+            </a>
+        </div>
+    </div>
+{% endif %}
 
             {% if current_user.role == "admin" %}
                 <div class="nav-group nav-dropdown">
@@ -108,7 +130,10 @@
 
             <div class="nav-group nav-group-right nav-account">
                 <a href="{{ url_for('auth.profile') }}">{{ t('nav.profile') }}</a>
-                <a class="nav-danger" href="{{ url_for('auth.logout') }}">{{ t('nav.logout') }}</a>
+                <form class="nav-logout-form" action="{{ url_for('auth.logout') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="nav-danger" type="submit">{{ t('nav.logout') }}</button>
+                </form>
             </div>
         {% endif %}
 

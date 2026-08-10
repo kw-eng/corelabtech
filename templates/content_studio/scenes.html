@@ -1,0 +1,43 @@
+{% extends "content_studio/base.html" %}
+
+{% block studio_title %}
+Scene Library
+{% endblock %}
+
+{% block studio_subtitle %}
+Reusable scenes for images and videos.
+{% endblock %}
+
+{% block studio_content %}
+
+<div class="scene-grid">
+
+{% for scene in scenes %}
+
+<div class="scene-card">
+
+    <h3>{{ scene.id }}</h3>
+
+    <p>{{ scene.title }}</p>
+
+    <p>{{ scene.category }}</p>
+
+    <button>
+
+        Preview
+
+    </button>
+
+    <button>
+
+        Generate
+
+    </button>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endblock %}

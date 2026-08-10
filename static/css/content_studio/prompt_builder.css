@@ -1,0 +1,156 @@
+/* ==========================================================
+   CoreLabTech AI Content Studio
+   Prompt Builder
+   ========================================================== */
+
+.prompt-builder-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+
+.prompt-builder-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.prompt-builder-section {
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--studio-border);
+}
+
+.prompt-builder-section:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.prompt-builder-section h3 {
+    margin: 0 0 14px;
+
+    color: var(--studio-text);
+    font-size: 0.92rem;
+}
+
+.prompt-builder-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.prompt-builder-preview {
+    position: sticky;
+    top: 20px;
+
+    min-width: 0;
+}
+
+.prompt-preview-panel {
+    overflow: hidden;
+
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius);
+
+    background: var(--studio-panel);
+
+    box-shadow: var(--studio-shadow);
+}
+
+.prompt-preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    padding: 14px 18px;
+
+    border-bottom: 1px solid var(--studio-border);
+}
+
+.prompt-preview-toolbar strong {
+    font-size: 0.85rem;
+}
+
+.prompt-preview-toolbar-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.prompt-preview-content {
+    min-height: 600px;
+}
+
+.prompt-preview-content textarea {
+    width: 100%;
+    min-height: 600px;
+    padding: 20px;
+
+    border: 0;
+    border-radius: 0;
+
+    color: #dbeafe;
+
+    background: #020712;
+
+    font-family:
+        "Cascadia Code",
+        "SFMono-Regular",
+        Consolas,
+        monospace;
+
+    font-size: 0.82rem;
+    line-height: 1.7;
+
+    resize: vertical;
+}
+
+.prompt-builder-token-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.prompt-builder-token {
+    padding: 5px 9px;
+
+    border: 1px solid rgba(60, 213, 255, 0.16);
+    border-radius: 999px;
+
+    color: var(--studio-secondary);
+    background: rgba(22, 167, 255, 0.07);
+
+    font-size: 0.7rem;
+}
+
+.prompt-builder-message {
+    min-height: 20px;
+    margin: 0;
+
+    color: var(--studio-text-muted);
+    font-size: 0.8rem;
+}
+
+.prompt-builder-message.success {
+    color: var(--studio-success);
+}
+
+.prompt-builder-message.error {
+    color: var(--studio-danger);
+}
+
+@media (max-width: 1050px) {
+    .prompt-builder-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .prompt-builder-preview {
+        position: static;
+    }
+}
+
+@media (max-width: 600px) {
+    .prompt-builder-grid {
+        grid-template-columns: 1fr;
+    }
+}

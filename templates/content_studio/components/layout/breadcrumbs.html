@@ -1,0 +1,70 @@
+<nav
+    class="studio-breadcrumbs"
+    aria-label="Breadcrumb"
+>
+
+    <ol class="studio-breadcrumbs-list">
+
+        <li>
+            <a href="{{ url_for('content_studio.content_studio_page') }}">
+                AI Content Studio
+            </a>
+        </li>
+
+        {% if breadcrumb_items %}
+
+            {% for item in breadcrumb_items %}
+
+                <li
+                    {% if loop.last %}
+                        aria-current="page"
+                    {% endif %}
+                >
+
+                    <span class="studio-breadcrumb-separator">
+                        /
+                    </span>
+
+                    {% if item.url and not loop.last %}
+
+                        <a href="{{ item.url }}">
+                            {{ item.label }}
+                        </a>
+
+                    {% else %}
+
+                        <span>
+                            {{ item.label }}
+                        </span>
+
+                    {% endif %}
+
+                </li>
+
+            {% endfor %}
+
+        {% else %}
+
+            {% if request.endpoint != 'content_studio.content_studio_page' %}
+
+                <li aria-current="page">
+
+                    <span class="studio-breadcrumb-separator">
+                        /
+                    </span>
+
+                    <span>
+                        {% block breadcrumb_current %}
+                            Studio
+                        {% endblock %}
+                    </span>
+
+                </li>
+
+            {% endif %}
+
+        {% endif %}
+
+    </ol>
+
+</nav>

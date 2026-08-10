@@ -6,6 +6,7 @@ Python dictionaries and PostgreSQL tables used by the merge pipeline.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from psycopg2.extras import execute_values
@@ -66,6 +67,8 @@ def complete_merge_job(
     merge_id: int,
     merged_records: int,
     notes: str | None = None,
+    time_alignment_method: str | None = None,
+    time_alignment_quality: str | None = None,
 ) -> None:
     """Mark a merge job as completed after rows are inserted."""
 
@@ -76,12 +79,16 @@ def complete_merge_job(
             merged_records = %s,
             status = 'COMPLETED',
             finished_at = CURRENT_TIMESTAMP,
-            notes = COALESCE(%s, notes)
+            notes = COALESCE(%s, notes),
+            time_alignment_method = COALESCE(%s, time_alignment_method),
+            time_alignment_quality = COALESCE(%s, time_alignment_quality)
         WHERE merge_id = %s
         """,
         (
             merged_records,
             notes,
+            time_alignment_method,
+            time_alignment_quality,
             merge_id,
         ),
     )
@@ -133,12 +140,28 @@ def insert_merged_measurements(
             "during",
 
             row.get("heart_rate"),
+            row.get("heart_rate_bpm"),
             row.get("hrv"),
             row.get("rr_interval"),
+            json.dumps(row.get("rr_intervals") or []),
 
             row.get("spo2"),
             row.get("pulse"),
+            row.get("pulse_rate_bpm"),
             row.get("motion"),
+
+            row.get("hr_source_type"),
+            row.get("hr_measurement_method"),
+            row.get("hr_signal_quality"),
+            row.get("pulse_source_type"),
+            row.get("pulse_measurement_method"),
+            row.get("pulse_signal_quality"),
+            row.get("telemetry_schema_version"),
+            row.get("timestamp_utc"),
+            row.get("fit_timestamp_utc"),
+            row.get("csv_timestamp_utc"),
+            row.get("time_alignment_method"),
+            row.get("time_alignment_quality"),
 
             row.get("fit_timestamp"),
             row.get("csv_timestamp"),
@@ -159,12 +182,27 @@ def insert_merged_measurements(
             phase,
 
             heart_rate,
+            heart_rate_bpm,
             hrv,
             rr_interval,
+            rr_intervals_json,
 
             spo2,
             pulse,
+            pulse_rate_bpm,
             motion,
+            hr_source_type,
+            hr_measurement_method,
+            hr_signal_quality,
+            pulse_source_type,
+            pulse_measurement_method,
+            pulse_signal_quality,
+            telemetry_schema_version,
+            timestamp_utc,
+            fit_timestamp_utc,
+            csv_timestamp_utc,
+            time_alignment_method,
+            time_alignment_quality,
 
             fit_timestamp,
             csv_timestamp,
@@ -254,11 +292,27 @@ def load_merged_measurements(
         SELECT
             timestamp,
             heart_rate,
+            heart_rate_bpm,
             hrv,
             rr_interval,
+            rr_intervals_json,
             spo2,
             pulse,
+            pulse_rate_bpm,
             motion,
+
+            hr_source_type,
+            hr_measurement_method,
+            hr_signal_quality,
+            pulse_source_type,
+            pulse_measurement_method,
+            pulse_signal_quality,
+            telemetry_schema_version,
+            timestamp_utc,
+            fit_timestamp_utc,
+            csv_timestamp_utc,
+            time_alignment_method,
+            time_alignment_quality,
             fit_timestamp,
             csv_timestamp,
             delta_ms,
@@ -275,15 +329,42 @@ def load_merged_measurements(
         {
             "timestamp": row[0],
             "heart_rate": row[1],
-            "hrv": row[2],
-            "rr_interval": row[3],
-            "spo2": row[4],
-            "pulse": row[5],
-            "motion": row[6],
-            "fit_timestamp": row[7],
-            "csv_timestamp": row[8],
-            "delta_ms": row[9],
-            "synchronized": bool(row[10]),
+            "heart_rate_bpm": row[2] if row[2] is not None else row[1],
+            "hrv": row[3],
+            "rr_interval": row[4],
+            "rr_intervals": decode_json_list(row[5]),
+            "spo2": row[6],
+            "pulse": row[7],
+            "pulse_rate_bpm": row[8] if row[8] is not None else row[7],
+            "motion": row[9],
+            "hr_source_type": row[10] or "unknown",
+            "hr_measurement_method": row[11] or "unknown",
+            "hr_signal_quality": row[12] or "unknown",
+            "pulse_source_type": row[13] or "unknown",
+            "pulse_measurement_method": row[14] or "unknown",
+            "pulse_signal_quality": row[15] or "unknown",
+            "telemetry_schema_version": row[16],
+            "timestamp_utc": row[17],
+            "fit_timestamp_utc": row[18],
+            "csv_timestamp_utc": row[19],
+            "time_alignment_method": row[20] or "unknown",
+            "time_alignment_quality": row[21] or "unknown",
+            "fit_timestamp": row[22],
+            "csv_timestamp": row[23],
+            "delta_ms": row[24],
+            "synchronized": bool(row[25]),
         }
         for row in cursor.fetchall()
     ]
+
+
+def decode_json_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if not value:
+        return []
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        return []
+    return decoded if isinstance(decoded, list) else []

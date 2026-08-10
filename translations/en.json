@@ -122,7 +122,6 @@
   "admin.total_sessions": "Total sessions",
   "analysis.ai_timeline": "AI Timeline",
   "analysis.avg_hr": "Average HR",
-  "analysis.avg_hrv": "Average HRV",
   "analysis.avg_pulse": "Average pulse",
   "analysis.avg_spo2": "Average SpO2",
   "analysis.baseline_confidence": "Baseline confidence",
@@ -159,11 +158,9 @@
   "analysis.not_available": "Not available",
   "analysis.pending": "Pending",
   "analysis.phys_avg_hrv": "average HRV was {avg} ms",
-  "analysis.phys_hr_avg_range": "wearable HR averaged {avg} bpm (range {min}-{max} bpm)",
   "analysis.phys_pulse_avg_range": "pulse averaged {avg} bpm (range {min}-{max} bpm)",
   "analysis.physiology_metrics": "Physiology Metrics",
   "analysis.positive_findings": "Positive Findings",
-  "analysis.pulse_hrv_summary": "Pulse, wearable HR and HRV should be interpreted as wellness trend signals: {details}.",
   "analysis.pulse_range": "Pulse range",
   "analysis.recovery_trend": "Recovery trend",
   "analysis.review_context": "Review context",
@@ -231,6 +228,52 @@
   "chamber.current_session": "Current session",
   "chamber.data_sources": "Data Sources",
   "chamber.data_sources_help": "Upload HR/HRV and SpO2/pulse timelines into the same session before synchronization.",
+  "chamber.select_device": "Source device",
+  "chamber.select_device_placeholder": "Select a device or ecosystem",
+  "chamber.device_guidance_empty": "Select a device to see the available import path and analysis scope.",
+  "chamber.device_import_ready": "Import available: {formats}",
+  "chamber.device_import_planned": "This integration is not yet available in this environment.",
+  "chamber.device_raw_rr": "Raw RR: {value}",
+  "chamber.device_reported_hrv": "Manufacturer HRV: {value}",
+  "chamber.device_analysis_role": "Analysis scope: {value}",
+  "chamber.device_cloud": "Account/cloud: {value}",
+  "chamber.device_analysis_raw_rr": "own HRV only after raw RR verification",
+  "chamber.device_analysis_watch": "watch trends; full HRV only with a verified external HRM",
+  "chamber.device_analysis_reported": "manufacturer-reported HRV and trends",
+  "chamber.device_analysis_spo2": "reference SpO2, auxiliary pulse",
+  "chamber.validate_file": "Validate file",
+  "chamber.preflight_select_file": "Select a file first.",
+  "chamber.preflight_validating": "Validating file...",
+  "chamber.preflight_ready": "Ready to import",
+  "chamber.preflight_records": "{valid} valid records; {rejected} rejected",
+  "chamber.preflight_range": "{start} to {end}",
+  "chamber.preflight_signals": "Signals: {signals}",
+  "chamber.preflight_signals_none": "none",
+  "chamber.preflight_hrv_quality": "HRV: {hrv}; quality: {quality}",
+  "chamber.preflight_parser": "Parser: {version}",
+  "chamber.signal_heart_rate": "heart rate",
+  "chamber.signal_pulse": "pulse",
+  "chamber.signal_spo2": "SpO2",
+  "chamber.signal_raw_rr": "raw RR",
+  "chamber.signal_reported_hrv": "reported HRV",
+  "chamber.value_high": "high",
+  "chamber.value_medium": "medium",
+  "chamber.value_low": "low",
+  "chamber.value_unknown": "unknown",
+  "chamber.hrv_eligible_from_raw_rr": "eligible for HRV calculation from approved raw RR",
+  "chamber.hrv_raw_rr_requires_source_review": "raw RR detected; source review required before HRV calculation",
+  "chamber.hrv_reported_by_device_only": "manufacturer-reported HRV only; no raw RR",
+  "chamber.hrv_not_available": "not available because raw RR is absent",
+  "chamber.session_data_sources": "Session data sources",
+  "chamber.session_data_sources_empty": "Select a client and import a file to view source provenance.",
+  "chamber.session_data_sources_none": "No imported telemetry sources for this session.",
+  "chamber.source_records": "{start} to {end}; {count} records",
+  "chamber.source_hrv_from_rr": "RR retained; HRV can be calculated from approved RR",
+  "chamber.source_hrv_reported": "manufacturer-reported HRV only",
+  "chamber.source_hrv_none": "No RR or HRV source",
+  "chamber.source_provenance": "{hrv} | parser {parser} | timezone {timezone}",
+  "chamber.source_audit": "Imported: {imported} | file hash: {hash}",
+  "chamber.source_reimport_required": "To apply a newer parser, upload the original file again.",
   "chamber.decompression_min": "Decompression (min)",
   "chamber.delete_client": "Delete Client",
   "chamber.delete_client_confirm": "Are you sure you want to delete this client and all related sessions?\n\nClient: {client}\nID: {id}",
@@ -431,6 +474,18 @@
   "chamber.total_segments": "{total} min total across detailed segments",
   "chamber.training_last_24h": "Training last 24h",
   "chamber.upload_hr_hrv": "Upload HR & HRV",
+  "chamber.external_telemetry_title": "External device telemetry",
+  "chamber.source_timezone": "Source time zone",
+  "chamber.timezone_browser": "This browser's time zone",
+  "chamber.timezone_unknown": "Unknown - do not normalize time",
+  "chamber.external_telemetry_help": "Polar CSV, Apple Health XML, or Health Connect JSON. HRV without raw RR remains a device-reported metric.",
+  "chamber.device_model_optional": "Device model (optional)",
+  "chamber.upload_external_telemetry": "Upload device data",
+  "chamber.select_external_telemetry": "Choose a device data file and format.",
+  "chamber.uploading_external_telemetry": "Uploading device data...",
+  "chamber.external_telemetry_uploaded": "Device data was uploaded.",
+  "chamber.external_telemetry_already_imported": "This device file was already uploaded.",
+  "chamber.external_telemetry_upload_failed": "Device data could not be uploaded.",
   "chamber.upload_spo2_pulse": "Upload SpO2 & Pulse",
   "chamber.upload_timeline_first": "Upload HR/HRV or SpO2/pulse timeline first",
   "chamber.uploading_hr": "Uploading and parsing HR/HRV timeline...",
@@ -450,6 +505,7 @@
   "mission.ai_analysis_failed": "AI analysis failed: {error}",
   "mission.ai_empty": "Select a session and load the latest analysis, or run a new one.",
   "mission.analysis": "Analysis",
+  "mission.analysis_confidence": "Analysis confidence",
   "mission.analyzed": "Analyzed",
   "mission.avg_data_quality": "Avg data quality",
   "mission.avg_hrv": "Avg HRV",
@@ -468,9 +524,19 @@
   "mission.context_recovery_improved": "post-session recovery feedback improved",
   "mission.context_stress_fatigue": "reported stress or fatigue",
   "mission.context_training_load": "higher recent activity load",
+  "mission.comparison_against": "Against the previous {count} sessions",
+  "mission.comparison_confidence": "Comparison confidence: {value}",
+  "mission.comparison_help": "A descriptive comparison with eligible personal sessions only. Higher or lower does not imply a better physiological response.",
+  "mission.comparison_higher": "Higher than reference",
+  "mission.comparison_lower": "Lower than reference",
+  "mission.comparison_not_ready": "Not compared because the data-quality gate or an eligible personal reference is missing.",
+  "mission.comparison_reference_sessions": "Eligible reference sessions: {count}",
+  "mission.comparison_unchanged": "Unchanged from reference",
+  "mission.comparison_unavailable": "Personal comparison is not available yet.",
   "mission.coverage": "Coverage",
   "mission.crashed": "Crashed",
   "mission.data_quality": "Data quality",
+  "mission.data_sources": "Session data sources",
   "mission.data_quality_engine": "Session Data Quality Engine",
   "mission.data_quality_engine_fallback": "Data quality describes confidence in the session data, not client health.",
   "mission.data_quality_review_recommended": "Data quality review recommended: HR/pulse alignment difference detected.",
@@ -579,10 +645,16 @@
   "mission.series_trend_more_sessions_sentence": "More analyzed sessions are needed to establish a trend.",
   "mission.series_trend_stable_sentence": "The wellness response trend is stable across the selected series.",
   "mission.session": "Session",
+  "mission.session_comparison": "Session Comparison",
+  "mission.session_summary_ai": "Session Summary AI",
   "mission.session_option": "Session {number} · {date} · {protocol}",
   "mission.spo2_warnings": "SpO2 warnings",
   "mission.stable_response": "Stable response",
   "mission.status": "Status",
+  "mission.signal_quality": "Signal quality",
+  "mission.sources_empty": "No device provenance was recorded for this session.",
+  "mission.summary_source_fallback": "Versioned deterministic summary",
+  "mission.summary_source_llm": "LLM narrative over verified facts",
   "mission.sync": "Sync",
   "mission.sync_quality": "Sync quality",
   "mission.telemetry_help": "SpO2, pulse, wearable heart rate and HRV after timeline synchronization.",
@@ -598,6 +670,8 @@
   "mission.traceability": "Session Traceability",
   "mission.traceability_help": "Operational history from session creation through report export.",
   "mission.trend": "Trend",
+  "mission.trend_ai": "Trend AI",
+  "mission.trend_ai_version": "Versioned fact summary: {version}",
   "mission.trend_failed": "Trend failed: {error}",
   "mission.trend_interpretation_fallback": "Interpret the trend together with session data quality. This is not a diagnosis.",
   "mission.trend_load_failed": "Trend could not be loaded: {error}",
@@ -618,6 +692,54 @@
   "mission.wellness_only_interpretation": "Wellness-only interpretation",
   "mission.wellness_response": "Wellness response",
   "mission.wellness_score": "Wellness Score",
+  "mission.recovery_follow_up": "Recovery follow-up",
+  "mission.recovery_follow_up_help": "Record voluntary wellness feedback after the session. It is used only as context for the next recovery summary.",
+  "mission.recovery_follow_up_empty": "Choose a session and record follow-up only when it is available.",
+  "mission.recovery_follow_up_saving": "Saving recovery follow-up...",
+  "mission.recovery_follow_up_saved": "Recovery follow-up was saved.",
+  "mission.recovery_follow_up_failed": "Recovery follow-up could not be saved: {error}",
+  "mission.recovery_window_pending": "Entry pending",
+  "mission.compared_with_check_in": "Change from check-in (HR | SpO2)",
+  "mission.recovery_checkin_unavailable": "No comparable check-in measurements",
+  "mission.compared_with_personal_history": "Change from personal history (delta | average)",
+  "mission.recovery_history_not_ready": "Personal history for this window is not ready for comparison",
+  "mission.recovery_history_entries": "Personal follow-up history: {count} entries",
+  "mission.recovery_history_unavailable": "No earlier follow-up entries for comparison",
+  "mission.research_ai": "Research AI",
+  "mission.research_ai_help": "Versioned research description based only on session facts.",
+  "mission.refresh_research_ai": "Refresh",
+  "mission.research_ai_empty": "Choose an analyzed session to view its research summary.",
+  "mission.research_ai_load_failed": "Research AI could not be loaded: {error}",
+  "mission.research_narration_source": "Narration source",
+  "mission.hrv_algorithm": "HRV algorithm",
+  "mission.research_methods": "Methods",
+  "mission.research_observations": "Observations",
+  "mission.device_compatibility": "Device compatibility",
+  "mission.device_compatibility_help": "Device classes, signal quality, and permitted HRV use.",
+  "mission.refresh_device_catalog": "Refresh",
+  "mission.device_catalog_loading": "Loading device catalog...",
+  "mission.device_catalog_load_failed": "Device catalog could not be loaded: {error}",
+  "mission.hrv_policy": "HRV policy",
+  "mission.save_recovery_follow_up": "Save follow-up",
+  "mission.energy": "Energy",
+  "mission.fatigue": "Fatigue",
+  "mission.sleep_quality": "Sleep quality",
+  "mission.discomfort": "Discomfort",
+  "mission.follow_up_hr": "Heart rate (optional)",
+  "mission.follow_up_window": "Follow-up timing",
+  "mission.follow_up_one_hour": "About one hour after session",
+  "mission.follow_up_next_day": "Next day",
+  "mission.lower": "Lower",
+  "mission.same": "Same",
+  "mission.higher": "Higher",
+  "mission.poor": "Poor",
+  "mission.fair": "Fair",
+  "mission.good": "Good",
+  "mission.none": "None",
+  "mission.mild": "Mild",
+  "mission.moderate": "Moderate",
+  "mission.monitor_before_next": "Monitor before the next session",
+  "mission.data_limitations": "Data limitations",
   "nav.about": "About",
   "nav.accounts": "Accounts",
   "nav.ai_lab": "AI Lab",
@@ -958,5 +1080,223 @@
   "session.recovery_saved": "Recovery saved",
   "session.resume_before_assigning": "Resume it before assigning new sessions.",
   "session.single_no_package": "Single session / no package",
-  "session.single_outside_package": "Single session, outside a package."
+  "session.single_outside_package": "Single session, outside a package.",
+  "chamber.telemetry_intelligence": "Telemetry Intelligence",
+  "chamber.telemetry_intelligence_help": "The platform automatically inspects uploaded telemetry files and determines which analyses are available.",
+  "chamber.telemetry_source": "Telemetry source",
+"chamber.wearable_telemetry": "Wearable Telemetry",
+"chamber.pulse_oximetry": "Pulse Oximetry",
+"chamber.pulse_oximetry_help": "Upload timestamped SpO₂ and pulse telemetry.",
+"chamber.expected_signals": "Expected signals",
+"chamber.signal_rr_intervals": "RR Intervals",
+"chamber.signal_timestamp": "Timestamp",
+"chamber.accepted_format": "Accepted format",
+"chamber.preflight_quality_score": "Data quality: {score}% · level: {level}",
+"chamber.wearable_telemetry_help": "Upload a telemetry file from a wearable device. The platform automatically detects available signals and supported analyses.",
+"chamber.show_imported_data": "Show Imported Data",
+"chamber.telemetry_detected": "Telemetry Detected",
+"chamber.telemetry_quality": "Data Quality",
+"chamber.analysis_available": "Available Analysis",
+"chamber.detected_signals": "Detected Signals",
+"chamber.data_quality_excellent": "excellent",
+"chamber.data_quality_good": "good",
+"chamber.data_quality_fair": "fair",
+"chamber.data_quality_poor": "poor",
+  "analysis.pulse_avg": "Pulse averaged {avg} bpm.",
+  "analysis.pulse_avg_range": "Pulse averaged {avg} bpm (range {min}-{max} bpm).",
+
+  "analysis.phys_hr_avg": "Wearable heart rate averaged {avg} bpm.",
+  "analysis.phys_hr_avg_range": "Wearable heart rate averaged {avg} bpm (range {min}-{max} bpm).",
+
+  "analysis.avg_hrv": "Average HRV was {value} ms.",
+
+  "analysis.pulse_hrv_summary": "Pulse, wearable heart rate and HRV should be interpreted as wellness trend indicators: {details}.",
+
+  "analysis.context_low_sleep": "reduced sleep quality or short sleep",
+  "analysis.context_training": "higher recent activity load",
+  "analysis.context_stress": "reported stress or fatigue",
+  "analysis.context_recovery": "improved post-session recovery feedback",
+
+  "analysis.context_none": "No elevated sleep, fatigue, stress or recent activity context was identified in the available check-in data.",
+
+  "analysis.context_prefix": "Check-in context:",
+  "analysis.sensor_mismatch": "A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse. This may indicate sensor alignment, time alignment or signal-quality issues.",
+  "analysis.sensor_mismatch_with_difference": "A notable discrepancy was detected between wearable heart rate and pulse oximeter pulse. This may indicate sensor alignment, time alignment or signal-quality issues. The maximum observed difference was {difference} bpm.",
+  "analysis.additional_findings": "Additional wellness findings: {details}.",
+  "analysis.recommend_sensor_alignment": "Review the synchronized timeline, sensor placement and time alignment before interpreting heart-rate and pulse trends.",
+  "analysis.recommend_sleep_context": "Sleep context suggests reduced recovery readiness. Consider an easier day and compare tomorrow's HRV and resting response.",
+  "analysis.recommend_training_context": "Recent training load may influence the HR and HRV response. Treat this session as recovery support and review the next baseline reading.",
+  "analysis.recommend_stress_context": "Reported stress or fatigue is elevated. Prioritize recovery and repeat measurement under calmer conditions.",
+  "analysis.recommend_review_signals": "Review the synchronized timeline, raw signals and recovery context.",
+  "analysis.recommend_none": "No additional wellness action indicated.",
+  "analysis.hr_high_threshold": "Heart rate exceeded the configured high-load threshold",
+  "report.page": "Page {page}",
+  "report.key_findings": "Key Findings",
+  "report.label_client": "Client",
+  "report.label_range": "Range",
+  "report.label_protocol": "Protocol",
+  "report.label_total_sessions": "Total sessions",
+  "report.label_analyzed_sessions": "Analyzed sessions",
+  "report.label_evidence_level": "Evidence level",
+  "report.label_review_flags": "Review flags",
+  "report.label_latest_session": "Latest session",
+  "report.label_latest_score": "Latest score",
+  "report.label_wellness_score": "Wellness score",
+  "report.label_data_quality": "Data quality",
+  "report.label_average_hr": "Average HR",
+  "report.label_average_hrv": "Average HRV",
+  "report.label_average_spo2": "Average SpO2",
+  "report.label_average_coverage": "Average coverage",
+  "report.label_average_sync": "Average sync quality",
+  "report.label_missing_samples": "Missing samples",
+  "report.label_sensor_gap_sessions": "Sensor gap sessions",
+  "report.label_hr_pulse_mismatch": "HR / pulse mismatch",
+  "report.label_spo2_warnings": "SpO2 warnings",
+  "report.label_warning_summary": "Warning summary",
+  "report.evidence_insufficient": "Insufficient",
+  "report.evidence_preliminary": "Preliminary",
+  "report.evidence_emerging": "Emerging",
+  "report.evidence_established": "Established",
+  "report.trend_stable": "Stable",
+  "report.trend_improving": "Improving",
+  "report.trend_declining": "Declining",
+  "report.trend_insufficient": "Insufficient data",
+  "report.comparison_single": "Single-session summary",
+  "report.comparison_first_latest": "First available session vs latest available session",
+  "report.comparison_first_last": "First {count} available sessions vs latest {count} available sessions",
+  "report.quality_confidence": "Data quality indicates confidence in the measurements and calculations; it is not a health assessment.",
+  "report.finding_evidence": "{count} analyzed sessions are available; longitudinal evidence is {evidence}.",
+  "report.finding_stable": "The available wellness score is stable across the sessions; no clear improvement or decline is established. Review the measured HR, HRV and SpO2 comparison alongside data quality.",
+  "report.finding_change": "A directional change is visible in the available measurements, but should be interpreted with the evidence level and data quality.",
+  "report.finding_quality_warning": "Data-quality warnings affect confidence: {warnings}. Review sensor alignment and synchronization before drawing stronger conclusions.",
+  "report.finding_more_sessions": "Additional sessions are needed before a stronger longitudinal conclusion can be made."
+  ,"report.warning_none": "No repeated quality warnings"
+  ,"report.warning_sensor_alignment_warning": "Sensor alignment warning"
+  ,"report.warning_low_coverage": "Low sensor coverage"
+  ,"report.warning_sync_quality_warning": "Synchronization quality warning"
+  ,"report.warning_spo2_range_warning": "SpO2 range warning"
+  ,"report.label_date": "Date"
+  ,"report.label_program": "Program"
+  ,"report.label_location": "Location"
+  ,"report.label_pressure": "Pressure"
+  ,"report.label_duration": "Duration"
+  ,"report.label_target": "target"
+  ,"report.label_data_quality_score": "Data quality score"
+  ,"report.label_coverage": "Coverage"
+  ,"report.label_sync_quality": "Synchronization quality"
+  ,"report.label_hr_pulse_alignment": "HR / pulse alignment"
+  ,"report.label_spo2_range": "SpO2 range"
+  ,"report.label_quality_notes": "Quality notes"
+  ,"report.label_check_in_recovery": "Check-in and Recovery"
+  ,"report.label_check_in_context": "Check-in context"
+  ,"report.label_recovery_context": "Recovery context"
+  ,"report.label_oxygen_flow": "Oxygen flow"
+  ,"report.label_estimated_mask_oxygen": "Estimated mask O2"
+  ,"report.label_chamber_temperature": "Chamber temperature"
+  ,"report.label_pressure_deviation": "Pressure deviation"
+  ,"report.label_hr_hrv_samples": "HR / HRV samples"
+  ,"report.label_spo2_pulse_samples": "SpO2 / pulse samples"
+  ,"report.label_synchronized_samples": "Synchronized samples"
+  ,"report.label_baseline_status": "Baseline status"
+  ,"report.label_sessions_last_30_days": "Sessions in last 30 days"
+  ,"report.label_rmssd_7_days": "RMSSD - 7 days"
+  ,"report.label_spo2_average": "SpO2 average"
+  ,"report.label_spo2_minimum": "SpO2 minimum"
+  ,"report.label_baseline_data_quality": "Baseline data quality"
+  ,"report.label_timeline": "Timeline"
+  ,"report.label_no_segment_data": "No segment data available"
+  ,"report.label_session_number": "Session {number}"
+  ,"report.status_active": "Active"
+  ,"report.status_as_planned": "Completed as planned"
+  ,"report.status_baseline": "Baseline building"
+  ,"report.status_completed": "Completed"
+  ,"report.status_modified": "Completed with changes"
+  ,"report.status_paused": "Paused"
+  ,"report.status_cancelled": "Cancelled"
+  ,"report.quality_alignment_review": "Operator review recommended"
+  ,"report.quality_no_alignment_warning": "No alignment warning"
+  ,"report.quality_no_range_warning": "No range warning"
+  ,"report.research_ai": "Research AI"
+  ,"report.research_methods_versions": "Methods and versions"
+  ,"report.research_fact_sheet": "Fact sheet"
+  ,"report.research_narration": "Research narration"
+  ,"report.research_narration_source": "Narration source"
+  ,"report.research_analysis_model": "Analysis model"
+  ,"report.research_hrv_algorithm": "HRV algorithm"
+  ,"report.research_hrv_window": "HRV window"
+  ,"report.research_abstract": "Abstract"
+  ,"report.research_methods": "Methods"
+  ,"report.research_observations": "Observations"
+  ,"report.research_interpretation": "Interpretation"
+  ,"report.research_limitations": "Limitations"
+  ,"report.research_future_data": "Future data required"
+  ,"report.research_content_disclaimer": "The research summary describes observational data from one wellness session and is not a medical diagnosis."
+  ,"report.research_content_unavailable": "Not available"
+  ,"report.research_content_abstract": "Observational description of one wellness session based on synchronized data and a versioned analysis model."
+  ,"report.research_content_methods": "Model: {model}; synchronized samples: {synchronized}/{total}; protocol: {protocol}; HRV: {hrv}."
+  ,"report.research_content_observations": "Average/minimum SpO2: {avg_spo2}/{min_spo2}; reference HR: {heart_rate}; RMSSD: {rmssd}."
+  ,"report.research_content_interpretation": "The results describe observed measurements and their data quality in the context of this session only."
+  ,"report.research_content_limitations": "Analysis confidence: {confidence}; signal quality: {signal_quality}; quality warnings: {warnings}."
+  ,"report.research_content_future_data": "Additional sessions with comparable protocol and data quality are needed for longitudinal conclusions."
+  ,"report.executive_summary": "Executive Summary"
+  ,"report.executive_summary_text": "{sessions} sessions are available and {analyzed} were analyzed. Evidence is {evidence}; the observed wellness-score direction is {trend}. Average data quality is {quality}. {limitation}"
+  ,"report.executive_summary_warning": "{count} data-quality warning(s) limit interpretation confidence."
+  ,"report.executive_summary_no_warning": "No repeated data-quality warnings were identified."
+  ,"report.label_at": "at"
+  ,"report.phase_compression": "Compression"
+  ,"report.phase_exposure": "Exposure"
+  ,"report.phase_decompression": "Decompression"
+  ,"report.phase_pre": "Pre-session"
+  ,"report.phase_during": "During session"
+  ,"report.phase_post": "Post-session"
+  ,"report.status_early": "Early"
+  ,"report.wellness_status_unknown": "Available session result"
+  ,"report.wellness_status_stable": "Stable wellness response"
+  ,"report.wellness_status_elevated_load": "Elevated wellness review"
+  ,"report.wellness_status_data_quality_warning": "Data-quality review required"
+  ,"report.session_interpretation_text": "This session has a wellness score of {score} and a data-quality score of {quality}. The available wellness result is: {status}. Interpret this result together with measurement quality and session context."
+  ,"report.operator_review_warnings": "Review the following data-quality items before drawing stronger conclusions: {warnings}."
+  ,"report.operator_review_clear": "No data-quality warning requiring operator review was identified."
+  ,"report.narration_source_deterministic_fallback": "Deterministic report content"
+  ,"report.narration_source_llm": "AI-assisted narration"
+  ,"report.confidence_low": "Low"
+  ,"report.confidence_medium": "Medium"
+  ,"report.confidence_high": "High"
+  ,"report.wellness_status_baseline": "Baseline wellness response"
+  ,"report.context_spo2": "SpO2"
+  ,"report.context_pulse_hr": "Pulse / HR"
+  ,"report.context_sleep_hours": "Sleep hours"
+  ,"report.context_sleep_quality": "Sleep quality"
+  ,"report.context_stress_level": "Stress level"
+  ,"report.context_training_load_24h": "Training load (24 h)"
+  ,"report.context_fatigue_level": "Fatigue level"
+  ,"report.context_session_goal": "Session goal"
+  ,"report.context_energy_level": "Energy level"
+  ,"report.context_relaxation_level": "Relaxation level"
+  ,"report.context_discomfort": "Discomfort"
+  ,"report.context_value_fair": "Fair"
+  ,"report.context_value_low": "Low"
+  ,"report.context_value_light": "Light"
+  ,"report.context_value_recovery": "Recovery"
+  ,"report.context_value_higher": "Higher"
+  ,"report.context_value_moderate": "Moderate"
+  ,"report.context_value_lower": "Lower"
+  ,"report.context_value_none": "None"
+  ,"report.context_value_baseline": "Baseline"
+  ,"report.context_value_yes": "Yes"
+  ,"report.context_value_no": "No"
+  ,"report.session_summary_limitations": "Data limitations"
+  ,"report.session_summary_no_limitations": "No reported limitations"
+  ,"report.session_summary_confidence": "Analysis confidence"
+  ,"report.session_summary_overview": "Summary"
+  ,"report.session_summary_wellness_status": "Wellness status"
+  ,"report.session_summary_check_in": "Check-in"
+  ,"report.session_summary_during": "Session phases"
+  ,"report.session_summary_check_out": "Check-out"
+  ,"report.session_summary_quality": "Session quality"
+  ,"report.session_summary_signal_quality": "Signal quality"
+  ,"report.session_summary_unavailable": "No data available for this part of the session"
+  ,"mission.recovery_summary_complete": "Both recovery follow-up windows are recorded and ready for comparison."
+  ,"mission.recovery_summary_recorded": "One recovery follow-up is recorded; the other window remains available."
+  ,"mission.recovery_summary_pending": "No recovery follow-up data is available for this session."
 }

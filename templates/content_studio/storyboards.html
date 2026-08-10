@@ -1,0 +1,55 @@
+{% extends "content_studio/base.html" %}
+
+{% block studio_title %}
+Storyboards
+{% endblock %}
+
+{% block studio_subtitle %}
+Create complete commercial sequences.
+{% endblock %}
+
+{% block studio_content %}
+
+<div class="storyboard-list">
+
+{% for board in storyboards %}
+
+<div class="storyboard-card">
+
+<h2>
+
+{{ board.title }}
+
+</h2>
+
+<p>
+
+{{ board.description }}
+
+</p>
+
+<p>
+
+{{ board.scene_count }} scenes
+
+</p>
+
+<button>
+
+Open
+
+</button>
+
+<button>
+
+Generate Video
+
+</button>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endblock %}

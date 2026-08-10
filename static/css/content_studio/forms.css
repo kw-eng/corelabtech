@@ -1,0 +1,142 @@
+/* ==========================================================
+   CoreLabTech AI Content Studio
+   Forms
+   ========================================================== */
+
+.studio-form{
+
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+
+}
+
+.studio-form-group{
+
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+
+}
+
+.studio-form-row{
+
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:20px;
+
+}
+
+.studio-form-row-3{
+
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:20px;
+
+}
+
+.studio-form label{
+
+    font-size:.88rem;
+    font-weight:600;
+    color:var(--studio-text);
+
+}
+
+.studio-form small{
+
+    color:var(--studio-text-muted);
+
+}
+
+.studio-input,
+.studio-select,
+.studio-textarea{
+
+    width:100%;
+
+    padding:13px 15px;
+
+    border-radius:12px;
+
+    border:1px solid var(--studio-border);
+
+    background:var(--studio-panel-light);
+
+    color:var(--studio-text);
+
+    font-size:.95rem;
+
+    transition:all var(--transition-fast);
+
+}
+
+.studio-input:focus,
+.studio-select:focus,
+.studio-textarea:focus{
+
+    outline:none;
+
+    border-color:var(--studio-primary);
+
+    box-shadow:
+
+        0 0 0 4px rgba(22,167,255,.12);
+
+}
+
+.studio-textarea{
+
+    resize:vertical;
+
+    min-height:180px;
+
+    font-family:monospace;
+
+}
+
+.studio-checkbox{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+}
+
+.studio-checkbox input{
+
+    width:18px;
+    height:18px;
+
+}
+
+.studio-switch{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:14px;
+
+    border-radius:12px;
+
+    background:var(--studio-panel);
+
+    border:1px solid var(--studio-border);
+
+}
+
+@media(max-width:900px){
+
+.studio-form-row,
+.studio-form-row-3{
+
+grid-template-columns:1fr;
+
+}
+
+}

@@ -235,6 +235,10 @@ window.onload = () => {
 
     loadSubjects()
 
+    if (window.TelemetryIntelligence) {
+        window.TelemetryIntelligence.renderPending()
+    }
+
     loadSessions()
 
     loadSessionConfiguration()
@@ -1522,6 +1526,8 @@ async function uploadFIT() {
 
     try {
 
+        renderTelemetryScanning()
+
         if (uploadButton) {
             uploadButton.disabled = true
         }
@@ -1607,15 +1613,20 @@ async function uploadFIT() {
 
         await loadFITTable(sessionId, data.import_id)
         clearMergedPreview()
+    resetTelemetryIntelligence()
 
         if (typeof loadFitChart === "function") {
 
             loadFitChart(sessionId, data.import_id)
         }
 
+        renderTelemetryIntelligence(data)
+        await loadSessionDataSources()
+
     } catch (err) {
 
         console.error(err)
+        renderTelemetryError(err)
 
         const message =
             err.name === "AbortError"
@@ -1637,6 +1648,334 @@ async function uploadFIT() {
         if (uploadButton) {
             uploadButton.disabled = false
         }
+    }
+}
+
+async function uploadExternalTelemetry() {
+    const input = document.getElementById("externalTelemetryFile")
+    const selectedType = document.getElementById("externalTelemetryType")?.value
+    const timezoneInput = document.getElementById("externalTelemetryTimezone")
+    const status = document.getElementById("externalTelemetryStatus")
+    const sessionId = document.getElementById("session_id")?.value.trim()
+    const file = input?.files?.[0]
+
+    if (!file) {
+        alert(i18n("chamber.select_external_telemetry"))
+        return
+    }
+
+    if (!sessionId) {
+        alert(i18n("chamber.generate_session_first"))
+        return
+    }
+
+    const importType = detectExternalImportType(file, selectedType)
+
+    if (!importType) {
+        alert(i18n("chamber.unsupported_file_format"))
+        return
+    }
+
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("session_id", sessionId)
+    formData.append("client_id", getSelectedSubjectId())
+    formData.append("import_type", importType)
+
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const selectedTimezone = timezoneInput?.value || "browser"
+    const sourceTimezone = selectedTimezone === "browser"
+        ? browserTimezone
+        : selectedTimezone
+
+    if (sourceTimezone && sourceTimezone !== "unknown") {
+        formData.append("source_timezone", sourceTimezone)
+    }
+
+    if (status) {
+        status.innerHTML = `
+            <div class="success-box">
+                ${escapeHtml(i18n("chamber.uploading_external_telemetry"))}
+            </div>
+        `
+    }
+
+    try {
+        renderTelemetryScanning()
+
+        const response = await fetch("/upload_telemetry", {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+        })
+
+        const data = await parseJsonResponse(
+            response,
+            "UPLOAD EXTERNAL TELEMETRY"
+        )
+
+        const duplicate =
+            response.status === 409 &&
+            data?.status === "duplicate"
+
+        if (
+            (!response.ok && !duplicate) ||
+            (data.error && !duplicate)
+        ) {
+            throw new Error(
+                data.error ||
+                i18n("chamber.external_telemetry_upload_failed")
+            )
+        }
+
+        if (status) {
+            status.innerHTML = `
+                <div class="success-box">
+                    ${escapeHtml(
+                        duplicate
+                            ? i18n("chamber.external_telemetry_already_imported")
+                            : i18n("chamber.external_telemetry_uploaded")
+                    )}
+                    <br>
+                    ${escapeHtml(i18n("chamber.records_count", {
+                        count: data.records_saved || data.records || 0
+                    }))}
+                </div>
+            `
+        }
+
+        renderTelemetryIntelligence(data)
+        await loadFITTable(sessionId, data.import_id)
+        clearMergedPreview()
+
+        if (typeof loadFitChart === "function") {
+            loadFitChart(sessionId, data.import_id)
+        }
+
+        await loadSessionDataSources()
+    } catch (error) {
+        console.error("uploadExternalTelemetry failed", error)
+        renderTelemetryError(error)
+
+        if (status) {
+            status.innerHTML = `
+                <div class="error-box">
+                    ${escapeHtml(error.message || error)}
+                </div>
+            `
+        }
+    }
+}
+
+function preflightConfig(kind) {
+    if (kind === "fit") {
+        return {
+            input: "fitFile",
+            output: "fitPreflight",
+            importType: "fit",
+        }
+    }
+
+    if (kind === "csv") {
+        return {
+            input: "csvFile",
+            output: "csvPreflight",
+            importType: "csv",
+        }
+    }
+
+    const input = document.getElementById("externalTelemetryFile")
+    const selectedType = document.getElementById("externalTelemetryType")?.value
+
+    return {
+        input: "externalTelemetryFile",
+        output: "externalTelemetryPreflight",
+        importType: detectExternalImportType(
+            input?.files?.[0],
+            selectedType
+        ),
+    }
+}
+
+function hrvStatusLabel(status) {
+    return i18n(`chamber.hrv_${status || "not_available"}`)
+}
+
+function telemetryValueLabel(value) {
+    const normalized = String(value || "unknown").toLowerCase()
+    const key = `chamber.value_${normalized}`
+    const translated = i18n(key)
+    return translated === key ? normalized : translated
+}
+
+async function preflightTelemetry(kind) {
+    const config = preflightConfig(kind)
+    const input = document.getElementById(config.input)
+    const output = document.getElementById(config.output)
+
+    if (!input?.files.length || !config.importType) {
+        if (output) {
+            output.innerHTML = `
+                <div class="error-box">
+                    ${escapeHtml(i18n("chamber.preflight_select_file"))}
+                </div>
+            `
+        }
+        return
+    }
+
+    const formData = new FormData()
+    formData.append("file", input.files[0])
+    formData.append("import_type", config.importType)
+
+    if (output) {
+        output.textContent = i18n("chamber.preflight_validating")
+    }
+
+    renderTelemetryScanning()
+
+    try {
+        const response = await fetch("/api/telemetry/preflight", {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+        })
+
+        const data = await parseJsonResponse(
+            response,
+            "TELEMETRY PREFLIGHT"
+        )
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || "Validation failed")
+        }
+
+        const report = getTelemetryIntelligenceReport(data)
+        renderTelemetryIntelligence(data)
+
+        const file = report?.file || {}
+        const quality = report?.quality || {}
+        const signalNames = Object.entries(
+            report?.signals || data.signals || {}
+        )
+            .filter(([, available]) => Boolean(available))
+            .filter(([name]) => name !== "hrv")
+            .map(([name]) => {
+                const key = `chamber.signal_${name}`
+                const translated = i18n(key)
+                return translated === key
+                    ? name.replaceAll("_", " ")
+                    : translated
+            })
+
+        if (output) {
+            output.innerHTML = `
+                <div class="preflight-ready">
+                    <strong>${escapeHtml(i18n("chamber.preflight_ready"))}</strong>
+                    <small>${escapeHtml(i18n("chamber.preflight_records", {
+                        valid: data.records_valid ?? file.records ?? 0,
+                        rejected: data.records_rejected ?? 0,
+                    }))}</small>
+                    <small>${escapeHtml(i18n("chamber.preflight_range", {
+                        start: file.first_timestamp || data.first_timestamp || "-",
+                        end: file.last_timestamp || data.last_timestamp || "-",
+                    }))}</small>
+                    <small>${escapeHtml(i18n("chamber.preflight_signals", {
+                        signals: signalNames.join(", ") || i18n("chamber.preflight_signals_none"),
+                    }))}</small>
+                    <small>${escapeHtml(i18n("chamber.preflight_quality_score", {
+                        score: quality.score ?? "-",
+                        level: telemetryValueLabel(quality.level),
+                    }))}</small>
+                </div>
+            `
+        }
+    } catch (error) {
+        renderTelemetryError(error)
+
+        if (output) {
+            output.innerHTML = `
+                <div class="error-box">
+                    ${escapeHtml(error.message || error)}
+                </div>
+            `
+        }
+    }
+}
+
+async function loadSessionDataSources() {
+    const sessionId = document.getElementById("session_id")?.value.trim()
+    const clientId = getSelectedSubjectId()
+    const output = document.getElementById("sessionDataSources")
+
+    if (!output || !sessionId || !clientId) {
+        return
+    }
+
+    try {
+        const response = await fetch(
+            `/api/sessions/${encodeURIComponent(sessionId)}/data-sources?client_id=${encodeURIComponent(clientId)}`,
+            {credentials: "same-origin"}
+        )
+
+        const data = await parseJsonResponse(
+            response,
+            "SESSION DATA SOURCES"
+        )
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || "Could not load sources")
+        }
+
+        renderTelemetryIntelligence(data)
+
+        if (!data.sources?.length) {
+            output.textContent = i18n("chamber.session_data_sources_none")
+            return
+        }
+
+        output.innerHTML = `
+            <div class="session-data-source-list">
+                ${data.sources.map(source => {
+                    const label = sourceCapabilityLabel(source)
+                    const hrv = sourceHrvLabel(source)
+                    const records = i18n("chamber.source_records", {
+                        start: source.first_timestamp || "-",
+                        end: source.last_timestamp || "-",
+                        count: source.records_saved || 0,
+                    })
+                    const provenance = i18n("chamber.source_provenance", {
+                        hrv,
+                        parser: source.parser_version || "-",
+                        timezone: source.source_timezone || "unknown",
+                    })
+                    const audit = i18n("chamber.source_audit", {
+                        imported: source.imported_at || "-",
+                        hash: String(source.file_hash || "-").slice(0, 12),
+                    })
+
+                    return `
+                        <div class="session-data-source">
+                            <strong>${escapeHtml(label)}</strong>
+                            <small>${escapeHtml(String(
+                                source.file_type ||
+                                source.import_type ||
+                                "telemetry"
+                            ).toUpperCase())}</small>
+                            <small>${escapeHtml(records)}</small>
+                            <small>${escapeHtml(provenance)}</small>
+                            <small>${escapeHtml(audit)}</small>
+                        </div>
+                    `
+                }).join("")}
+            </div>
+        `
+    } catch (error) {
+        output.innerHTML = `
+            <div class="error-box">
+                ${escapeHtml(error.message || error)}
+            </div>
+        `
     }
 }
 
@@ -1790,6 +2129,8 @@ async function uploadCSV() {
 
     try {
 
+        renderTelemetryScanning()
+
 let res = await fetch(
     "/upload_csv",
     {
@@ -1843,11 +2184,14 @@ let data = await parseJsonResponse(res, "UPLOAD SPO2/PULSE TIMELINE")
             ).value,
             data.import_id
         )
+        renderTelemetryIntelligence(data)
+        await loadSessionDataSources()
         clearMergedPreview()
 
     } catch (err) {
 
         console.error(err)
+        renderTelemetryError(err)
 
         alert(i18n("chamber.spo2_upload_server_error"))
     }
@@ -2007,6 +2351,8 @@ async function mergeDuring() {
             renderMergedChart(merged)
         }
 
+        renderTelemetryIntelligence(data)
+
         const status =
             document.getElementById("mergeStatus")
 
@@ -2032,6 +2378,7 @@ async function mergeDuring() {
     } catch (err) {
 
         console.error("mergeDuring crash:", err)
+        renderTelemetryError(err)
         alert(i18n("chamber.merge_crashed"))
         return []
     }
@@ -2079,10 +2426,23 @@ function renderMergedTable(rows) {
         return `
             <tr>
                 <td>${r.timestamp || r.time || "-"}</td>
-                <td>${r.hr || r.heart_rate || "-"}</td>
-                <td>${r.pulse || "-"}</td>
-                <td>${r.rr_interval || r.rr || "-"}</td>
-                <td>${r.hrv || "-"}</td>
+                <td>${escapeHtml(String(displayValue(
+                    r.heart_rate,
+                    r.heart_rate_bpm,
+                    r.hr
+                )))}</td>
+                <td>${escapeHtml(String(displayValue(
+                    r.pulse,
+                    r.pulse_rate_bpm
+                )))}</td>
+                <td>${escapeHtml(String(displayValue(
+                    r.rr_interval,
+                    r.rr
+                )))}</td>
+                <td>${escapeHtml(String(displayValue(
+                    r.hrv,
+                    r.rmssd
+                )))}</td>
                 <td>${spo2}</td>
                 <td>${r.source || "merged"}</td>
             </tr>
@@ -2816,6 +3176,104 @@ async function runAnalysis(sessionId) {
 // render AI Visualization
 // ========================================
 
+function getTelemetryIntelligenceReport(data) {
+    if (!data || typeof data !== "object") {
+        return null
+    }
+
+    return (
+        data.telemetry_intelligence ||
+        data.telemetry_report ||
+        (
+            data.signals && data.quality
+                ? data
+                : null
+        )
+    )
+}
+
+function renderTelemetryIntelligence(data) {
+    const report = getTelemetryIntelligenceReport(data)
+
+    if (!report || !window.TelemetryIntelligence) {
+        return
+    }
+
+    window.TelemetryIntelligence.render(report)
+}
+
+function renderTelemetryScanning() {
+    if (window.TelemetryIntelligence) {
+        window.TelemetryIntelligence.renderScanning()
+    }
+}
+
+function renderTelemetryError(error) {
+    if (!window.TelemetryIntelligence) {
+        return
+    }
+
+    window.TelemetryIntelligence.renderError(
+        error?.message || String(error || "Telemetry analysis failed")
+    )
+}
+
+function resetTelemetryIntelligence() {
+    if (window.TelemetryIntelligence) {
+        window.TelemetryIntelligence.renderPending()
+    }
+}
+
+function detectExternalImportType(file, selectedType) {
+    if (selectedType && selectedType !== "auto") {
+        return selectedType
+    }
+
+    const fileName = String(file?.name || "").toLowerCase()
+
+    if (fileName.endsWith(".csv")) {
+        return "polar_csv"
+    } 
+
+    if (fileName.endsWith(".xml")) {
+        return "apple_health_xml"
+    }
+
+    if (fileName.endsWith(".json")) {
+        return "health_connect_json"
+    }
+
+    return null
+}
+
+function sourceCapabilityLabel(source) {
+    if (
+        source.has_raw_rr ||
+        source.has_heart_rate ||
+        source.has_reported_hrv
+    ) {
+        return i18n("chamber.source_hr_rr_telemetry")
+    }
+
+    if (source.has_spo2 || source.has_pulse) {
+        return i18n("chamber.source_spo2_pulse_telemetry")
+    }
+
+    return i18n("chamber.source_external_telemetry")
+}
+
+function sourceHrvLabel(source) {
+    if (source.has_raw_rr) {
+        return i18n("chamber.source_hrv_from_rr")
+    }
+
+    if (source.has_reported_hrv) {
+        return i18n("chamber.source_hrv_reported")
+    }
+
+    return i18n("chamber.source_hrv_none")
+}
+
 function escapeHtml(value) {
     return String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -2942,6 +3400,29 @@ function renderFindingList(items, fallback, className = "") {
                 .join("")}
         </ul>
     `
+}
+
+function structuredFindingText(item) {
+    const keys = {
+        spo2_low_threshold: "analysis.spo2_low_threshold",
+        spo2_below_preferred: "analysis.spo2_below_preferred",
+        spo2_stable_expected: "analysis.spo2_stable_expected",
+        hrv_below_threshold: "analysis.hrv_below_threshold",
+        heart_rate_high_threshold: "analysis.hr_high_threshold",
+        sensor_mismatch: "analysis.sensor_mismatch",
+    }
+    const key = keys[item?.code]
+    return key ? i18n(key) : ""
+}
+
+function structuredFindings(data, kind) {
+    if (!Array.isArray(data?.finding_items)) {
+        return null
+    }
+    return data.finding_items
+        .filter(item => item?.kind === kind)
+        .map(structuredFindingText)
+        .filter(Boolean)
 }
 
 function renderMetricRows(rows) {
@@ -3143,14 +3624,12 @@ function renderAIVisualization(data) {
             : i18n("analysis.no_session_quality_flag")
 
     const warnings =
-        Array.isArray(data.reasons)
-            ? data.reasons
-            : []
+        structuredFindings(data, "warning") ??
+        (Array.isArray(data.reasons) ? data.reasons : [])
 
     const positiveFindings =
-        Array.isArray(data.positive_findings)
-            ? data.positive_findings
-            : []
+        structuredFindings(data, "positive") ??
+        (Array.isArray(data.positive_findings) ? data.positive_findings : [])
 
     const disclaimer =
         translateAnalysisText(
@@ -3918,7 +4397,10 @@ window.addSessionSegment = addSessionSegment
 
 window.savePRE = savePRE
 window.uploadFIT = uploadFIT
+window.uploadExternalTelemetry = uploadExternalTelemetry
 window.uploadCSV = uploadCSV
+window.preflightTelemetry = preflightTelemetry
+window.loadSessionDataSources = loadSessionDataSources
 window.loadFITTable = loadFITTable
 window.loadCSVTable = loadCSVTable
 

@@ -1,0 +1,118 @@
+{% extends "content_studio/base.html" %}
+
+{% block studio_title %}
+Settings
+{% endblock %}
+
+{% block studio_subtitle %}
+Configure providers and Content Studio.
+{% endblock %}
+
+{% block studio_content %}
+
+<div class="settings-grid">
+
+<div class="studio-card">
+
+<h2>Default Provider</h2>
+
+<select>
+
+<option>Mock Provider</option>
+<option>GPT Image</option>
+<option>Kling</option>
+<option>Veo</option>
+<option>ComfyUI</option>
+
+</select>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Default Resolution</h2>
+
+<select>
+
+<option>1024 × 1024</option>
+<option>1536 × 1536</option>
+<option>1920 × 1080</option>
+<option>3840 × 2160</option>
+
+</select>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Default Character</h2>
+
+<select>
+
+<option>Athlete</option>
+<option>Doctor</option>
+
+</select>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Generated Media Folder</h2>
+
+<input
+type="text"
+value="assets/athlete/generated/"
+>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Prompt Library</h2>
+
+<input
+type="text"
+value="assets/athlete/docs/"
+>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Reference Library</h2>
+
+<input
+type="text"
+value="assets/athlete/references/"
+>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Database</h2>
+
+<p>
+
+Connected
+
+</p>
+
+</div>
+
+<div class="studio-card">
+
+<h2>Save Settings</h2>
+
+<button class="primary">
+
+Save
+
+</button>
+
+</div>
+
+</div>
+
+{% endblock %}

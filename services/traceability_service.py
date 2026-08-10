@@ -64,20 +64,23 @@ def get_session_traceability(
         cursor.execute(
             """
             SELECT filename, status, records_saved, records_rejected,
-                   imported_at, error_message
+                   imported_at, error_message, device_type, device_model,
+                   measurement_method, NULL::VARCHAR AS signal_quality,
+                   COALESCE(import_type, 'fit') AS import_type
             FROM fit_imports
             WHERE session_id = %s
             ORDER BY imported_at DESC, id DESC
-            LIMIT 1
             """,
             (session_id,),
         )
-        fit_row = cursor.fetchone()
+        fit_rows = cursor.fetchall()
+        fit_row = fit_rows[0] if fit_rows else None
 
         cursor.execute(
             """
             SELECT filename, status, records_saved, records_rejected,
-                   imported_at, error_message
+                   imported_at, error_message, device_type, device_model,
+                   measurement_method, NULL::VARCHAR AS signal_quality
             FROM csv_imports
             WHERE session_id = %s
             ORDER BY imported_at DESC, id DESC
@@ -164,6 +167,7 @@ def get_session_traceability(
                 "records_saved": fit_row[2] if fit_row else 0,
                 "records_rejected": fit_row[3] if fit_row else 0,
                 "error": fit_row[5] if fit_row else None,
+                "import_type": fit_row[10] if fit_row and len(fit_row) > 10 else None,
             },
         ),
         build_trace_step(
@@ -238,6 +242,14 @@ def get_session_traceability(
         "session_id": session_id,
         "client_id": client_id,
         "report_exported": report_status == "completed",
+        "data_sources": [
+            source
+            for source in (
+                [build_data_source("hr_hrv", row) for row in fit_rows]
+                + [build_data_source("spo2_pulse", csv_row)]
+            )
+            if source is not None
+        ],
         "steps": steps,
         "events": [
             {
@@ -255,4 +267,21 @@ def get_session_traceability(
             }
             for row in audit_rows
         ],
+    }
+
+
+def build_data_source(signal_role: str, row) -> dict[str, Any] | None:
+    """Expose provenance with conservative unknown defaults for old imports."""
+
+    if not row:
+        return None
+    return {
+        "signal_role": signal_role,
+        "import_type": row[10] if len(row) > 10 else "fit",
+        "filename": row[0],
+        "device_type": row[6] or "unknown",
+        "device_model": row[7] or "unknown",
+        "measurement_method": row[8] or "unknown",
+        "signal_quality": row[9] or "unknown",
+        "records_saved": row[2] or 0,
     }

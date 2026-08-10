@@ -1,0 +1,256 @@
+{% extends "content_studio/base.html" %}
+
+{% from
+    "content_studio/components/layout/page_header.html"
+    import page_header
+%}
+
+
+{% block content_studio_styles %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for(
+        'static',
+        filename='css/content_studio/characters.css'
+    ) }}"
+>
+
+{% endblock %}
+
+
+{% block studio_content %}
+
+{{ page_header(
+    title="Characters",
+    subtitle="Manage CoreLabTech character identities, reference assets and AI profiles.",
+    eyebrow="Character Library"
+) }}
+
+<p class="studio-library-notice" role="status">
+    The active character is ready to use in generation. Planned characters are shown for library context and are not selectable yet.
+</p>
+
+
+<section
+    class="studio-character-library"
+    aria-label="CoreLabTech characters"
+>
+
+    <div class="character-grid">
+
+        <a
+            class="character-card character-card-active"
+            href="{{ url_for(
+                'content_studio.character_details_page',
+                character='athlete'
+            ) }}"
+        >
+
+            <div class="character-card-preview">
+
+                <img
+                    src="{{ url_for(
+                        'static',
+                        filename='img/content_studio/characters/corelabtech-athlete-face-reference.png'
+                    ) }}"
+                    alt="CoreLabTech Athlete"
+                    loading="lazy"
+                >
+
+                <span class="character-card-status active">
+                    Active
+                </span>
+
+            </div>
+
+            <div class="character-card-body">
+
+                <span class="character-card-type">
+                    Athlete
+                </span>
+
+                <h2>
+                    CoreLabTech Athlete
+                </h2>
+
+                <p>
+                    Performance Researcher
+                </p>
+
+                <div class="character-card-meta">
+
+                    <span>
+                        Reference ready
+                    </span>
+
+                    <span>
+                        Profile v1.0
+                    </span>
+
+                </div>
+
+            </div>
+
+        </a>
+
+
+        <article
+            class="character-card character-card-placeholder"
+        >
+
+            <div class="character-card-placeholder-preview">
+                <span>D</span>
+            </div>
+
+            <div class="character-card-body">
+
+                <span class="character-card-type">
+                    Medical
+                </span>
+
+                <h2>
+                    Doctor
+                </h2>
+
+                <p>
+                    Medical and wellness communication.
+                </p>
+
+                <span class="character-card-status planned">
+                    Planned
+                </span>
+
+            </div>
+
+        </article>
+
+
+        <article
+            class="character-card character-card-placeholder"
+        >
+
+            <div class="character-card-placeholder-preview">
+                <span>O</span>
+            </div>
+
+            <div class="character-card-body">
+
+                <span class="character-card-type">
+                    Operations
+                </span>
+
+                <h2>
+                    Operator
+                </h2>
+
+                <p>
+                    Chamber operation and session workflow.
+                </p>
+
+                <span class="character-card-status planned">
+                    Planned
+                </span>
+
+            </div>
+
+        </article>
+
+
+        <article
+            class="character-card character-card-placeholder"
+        >
+
+            <div class="character-card-placeholder-preview">
+                <span>R</span>
+            </div>
+
+            <div class="character-card-body">
+
+                <span class="character-card-type">
+                    Research
+                </span>
+
+                <h2>
+                    Researcher
+                </h2>
+
+                <p>
+                    Scientific data analysis and research communication.
+                </p>
+
+                <span class="character-card-status planned">
+                    Planned
+                </span>
+
+            </div>
+
+        </article>
+
+
+        <article
+            class="character-card character-card-placeholder"
+        >
+
+            <div class="character-card-placeholder-preview">
+                <span>N</span>
+            </div>
+
+            <div class="character-card-body">
+
+                <span class="character-card-type">
+                    Media
+                </span>
+
+                <h2>
+                    Narrator
+                </h2>
+
+                <p>
+                    Voice-over and educational storytelling.
+                </p>
+
+                <span class="character-card-status planned">
+                    Planned
+                </span>
+
+            </div>
+
+        </article>
+
+
+        <article
+            class="character-card character-card-placeholder"
+        >
+
+            <div class="character-card-placeholder-preview">
+                <span>FA</span>
+            </div>
+
+            <div class="character-card-body">
+
+                <span class="character-card-type">
+                    Athlete
+                </span>
+
+                <h2>
+                    Female Athlete
+                </h2>
+
+                <p>
+                    Performance and recovery scenarios.
+                </p>
+
+                <span class="character-card-status planned">
+                    Planned
+                </span>
+
+            </div>
+
+        </article>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -80,6 +80,7 @@
                         <th>Data quality</th>
                         <th>Telemetry</th>
                         <th>Review</th>
+                        <th>Operator AI</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -225,6 +226,21 @@ function getTimelineCount(session){
 
 function hasAi(session){
     return Boolean(session.ai && session.ai.status !== "missing" && !session.ai.error)
+}
+
+function getOperatorReport(session){
+    return session.ai?.result?.operator_report || session.ai?.operator_report || null
+}
+
+function operatorReportLabel(session){
+    const report = getOperatorReport(session)
+    if(!report){
+        return "Run analysis"
+    }
+    if(report.technical_attention_required){
+        return "Review required"
+    }
+    return "No intervention"
 }
 
 function hasExportedReport(session){
@@ -436,6 +452,12 @@ function renderOperatorRows(){
                     </span>
                     ${warnings ? `<small>${warnings} warning(s)</small>` : ""}
                     <small>${escapeHtml(reportLabel)}</small>
+                </td>
+                <td>
+                    <span class="operator-pill ${getOperatorReport(session)?.technical_attention_required ? "warn" : hasAi(session) ? "ok" : "neutral"}">
+                        ${escapeHtml(operatorReportLabel(session))}
+                    </span>
+                    ${getOperatorReport(session)?.attention_items?.length ? `<small>${escapeHtml(getOperatorReport(session).attention_items.join(", "))}</small>` : ""}
                 </td>
                 <td>
                     <div class="operator-row-actions">

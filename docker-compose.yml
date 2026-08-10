@@ -17,13 +17,14 @@ services:
       ENV_FILE: ${ENV_FILE:-.env.local}
       # DATABASE_URL: postgresql://corelabtech_user:corelabtech_password@db:5432/corelabtech
       DATABASE_URL: ${DATABASE_URL}
-      APP_ENV: production 
-      FLASK_ENV: production
+      APP_ENV: ${APP_ENV:-development}
+      FLASK_ENV: ${FLASK_ENV:-development}
       PERFORMANCE_TESTING: "false"
       DISABLE_DEBUG_ROUTES: "true"
       INTERNAL_TOOLS_ENABLED: ${INTERNAL_TOOLS_ENABLED:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       PLAYWRIGHT_BASE_URL: ${PLAYWRIGHT_BASE_URL}
+      APP_RUN_MIGRATIONS: ${APP_RUN_MIGRATIONS:-true}
 
     depends_on:
       db:
@@ -75,8 +76,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     ports:
-      - "5432:5432"
-      # Produkcja/VPS: usuń ports, jeśli baza nie ma być dostępna z zewnątrz.
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data

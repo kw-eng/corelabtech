@@ -122,7 +122,6 @@
   "admin.total_sessions": "Sesje łącznie",
   "analysis.ai_timeline": "Oś AI",
   "analysis.avg_hr": "Średnie HR",
-  "analysis.avg_hrv": "Średnie HRV",
   "analysis.avg_pulse": "Średni puls",
   "analysis.avg_spo2": "Średnie SpO2",
   "analysis.baseline_confidence": "Pewność baseline",
@@ -159,11 +158,9 @@
   "analysis.not_available": "Brak danych",
   "analysis.pending": "Oczekuje",
   "analysis.phys_avg_hrv": "średnie HRV wyniosło {avg} ms",
-  "analysis.phys_hr_avg_range": "HR z wearable wynosiło średnio {avg} bpm (zakres {min}-{max} bpm)",
   "analysis.phys_pulse_avg_range": "puls wynosił średnio {avg} bpm (zakres {min}-{max} bpm)",
   "analysis.physiology_metrics": "Metryki fizjologiczne",
   "analysis.positive_findings": "Pozytywne obserwacje",
-  "analysis.pulse_hrv_summary": "Puls, HR z wearable i HRV należy interpretować jako sygnały trendu wellness: {details}.",
   "analysis.pulse_range": "Zakres pulsu",
   "analysis.recovery_trend": "Trend recovery",
   "analysis.review_context": "Przegląd kontekstu",
@@ -231,6 +228,52 @@
   "chamber.current_session": "Bieżąca sesja",
   "chamber.data_sources": "Źródła danych",
   "chamber.data_sources_help": "Wgraj dane HR/HRV oraz SpO2/puls do tej samej sesji przed synchronizacją.",
+  "chamber.select_device": "Urządzenie źródłowe",
+  "chamber.select_device_placeholder": "Wybierz urządzenie lub ekosystem",
+  "chamber.device_guidance_empty": "Wybierz urządzenie, aby zobaczyć dostępną ścieżkę importu i zakres analizy.",
+  "chamber.device_import_ready": "Można zaimportować: {formats}",
+  "chamber.device_import_planned": "Integracja nie jest jeszcze dostępna w tym środowisku.",
+  "chamber.device_raw_rr": "Surowe RR: {value}",
+  "chamber.device_reported_hrv": "HRV producenta: {value}",
+  "chamber.device_analysis_role": "Zakres analizy: {value}",
+  "chamber.device_cloud": "Konto/chmura: {value}",
+  "chamber.device_analysis_raw_rr": "własne HRV wyłącznie po weryfikacji surowego RR",
+  "chamber.device_analysis_watch": "trend zegarka; pełne HRV tylko z potwierdzonym zewnętrznym HRM",
+  "chamber.device_analysis_reported": "HRV raportowane przez producenta i trendy",
+  "chamber.device_analysis_spo2": "SpO2 referencyjne, puls pomocniczy",
+  "chamber.validate_file": "Sprawd\u017a plik",
+  "chamber.preflight_select_file": "Najpierw wybierz plik.",
+  "chamber.preflight_validating": "Sprawdzanie pliku...",
+  "chamber.preflight_ready": "Plik gotowy do importu",
+  "chamber.preflight_records": "Poprawne rekordy: {valid}; odrzucone: {rejected}",
+  "chamber.preflight_range": "{start} do {end}",
+  "chamber.preflight_signals": "Sygna\u0142y: {signals}",
+  "chamber.preflight_signals_none": "brak",
+  "chamber.preflight_hrv_quality": "HRV: {hrv}; jako\u015b\u0107: {quality}",
+  "chamber.preflight_parser": "Parser: {version}",
+  "chamber.signal_heart_rate": "t\u0119tno",
+  "chamber.signal_pulse": "puls",
+  "chamber.signal_spo2": "SpO2",
+  "chamber.signal_raw_rr": "surowe RR",
+  "chamber.signal_reported_hrv": "raportowane HRV",
+  "chamber.value_high": "wysoka",
+  "chamber.value_medium": "\u015brednia",
+  "chamber.value_low": "niska",
+  "chamber.value_unknown": "nieznana",
+  "chamber.hrv_eligible_from_raw_rr": "mo\u017cliwe wyliczenie HRV z zatwierdzonych surowych RR",
+  "chamber.hrv_raw_rr_requires_source_review": "wykryto surowe RR; przed wyliczeniem HRV wymagany jest przegl\u0105d \u017ar\u00f3d\u0142a",
+  "chamber.hrv_reported_by_device_only": "wy\u0142\u0105cznie HRV raportowane przez producenta; brak surowych RR",
+  "chamber.hrv_not_available": "niedost\u0119pne, poniewa\u017c brak surowych RR",
+  "chamber.session_data_sources": "\u0179r\u00f3d\u0142a danych sesji",
+  "chamber.session_data_sources_empty": "Wybierz klienta i zaimportuj plik, aby zobaczy\u0107 pochodzenie danych.",
+  "chamber.session_data_sources_none": "Brak zaimportowanych \u017ar\u00f3de\u0142 telemetrii dla tej sesji.",
+  "chamber.source_records": "{start} do {end}; rekordy: {count}",
+  "chamber.source_hrv_from_rr": "RR zachowane; HRV mo\u017cna wyliczy\u0107 z zatwierdzonych RR",
+  "chamber.source_hrv_reported": "wy\u0142\u0105cznie HRV raportowane przez producenta",
+  "chamber.source_hrv_none": "Brak \u017ar\u00f3d\u0142a RR lub HRV",
+  "chamber.source_provenance": "{hrv} | parser {parser} | strefa czasu {timezone}",
+  "chamber.source_audit": "Zaimportowano: {imported} | hash pliku: {hash}",
+  "chamber.source_reimport_required": "Aby zastosowa\u0107 nowszy parser, wgraj ponownie oryginalny plik.",
   "chamber.decompression_min": "Dekompresja (min)",
   "chamber.delete_client": "Usuń klienta",
   "chamber.delete_client_confirm": "Czy na pewno usunąć tego klienta i wszystkie powiązane sesje?\n\nKlient: {client}\nID: {id}",
@@ -431,6 +474,18 @@
   "chamber.total_segments": "{total} min razem w segmentach szczegółowych",
   "chamber.training_last_24h": "Trening ostatnie 24h",
   "chamber.upload_hr_hrv": "Wgraj HR i HRV",
+  "chamber.external_telemetry_title": "Dane z urządzenia zewnętrznego",
+  "chamber.source_timezone": "Strefa czasu źródła",
+  "chamber.timezone_browser": "Strefa czasu tej przeglądarki",
+  "chamber.timezone_unknown": "Nieznana - nie normalizuj czasu",
+  "chamber.external_telemetry_help": "Polar CSV, Apple Health XML lub Health Connect JSON. HRV bez surowych RR pozostaje metryką urządzenia.",
+  "chamber.device_model_optional": "Model urządzenia (opcjonalnie)",
+  "chamber.upload_external_telemetry": "Wgraj dane urządzenia",
+  "chamber.select_external_telemetry": "Wybierz plik i format danych urządzenia.",
+  "chamber.uploading_external_telemetry": "Wgrywanie danych urządzenia...",
+  "chamber.external_telemetry_uploaded": "Dane urządzenia zostały wgrane.",
+  "chamber.external_telemetry_already_imported": "Ten plik urządzenia został już wgrany.",
+  "chamber.external_telemetry_upload_failed": "Nie można wgrać danych urządzenia.",
   "chamber.upload_spo2_pulse": "Wgraj SpO2 i puls",
   "chamber.upload_timeline_first": "Najpierw wgraj oś HR/HRV albo SpO2/puls",
   "chamber.uploading_hr": "Wgrywanie i parsowanie osi HR/HRV...",
@@ -450,6 +505,7 @@
   "mission.ai_analysis_failed": "Analiza AI nie powiodła się: {error}",
   "mission.ai_empty": "Wybierz sesję i załaduj najnowszą analizę albo uruchom nową.",
   "mission.analysis": "Analiza",
+  "mission.analysis_confidence": "Pewność analizy",
   "mission.analyzed": "Przeanalizowano",
   "mission.avg_data_quality": "Śr. jakość danych",
   "mission.avg_hrv": "Śr. HRV",
@@ -468,9 +524,19 @@
   "mission.context_recovery_improved": "poprawiona informacja recovery po sesji",
   "mission.context_stress_fatigue": "zgłoszony stres lub zmęczenie",
   "mission.context_training_load": "wyższe obciążenie ostatnią aktywnością",
+  "mission.comparison_against": "Wobec poprzednich {count} sesji",
+  "mission.comparison_confidence": "Pewność porównania: {value}",
+  "mission.comparison_help": "Opisowe porównanie tylko z kwalifikującymi się własnymi sesjami. Wartość wyższa lub niższa nie oznacza lepszej odpowiedzi fizjologicznej.",
+  "mission.comparison_higher": "Wyżej niż wartość referencyjna",
+  "mission.comparison_lower": "Niżej niż wartość referencyjna",
+  "mission.comparison_not_ready": "Brak porównania: nie spełniono bramki jakości danych albo nie ma kwalifikującej się osobistej referencji.",
+  "mission.comparison_reference_sessions": "Kwalifikujące sesje referencyjne: {count}",
+  "mission.comparison_unchanged": "Bez zmiany względem referencji",
+  "mission.comparison_unavailable": "Porównanie osobiste nie jest jeszcze dostępne.",
   "mission.coverage": "Pokrycie",
   "mission.crashed": "Przerwano",
   "mission.data_quality": "Jakość danych",
+  "mission.data_sources": "Źródła danych sesji",
   "mission.data_quality_engine": "Silnik jakości danych sesji",
   "mission.data_quality_engine_fallback": "Jakość danych opisuje pewność danych sesji, a nie stan zdrowia klienta.",
   "mission.data_quality_review_recommended": "Zalecany przegląd jakości danych: wykryto różnicę wyrównania HR/puls.",
@@ -579,10 +645,16 @@
   "mission.series_trend_more_sessions_sentence": "Potrzeba więcej przeanalizowanych sesji, aby ustalić trend.",
   "mission.series_trend_stable_sentence": "Trend odpowiedzi wellness jest stabilny w wybranej serii.",
   "mission.session": "Sesja",
+  "mission.session_comparison": "Porównanie sesji",
+  "mission.session_summary_ai": "AI: podsumowanie sesji",
   "mission.session_option": "Sesja {number} · {date} · {protocol}",
   "mission.spo2_warnings": "Ostrzeżenia SpO2",
   "mission.stable_response": "Stabilna odpowiedź",
   "mission.status": "Status",
+  "mission.signal_quality": "Jakość sygnału",
+  "mission.sources_empty": "Dla tej sesji nie zapisano metadanych urządzenia.",
+  "mission.summary_source_fallback": "Wersjonowane podsumowanie deterministyczne",
+  "mission.summary_source_llm": "Narracja LLM na zweryfikowanych faktach",
   "mission.sync": "Sync",
   "mission.sync_quality": "Jakość synchronizacji",
   "mission.telemetry_help": "SpO2, puls, tętno z wearable i HRV po synchronizacji osi czasu.",
@@ -598,6 +670,8 @@
   "mission.traceability": "Historia sesji",
   "mission.traceability_help": "Historia operacyjna od utworzenia sesji do eksportu raportu.",
   "mission.trend": "Trend",
+  "mission.trend_ai": "AI: trend sesji",
+  "mission.trend_ai_version": "Wersjonowane podsumowanie faktów: {version}",
   "mission.trend_failed": "Trend nie powiódł się: {error}",
   "mission.trend_interpretation_fallback": "Interpretuj trend razem z jakością danych sesji. To nie jest diagnoza.",
   "mission.trend_load_failed": "Nie można załadować trendu: {error}",
@@ -618,6 +692,54 @@
   "mission.wellness_only_interpretation": "Interpretacja wyłącznie wellness",
   "mission.wellness_response": "Odpowiedź wellness",
   "mission.wellness_score": "Wynik wellness",
+  "mission.recovery_follow_up": "Follow-up regeneracji",
+  "mission.recovery_follow_up_help": "Zapisz dobrowolną informację wellness po sesji. Służy wyłącznie jako kontekst kolejnego podsumowania regeneracji.",
+  "mission.recovery_follow_up_empty": "Wybierz sesję i zapisz follow-up, gdy dane będą dostępne.",
+  "mission.recovery_follow_up_saving": "Zapisywanie follow-up regeneracji...",
+  "mission.recovery_follow_up_saved": "Follow-up regeneracji został zapisany.",
+  "mission.recovery_follow_up_failed": "Nie można zapisać follow-up regeneracji: {error}",
+  "mission.recovery_window_pending": "Oczekuje na wpis",
+  "mission.compared_with_check_in": "Zmiana względem check-in (HR | SpO2)",
+  "mission.recovery_checkin_unavailable": "Brak porównywalnych pomiarów check-in",
+  "mission.compared_with_personal_history": "Zmiana względem własnej historii (delta | średnia)",
+  "mission.recovery_history_not_ready": "Własna historia dla tego okna nie jest jeszcze gotowa do porównania",
+  "mission.recovery_history_entries": "Własna historia follow-up: {count} wpisów",
+  "mission.recovery_history_unavailable": "Brak wcześniejszych wpisów follow-up do porównania",
+  "mission.research_ai": "Research AI",
+  "mission.research_ai_help": "Wersjonowany opis badawczy wyłącznie na podstawie faktów sesji.",
+  "mission.refresh_research_ai": "Odśwież",
+  "mission.research_ai_empty": "Wybierz przeanalizowaną sesję, aby wyświetlić podsumowanie badawcze.",
+  "mission.research_ai_load_failed": "Nie można załadować Research AI: {error}",
+  "mission.research_narration_source": "Źródło narracji",
+  "mission.hrv_algorithm": "Algorytm HRV",
+  "mission.research_methods": "Metody",
+  "mission.research_observations": "Obserwacje",
+  "mission.device_compatibility": "Kompatybilność urządzeń",
+  "mission.device_compatibility_help": "Klasy urządzeń, jakość sygnału i zasady użycia danych HRV.",
+  "mission.refresh_device_catalog": "Odśwież",
+  "mission.device_catalog_loading": "Ładowanie katalogu urządzeń...",
+  "mission.device_catalog_load_failed": "Nie można załadować katalogu urządzeń: {error}",
+  "mission.hrv_policy": "Zasada HRV",
+  "mission.save_recovery_follow_up": "Zapisz follow-up",
+  "mission.energy": "Energia",
+  "mission.fatigue": "Zmęczenie",
+  "mission.sleep_quality": "Jakość snu",
+  "mission.discomfort": "Dyskomfort",
+  "mission.follow_up_hr": "Tętno (opcjonalnie)",
+  "mission.follow_up_window": "Moment follow-up",
+  "mission.follow_up_one_hour": "Około godzinę po sesji",
+  "mission.follow_up_next_day": "Następnego dnia",
+  "mission.lower": "Niższa",
+  "mission.same": "Bez zmian",
+  "mission.higher": "Wyższa",
+  "mission.poor": "Słaba",
+  "mission.fair": "Umiarkowana",
+  "mission.good": "Dobra",
+  "mission.none": "Brak",
+  "mission.mild": "Łagodny",
+  "mission.moderate": "Umiarkowany",
+  "mission.monitor_before_next": "Monitoruj przed kolejną sesją",
+  "mission.data_limitations": "Ograniczenia danych",
   "nav.about": "O platformie",
   "nav.accounts": "Konta",
   "nav.ai_lab": "AI Lab",
@@ -921,8 +1043,8 @@
   "report.no_analysis": "Analiza wellness nie jest jeszcze dostępna dla tej sesji.",
   "report.no_analyzed_sessions": "Brak przeanalizowanych sesji",
   "report.operator_review": "Ocena operatora",
-  "report.personal_baseline": "Baseline klienta",
-  "report.platform": "Wellness Physiology & Research Platform",
+  "report.personal_baseline": "Poziom bazowy klienta",
+  "report.platform": "Platforma wellness, fizjologii i badań",
   "report.review_ok": "OK",
   "report.review_required": "Do oceny",
   "report.series_interpretation": "Interpretacja serii wellness",
@@ -935,12 +1057,12 @@
   "report.session_overview": "Podsumowanie sesji",
   "report.session_status": "Status sesji",
   "report.session_timeline": "Przebieg sesji",
-  "report.table_check_in": "CHECK-IN",
+  "report.table_check_in": "PRZED SESJĄ",
   "report.table_date": "DATA",
   "report.table_metric": "METRYKA",
   "report.table_pulse": "PULS",
   "report.table_quality": "JAKOŚĆ",
-  "report.table_recovery": "RECOVERY",
+  "report.table_recovery": "REGENERACJA",
   "report.table_review": "OCENA",
   "report.table_score": "WYNIK",
   "report.table_session": "SESJA",
@@ -958,5 +1080,224 @@
   "session.recovery_saved": "Recovery zapisane",
   "session.resume_before_assigning": "Wznów program przed przypisaniem nowych sesji.",
   "session.single_no_package": "Pojedyncza sesja / bez pakietu",
-  "session.single_outside_package": "Pojedyncza sesja poza pakietem."
+  "session.single_outside_package": "Pojedyncza sesja poza pakietem.",
+  "chamber.telemetry_intelligence": "Telemetry Intelligence",
+  "chamber.telemetry_intelligence_help": "Platforma automatycznie analizuje zawartość przesłanych plików i określa, które analizy są dostępne.",
+"chamber.telemetry_source": "Źródło telemetryczne",
+"chamber.wearable_telemetry": "Telemetria urządzenia ubieralnego",
+"chamber.wearable_telemetry_help":"Wgraj dane tętna i interwałów RR z zachowanymi znacznikami czasu.",
+"chamber.pulse_oximetry": "Pulsoksymetria",
+"chamber.pulse_oximetry_help": "Wgraj dane SpO₂ i pulsu z zachowanymi znacznikami czasu.",
+"chamber.expected_signals": "Oczekiwane sygnały",
+"chamber.signal_rr_intervals": "Interwały RR",
+"chamber.signal_timestamp": "Znaczniki czasu",
+"chamber.accepted_format": "Obsługiwany format",
+"chamber.preflight_quality_score": "Jakość danych: {score}% · poziom: {level}",
+"chamber.show_imported_data": "Pokaż zaimportowane dane",
+"chamber.telemetry_detected": "Wykryta telemetria",
+"chamber.telemetry_quality": "Jakość danych",
+"chamber.analysis_available": "Dostępne analizy",
+"chamber.detected_signals": "Wykryte sygnały",
+"chamber.data_quality_excellent": "doskonała",
+"chamber.data_quality_good": "dobra",
+"chamber.data_quality_fair": "średnia",
+"chamber.data_quality_poor": "niska",
+  "analysis.pulse_avg": "Średni puls wyniósł {avg} ud./min.",
+  "analysis.pulse_avg_range": "Średni puls wyniósł {avg} ud./min (zakres {min}–{max} ud./min).",
+
+  "analysis.phys_hr_avg": "Średnie tętno z urządzenia ubieralnego wyniosło {avg} ud./min.",
+  "analysis.phys_hr_avg_range": "Średnie tętno z urządzenia ubieralnego wyniosło {avg} ud./min (zakres {min}–{max} ud./min).",
+
+  "analysis.avg_hrv": "Średnie HRV wyniosło {value} ms.",
+
+  "analysis.pulse_hrv_summary": "Puls, tętno z urządzenia ubieralnego oraz HRV należy interpretować jako wskaźniki trendu wellness: {details}.",
+
+  "analysis.context_low_sleep": "obniżona jakość lub krótki czas snu",
+  "analysis.context_training": "zwiększone obciążenie treningowe",
+  "analysis.context_stress": "zgłoszony stres lub zmęczenie",
+  "analysis.context_recovery": "poprawa samopoczucia po sesji",
+
+  "analysis.context_none": "Dane z ankiety check-in nie wskazują na istotne zaburzenia snu, zwiększony stres, zmęczenie ani podwyższone obciążenie treningowe.",
+
+  "analysis.context_prefix": "Kontekst check-in:",
+  "analysis.sensor_mismatch": "Wykryto istotną rozbieżność między tętnem z urządzenia ubieralnego a pulsem z pulsoksymetru. Może to wskazywać na różnice między czujnikami, problemy z synchronizacją czasu lub jakością sygnału.",
+  "analysis.sensor_mismatch_with_difference": "Wykryto istotną rozbieżność między tętnem z urządzenia ubieralnego a pulsem z pulsoksymetru. Może to wskazywać na różnice między czujnikami, problemy z synchronizacją czasu lub jakością sygnału. Maksymalna zaobserwowana różnica wyniosła {difference} ud./min.",
+  "analysis.additional_findings": "Dodatkowe obserwacje wellness: {details}.",
+  "analysis.recommend_sensor_alignment": "Przed interpretacją trendów tętna i pulsu sprawdź zsynchronizowaną oś czasu, ułożenie sensorów oraz synchronizację czasu.",
+  "analysis.recommend_sleep_context": "Kontekst snu wskazuje na ograniczoną gotowość do regeneracji. Rozważ spokojniejszy dzień i porównaj jutrzejsze HRV oraz tętno spoczynkowe.",
+  "analysis.recommend_training_context": "Niedawne obciążenie treningowe może wpływać na odpowiedź HR i HRV. Traktuj sesję jako wsparcie regeneracji i sprawdź kolejny odczyt bazowy.",
+  "analysis.recommend_stress_context": "Zgłoszony stres lub zmęczenie są podwyższone. Priorytetem jest regeneracja; powtórz pomiar w spokojniejszych warunkach.",
+  "analysis.recommend_review_signals": "Sprawdź zsynchronizowaną oś czasu, surowe sygnały i kontekst regeneracji.",
+  "analysis.recommend_none": "Nie wskazano dodatkowego działania wellness.",
+  "analysis.hr_high_threshold": "Tętno przekroczyło skonfigurowany próg wysokiego obciążenia",
+  "report.page": "Strona {page}",
+  "report.key_findings": "Kluczowe wnioski",
+  "report.label_client": "Klient",
+  "report.label_range": "Zakres",
+  "report.label_protocol": "Protokół",
+  "report.label_total_sessions": "Wszystkie sesje",
+  "report.label_analyzed_sessions": "Przeanalizowane sesje",
+  "report.label_evidence_level": "Poziom dowodów",
+  "report.label_review_flags": "Flagi do oceny",
+  "report.label_latest_session": "Najnowsza sesja",
+  "report.label_latest_score": "Najnowszy wynik",
+  "report.label_wellness_score": "Wynik wellness",
+  "report.label_data_quality": "Jakość danych",
+  "report.label_average_hr": "Średnie HR",
+  "report.label_average_hrv": "Średnie HRV",
+  "report.label_average_spo2": "Średnie SpO2",
+  "report.label_average_coverage": "Średnie pokrycie",
+  "report.label_average_sync": "Średnia jakość synchronizacji",
+  "report.label_missing_samples": "Brakujące próbki",
+  "report.label_sensor_gap_sessions": "Sesje z lukami sensorów",
+  "report.label_hr_pulse_mismatch": "Niezgodność HR / pulsu",
+  "report.label_spo2_warnings": "Ostrzeżenia SpO2",
+  "report.label_warning_summary": "Podsumowanie ostrzeżeń",
+  "report.evidence_insufficient": "Niewystarczający",
+  "report.evidence_preliminary": "Wstępny",
+  "report.evidence_emerging": "Pojawiający się",
+  "report.evidence_established": "Ugruntowany",
+  "report.trend_stable": "Stabilny",
+  "report.trend_improving": "Poprawa",
+  "report.trend_declining": "Pogorszenie",
+  "report.trend_insufficient": "Za mało danych",
+  "report.comparison_single": "Podsumowanie pojedynczej sesji",
+  "report.comparison_first_latest": "Pierwsza dostępna sesja vs najnowsza dostępna sesja",
+  "report.comparison_first_last": "Pierwsze {count} dostępne sesje vs ostatnie {count} dostępne sesje",
+  "report.quality_confidence": "Jakość danych określa pewność pomiarów i obliczeń; nie jest oceną zdrowia.",
+  "report.finding_evidence": "Dostępnych jest {count} przeanalizowanych sesji; dowody podłużne są na poziomie: {evidence}.",
+  "report.finding_stable": "Dostępny wynik wellness jest stabilny w sesjach; nie ustalono wyraźnej poprawy ani pogorszenia. Porównanie zmierzonych HR, HRV i SpO2 należy oceniać razem z jakością danych.",
+  "report.finding_change": "W dostępnych pomiarach widoczna jest zmiana kierunkowa, ale należy interpretować ją z uwzględnieniem poziomu dowodów i jakości danych.",
+  "report.finding_quality_warning": "Ostrzeżenia dotyczące jakości danych ograniczają pewność: {warnings}. Przed mocniejszymi wnioskami sprawdź zgodność sensorów i synchronizację.",
+  "report.finding_more_sessions": "Potrzebne są dodatkowe sesje przed sformułowaniem silniejszego wniosku podłużnego."
+  ,"report.warning_none": "Brak powtarzających się ostrzeżeń jakości danych"
+  ,"report.warning_sensor_alignment_warning": "Ostrzeżenie dotyczące zgodności sensorów"
+  ,"report.warning_low_coverage": "Niskie pokrycie sensorów"
+  ,"report.warning_sync_quality_warning": "Ostrzeżenie jakości synchronizacji"
+  ,"report.warning_spo2_range_warning": "Ostrzeżenie zakresu SpO2"
+  ,"report.label_date": "Data"
+  ,"report.label_program": "Program"
+  ,"report.label_location": "Lokalizacja"
+  ,"report.label_pressure": "Ciśnienie"
+  ,"report.label_duration": "Czas trwania"
+  ,"report.label_target": "cel"
+  ,"report.label_data_quality_score": "Wynik jakości danych"
+  ,"report.label_coverage": "Pokrycie"
+  ,"report.label_sync_quality": "Jakość synchronizacji"
+  ,"report.label_hr_pulse_alignment": "Zgodność HR / pulsu"
+  ,"report.label_spo2_range": "Zakres SpO2"
+  ,"report.label_quality_notes": "Uwagi dotyczące jakości"
+  ,"report.label_check_in_recovery": "Check-in i regeneracja"
+  ,"report.label_check_in_context": "Kontekst check-in"
+  ,"report.label_recovery_context": "Kontekst regeneracji"
+  ,"report.label_oxygen_flow": "Przepływ tlenu"
+  ,"report.label_estimated_mask_oxygen": "Szacowany tlen w masce"
+  ,"report.label_chamber_temperature": "Temperatura komory"
+  ,"report.label_pressure_deviation": "Odchylenie ciśnienia"
+  ,"report.label_hr_hrv_samples": "Próbki HR / HRV"
+  ,"report.label_spo2_pulse_samples": "Próbki SpO2 / pulsu"
+  ,"report.label_synchronized_samples": "Zsynchronizowane próbki"
+  ,"report.label_baseline_status": "Status baseline"
+  ,"report.label_sessions_last_30_days": "Sesje z ostatnich 30 dni"
+  ,"report.label_rmssd_7_days": "RMSSD - 7 dni"
+  ,"report.label_spo2_average": "Średnie SpO2"
+  ,"report.label_spo2_minimum": "Minimalne SpO2"
+  ,"report.label_baseline_data_quality": "Bazowa jakość danych"
+  ,"report.label_timeline": "Przebieg"
+  ,"report.label_no_segment_data": "Brak danych o segmentach"
+  ,"report.label_session_number": "Sesja {number}"
+  ,"report.status_active": "Aktywna"
+  ,"report.status_as_planned": "Ukończona zgodnie z planem"
+  ,"report.status_baseline": "Budowanie baseline"
+  ,"report.status_completed": "Ukończona"
+  ,"report.status_modified": "Ukończona ze zmianami"
+  ,"report.status_paused": "Wstrzymana"
+  ,"report.status_cancelled": "Anulowana"
+  ,"report.quality_alignment_review": "Zalecana ocena operatora"
+  ,"report.quality_no_alignment_warning": "Brak ostrzeżenia zgodności"
+  ,"report.quality_no_range_warning": "Brak ostrzeżenia zakresu"
+  ,"report.research_ai": "AI badań"
+  ,"report.research_methods_versions": "Metody i wersje"
+  ,"report.research_fact_sheet": "Arkusz faktów"
+  ,"report.research_narration": "Narracja badawcza"
+  ,"report.research_narration_source": "Źródło narracji"
+  ,"report.research_analysis_model": "Model analizy"
+  ,"report.research_hrv_algorithm": "Algorytm HRV"
+  ,"report.research_hrv_window": "Okno HRV"
+  ,"report.research_abstract": "Streszczenie"
+  ,"report.research_methods": "Metody"
+  ,"report.research_observations": "Obserwacje"
+  ,"report.research_interpretation": "Interpretacja"
+  ,"report.research_limitations": "Ograniczenia"
+  ,"report.research_future_data": "Wymagane dalsze dane"
+  ,"report.research_content_disclaimer": "Podsumowanie badawcze opisuje dane obserwacyjne jednej sesji wellness i nie stanowi diagnozy medycznej."
+  ,"report.research_content_unavailable": "Brak danych"
+  ,"report.research_content_abstract": "Opis obserwacyjny pojedynczej sesji wellness oparty na zsynchronizowanych danych i wersjonowanym modelu analizy."
+  ,"report.research_content_methods": "Model: {model}; zsynchronizowane próbki: {synchronized}/{total}; protokół: {protocol}; HRV: {hrv}."
+  ,"report.research_content_observations": "Średnie/minimalne SpO2: {avg_spo2}/{min_spo2}; referencyjne HR: {heart_rate}; RMSSD: {rmssd}."
+  ,"report.research_content_interpretation": "Wyniki opisują wyłącznie zaobserwowane pomiary i ich jakość danych w kontekście tej sesji."
+  ,"report.research_content_limitations": "Pewność analizy: {confidence}; jakość sygnału: {signal_quality}; ostrzeżenia jakości danych: {warnings}."
+  ,"report.research_content_future_data": "Dodatkowe sesje o porównywalnym protokole i jakości danych są potrzebne do wniosków podłużnych."
+  ,"report.executive_summary": "Podsumowanie wykonawcze"
+  ,"report.executive_summary_text": "Dostępnych jest {sessions} sesji, z czego przeanalizowano {analyzed}. Poziom dowodów: {evidence}; zaobserwowany kierunek wyniku wellness: {trend}. Średnia jakość danych wynosi {quality}. {limitation}"
+  ,"report.executive_summary_warning": "{count} ostrzeżenie(a) jakości danych ogranicza pewność interpretacji."
+  ,"report.executive_summary_no_warning": "Nie stwierdzono powtarzających się ostrzeżeń jakości danych."
+  ,"report.label_at": "przy"
+  ,"report.phase_compression": "Kompresja"
+  ,"report.phase_exposure": "Ekspozycja"
+  ,"report.phase_decompression": "Dekompresja"
+  ,"report.phase_pre": "Przed sesją"
+  ,"report.phase_during": "W trakcie sesji"
+  ,"report.phase_post": "Po sesji"
+  ,"report.status_early": "Wczesny"
+  ,"report.wellness_status_unknown": "Dostępny wynik sesji"
+  ,"report.wellness_status_stable": "Stabilna odpowiedź wellness"
+  ,"report.wellness_status_elevated_load": "Podwyższony poziom do oceny wellness"
+  ,"report.wellness_status_data_quality_warning": "Wymagana ocena jakości danych"
+  ,"report.session_interpretation_text": "Sesja ma wynik wellness {score} oraz wynik jakości danych {quality}. Dostępny wynik wellness: {status}. Należy interpretować go razem z jakością pomiarów i kontekstem sesji."
+  ,"report.operator_review_warnings": "Przed sformułowaniem mocniejszych wniosków sprawdź następujące elementy jakości danych: {warnings}."
+  ,"report.operator_review_clear": "Nie stwierdzono ostrzeżenia jakości danych wymagającego oceny operatora."
+  ,"report.narration_source_deterministic_fallback": "Deterministyczna treść raportu"
+  ,"report.narration_source_llm": "Narracja wspomagana AI"
+  ,"report.confidence_low": "Niska"
+  ,"report.confidence_medium": "Średnia"
+  ,"report.confidence_high": "Wysoka"
+  ,"report.wellness_status_baseline": "Bazowa odpowiedź wellness"
+  ,"report.context_spo2": "SpO2"
+  ,"report.context_pulse_hr": "Puls / HR"
+  ,"report.context_sleep_hours": "Godziny snu"
+  ,"report.context_sleep_quality": "Jakość snu"
+  ,"report.context_stress_level": "Poziom stresu"
+  ,"report.context_training_load_24h": "Obciążenie treningowe (24 h)"
+  ,"report.context_fatigue_level": "Poziom zmęczenia"
+  ,"report.context_session_goal": "Cel sesji"
+  ,"report.context_energy_level": "Poziom energii"
+  ,"report.context_relaxation_level": "Poziom relaksacji"
+  ,"report.context_discomfort": "Dyskomfort"
+  ,"report.context_value_fair": "Umiarkowana"
+  ,"report.context_value_low": "Niski"
+  ,"report.context_value_light": "Lekka"
+  ,"report.context_value_recovery": "Regeneracja"
+  ,"report.context_value_higher": "Wyższy"
+  ,"report.context_value_moderate": "Umiarkowany"
+  ,"report.context_value_lower": "Niższy"
+  ,"report.context_value_none": "Brak"
+  ,"report.context_value_baseline": "Bazowy"
+  ,"report.context_value_yes": "Tak"
+  ,"report.context_value_no": "Nie"
+  ,"report.session_summary_limitations": "Ograniczenia danych"
+  ,"report.session_summary_no_limitations": "Brak zgłoszonych ograniczeń"
+  ,"report.session_summary_confidence": "Pewność analizy"
+  ,"report.session_summary_overview": "Podsumowanie"
+  ,"report.session_summary_wellness_status": "Status wellness"
+  ,"report.session_summary_check_in": "Check-in"
+  ,"report.session_summary_during": "Fazy sesji"
+  ,"report.session_summary_check_out": "Check-out"
+  ,"report.session_summary_quality": "Jakość sesji"
+  ,"report.session_summary_signal_quality": "Jakość sygnału"
+  ,"report.session_summary_unavailable": "Brak danych dla tej części sesji"
+  ,"mission.recovery_summary_complete": "Zapisano oba okna follow-up regeneracji; są gotowe do porównania."
+  ,"mission.recovery_summary_recorded": "Zapisano jeden follow-up regeneracji; drugie okno pozostaje dostępne."
+  ,"mission.recovery_summary_pending": "Brak danych follow-up regeneracji dla tej sesji."
 }
+

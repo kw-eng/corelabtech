@@ -1,0 +1,115 @@
+{% extends "content_studio/base.html" %}
+
+{% block studio_title %}
+Dashboard
+{% endblock %}
+
+{% block studio_subtitle %}
+Manage your complete AI production pipeline.
+{% endblock %}
+
+{% block studio_content %}
+
+<div class="dashboard-grid">
+
+    <a class="studio-card"
+    href="{{ url_for('content_studio.characters_page') }}">
+
+        <h2>Characters</h2>
+
+        <p>
+
+            Athlete
+
+            Doctor
+
+            Operator
+
+            Researcher
+
+            Narrator
+
+        </p>
+
+    </a>
+
+    <a class="studio-card"
+    href="{{ url_for('content_studio.scenes_page') }}">
+
+        <h2>Scene Library</h2>
+
+        <p>
+
+            Home Hero
+
+            HBOT
+
+            Running
+
+            Dashboard
+
+            Recovery
+
+        </p>
+
+    </a>
+
+    <a class="studio-card"
+    href="{{ url_for('content_studio.prompt_builder_page') }}">
+
+        <h2>Prompt Builder</h2>
+
+        <p>
+
+            Build prompts from templates
+
+        </p>
+
+    </a>
+
+    <a class="studio-card"
+    href="{{ url_for('content_studio.storyboards_page') }}">
+
+        <h2>Storyboards</h2>
+
+        <p>
+
+            Build complete video stories
+
+        </p>
+
+    </a>
+
+    <a class="studio-card"
+    href="{{ url_for('content_studio.generate_page') }}">
+
+        <h2>Generate</h2>
+
+        <p>
+
+            Images
+
+            Videos
+
+            Batch generation
+
+        </p>
+
+    </a>
+
+    <a class="studio-card"
+    href="{{ url_for('content_studio.media_page') }}">
+
+        <h2>Generated Media</h2>
+
+        <p>
+
+            Browse all generated assets
+
+        </p>
+
+    </a>
+
+</div>
+
+{% endblock %}

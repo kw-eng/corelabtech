@@ -1,0 +1,88 @@
+{% macro page_header(
+    title,
+    subtitle=None,
+    eyebrow=None,
+    actions=None
+) %}
+
+<header class="studio-page-header">
+
+    <div class="studio-page-header-copy">
+
+        {% if eyebrow %}
+            <span class="studio-page-eyebrow">
+                {{ eyebrow }}
+            </span>
+        {% endif %}
+
+        <h1 class="studio-page-title">
+            {{ title }}
+        </h1>
+
+        {% if subtitle %}
+            <p class="studio-page-subtitle">
+                {{ subtitle }}
+            </p>
+        {% endif %}
+
+    </div>
+
+    {% if actions %}
+
+    <div class="studio-page-header-actions">
+
+        {% for action in actions %}
+
+            {% if action.href %}
+
+                <a
+                    href="{{ action.href }}"
+                    class="studio-action-button{% if action.primary %} primary{% endif %}"
+                >
+
+                    {% if action.icon %}
+                        <span class="studio-button-icon">
+                            {{ action.icon }}
+                        </span>
+                    {% endif %}
+
+                    {{ action.label }}
+
+                </a>
+
+            {% else %}
+
+                <button
+                    type="{{ action.type|default('button') }}"
+                    class="studio-action-button{% if action.primary %} primary{% endif %}"
+
+                    {% if action.id %}
+                        id="{{ action.id }}"
+                    {% endif %}
+
+                    {% if action.disabled %}
+                        disabled
+                    {% endif %}
+                >
+
+                    {% if action.icon %}
+                        <span class="studio-button-icon">
+                            {{ action.icon }}
+                        </span>
+                    {% endif %}
+
+                    {{ action.label }}
+
+                </button>
+
+            {% endif %}
+
+        {% endfor %}
+
+    </div>
+
+    {% endif %}
+
+</header>
+
+{% endmacro %}

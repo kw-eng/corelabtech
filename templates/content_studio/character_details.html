@@ -1,0 +1,277 @@
+{% extends "content_studio/base.html" %}
+
+{% from
+    "content_studio/components/layout/page_header.html"
+    import page_header
+%}
+
+
+{% block content_studio_styles %}
+<link
+    rel="stylesheet"
+    href="{{ url_for(
+        'static',
+        filename='css/content_studio/characters.css'
+    ) }}"
+>
+{% endblock %}
+
+
+{% block studio_content %}
+
+{{ page_header(
+    title="CoreLabTech Athlete",
+    subtitle="Official character profile, reference assets and generation entry point.",
+    eyebrow="Character Details",
+    actions=[
+        {
+            "label": "Generate",
+            "icon": "▶",
+            "href": url_for(
+                "content_studio.generate_page",
+                character=character
+            ),
+            "primary": True
+        },
+        {
+            "label": "Back to Characters",
+            "href": url_for(
+                "content_studio.characters_page"
+            )
+        }
+    ]
+) }}
+
+
+<section class="character-details-layout">
+
+    <div class="character-left">
+
+        <div class="studio-card">
+
+            <div class="character-detail-preview">
+
+                <img
+                    class="reference-image"
+                    src="{{ url_for(
+                        'static',
+                        filename='img/content_studio/characters/corelabtech-athlete-face-reference.png'
+                    ) }}"
+                    alt="CoreLabTech Athlete"
+                >
+
+            </div>
+
+            <div class="character-detail-actions">
+
+                <button
+                    type="button"
+                    class="studio-button outline"
+                    id="edit-character-button"
+                >
+                    Edit Profile
+                </button>
+
+                <a
+                    class="studio-button outline"
+                    href="{{ url_for(
+                        'content_studio.prompt_builder_page',
+                        character=character
+                    ) }}"
+                >
+                    Build Prompt
+                </a>
+
+                <a
+                    class="studio-button primary"
+                    href="{{ url_for(
+                        'content_studio.generate_page',
+                        character=character
+                    ) }}"
+                >
+                    Generate Assets
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="character-right">
+
+        <div class="studio-card info-card">
+
+            <h2>Identity</h2>
+
+            <table class="studio-table">
+
+                <tbody>
+
+                    <tr>
+                        <th>Name</th>
+                        <td>CoreLabTech Athlete</td>
+                    </tr>
+
+                    <tr>
+                        <th>Age</th>
+                        <td>29</td>
+                    </tr>
+
+                    <tr>
+                        <th>Height</th>
+                        <td>185 cm</td>
+                    </tr>
+
+                    <tr>
+                        <th>Role</th>
+                        <td>Performance Researcher</td>
+                    </tr>
+
+                    <tr>
+                        <th>Status</th>
+                        <td>
+                            <span class="badge success">
+                                Active
+                            </span>
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <div class="studio-card info-card">
+
+            <div class="character-section-header">
+
+                <div>
+                    <h2>Character Files</h2>
+
+                    <p>
+                        Prompt, profile and brand configuration
+                        used for generation.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="character-file-list">
+
+                <div class="character-file-item">
+                    <span class="character-file-name">
+                        MASTER_PROMPT.md
+                    </span>
+
+                    <span class="badge success">
+                        Ready
+                    </span>
+                </div>
+
+                <div class="character-file-item">
+                    <span class="character-file-name">
+                        CHARACTER_PROFILE.md
+                    </span>
+
+                    <span class="badge success">
+                        Ready
+                    </span>
+                </div>
+
+                <div class="character-file-item">
+                    <span class="character-file-name">
+                        BRAND_RULES.md
+                    </span>
+
+                    <span class="badge success">
+                        Ready
+                    </span>
+                </div>
+
+                <div class="character-file-item">
+                    <span class="character-file-name">
+                        IMAGE_PROMPTS.md
+                    </span>
+
+                    <span class="badge success">
+                        Ready
+                    </span>
+                </div>
+
+                <div class="character-file-item">
+                    <span class="character-file-name">
+                        VIDEO_PROMPTS.md
+                    </span>
+
+                    <span class="badge success">
+                        Ready
+                    </span>
+                </div>
+
+                <div class="character-file-item">
+                    <span class="character-file-name">
+                        SCENE_LIBRARY.md
+                    </span>
+
+                    <span class="badge success">
+                        Ready
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="studio-card info-card">
+
+            <h2>Generated Assets</h2>
+
+            <div class="character-asset-stats">
+
+                <div class="character-asset-stat">
+
+                    <span class="character-asset-value">
+                        {{ image_count }}
+                    </span>
+
+                    <span class="character-asset-label">
+                        Images
+                    </span>
+
+                </div>
+
+                <div class="character-asset-stat">
+
+                    <span class="character-asset-value">
+                        {{ video_count }}
+                    </span>
+
+                    <span class="character-asset-label">
+                        Videos
+                    </span>
+
+                </div>
+
+            </div>
+
+            <a
+                class="studio-button outline"
+                href="{{ url_for(
+                    'content_studio.media_page'
+                ) }}?character={{ character }}"
+            >
+                View Generated Media
+            </a>
+
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

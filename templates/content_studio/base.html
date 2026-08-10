@@ -1,0 +1,204 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+    {{ super() }}
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/variables.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/themes.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/base.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/buttons.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/cards.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/forms.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/tables.css'
+        ) }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='css/content_studio/animations.css'
+        ) }}"
+    >
+
+    {% block content_studio_styles %}
+    {% endblock %}
+{% endblock %}
+
+
+{% block content %}
+
+<div class="studio-shell">
+
+    <div
+        id="studio-sidebar"
+        class="studio-sidebar-wrapper"
+    >
+        {% include
+            "content_studio/components/layout/sidebar.html"
+        %}
+    </div>
+
+
+    <div class="studio-workspace">
+
+        {% include
+            "content_studio/components/layout/topbar.html"
+        %}
+
+
+        <main class="studio-main">
+
+            {% include
+                "content_studio/components/layout/breadcrumbs.html"
+            %}
+
+
+            <div class="studio-content">
+
+                {% block studio_content %}
+                {% endblock %}
+
+            </div>
+
+        </main>
+
+    </div>
+
+</div>
+
+
+<div
+    id="studio-sidebar-backdrop"
+    class="studio-sidebar-backdrop"
+    aria-hidden="true"
+></div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const button = document.getElementById(
+        "studio-mobile-menu-button"
+    );
+
+    const sidebar = document.getElementById(
+        "studio-sidebar"
+    );
+
+    const backdrop = document.getElementById(
+        "studio-sidebar-backdrop"
+    );
+
+    if (!button || !sidebar || !backdrop) {
+        return;
+    }
+
+    function setSidebarState(open) {
+
+        sidebar.classList.toggle(
+            "is-open",
+            open
+        );
+
+        backdrop.classList.toggle(
+            "is-visible",
+            open
+        );
+
+        button.setAttribute(
+            "aria-expanded",
+            open ? "true" : "false"
+        );
+
+        document.body.classList.toggle(
+            "studio-menu-open",
+            open
+        );
+    }
+
+
+    button.addEventListener(
+        "click",
+        function () {
+
+            setSidebarState(
+                !sidebar.classList.contains("is-open")
+            );
+        }
+    );
+
+
+    backdrop.addEventListener(
+        "click",
+        function () {
+
+            setSidebarState(false);
+        }
+    );
+
+
+    window.addEventListener(
+        "resize",
+        function () {
+
+            if (window.innerWidth > 900) {
+                setSidebarState(false);
+            }
+        }
+    );
+
+});
+</script>
+
+
+{% block content_studio_scripts %}
+{% endblock %}
+
+{% endblock %}

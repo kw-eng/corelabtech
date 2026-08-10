@@ -1,0 +1,744 @@
+/* ==========================================================
+   CoreLabTech AI Content Studio
+   Characters
+   Final Version
+   ========================================================== */
+
+
+/* ==========================================================
+   CHARACTER LIBRARY
+   ========================================================== */
+
+.studio-character-library {
+    width: 100%;
+}
+
+.studio-library-notice {
+    margin: -10px 0 4px;
+    color: var(--studio-text-light);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+
+/* ==========================================================
+   CHARACTER GRID
+   ========================================================== */
+
+.character-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+}
+
+
+/* ==========================================================
+   CHARACTER CARD
+   ========================================================== */
+
+.character-card {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius);
+
+    color: inherit;
+    text-decoration: none;
+
+    background:
+        linear-gradient(
+            160deg,
+            rgba(7, 26, 45, 0.96),
+            rgba(2, 7, 18, 0.98)
+        );
+
+    box-shadow: var(--studio-shadow);
+
+    transition:
+        transform var(--transition-normal),
+        border-color var(--transition-normal),
+        box-shadow var(--transition-normal);
+}
+
+
+a.character-card:hover {
+    transform: translateY(-4px);
+
+    border-color: var(--studio-border-hover);
+
+    box-shadow:
+        var(--studio-shadow-hover),
+        0 0 30px rgba(22, 167, 255, 0.08);
+}
+
+
+.character-card-active {
+    border-color: rgba(22, 167, 255, 0.30);
+}
+
+
+/* ==========================================================
+   CHARACTER CARD PREVIEW
+   ========================================================== */
+
+.character-card-preview {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+
+    aspect-ratio: 16 / 10;
+
+    overflow: hidden;
+
+    background:
+        radial-gradient(
+            circle at 50% 20%,
+            rgba(22, 167, 255, 0.14),
+            transparent 55%
+        ),
+        var(--studio-bg);
+}
+
+
+.character-card-preview img {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: contain;
+    object-position: center;
+
+    transition: transform var(--transition-slow);
+}
+
+
+a.character-card:hover
+.character-card-preview img {
+    transform: scale(1.025);
+}
+
+
+/* ==========================================================
+   PLACEHOLDER CHARACTER
+   ========================================================== */
+
+.character-card-placeholder {
+    opacity: 0.78;
+}
+
+
+.character-card-placeholder-preview {
+    display: grid;
+    place-items: center;
+
+    width: 100%;
+
+    aspect-ratio: 16 / 10;
+
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(22, 167, 255, 0.10),
+            transparent 58%
+        ),
+        rgba(2, 7, 18, 0.96);
+}
+
+
+.character-card-placeholder-preview span {
+    display: grid;
+    place-items: center;
+
+    width: 76px;
+    height: 76px;
+
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 50%;
+
+    color: var(--studio-secondary);
+
+    font-size: 1.45rem;
+    font-weight: 800;
+
+    background: rgba(22, 167, 255, 0.08);
+
+    box-shadow:
+        0 0 25px rgba(22, 167, 255, 0.08);
+}
+
+
+/* ==========================================================
+   CHARACTER CARD STATUS
+   ========================================================== */
+
+.character-card-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: max-content;
+
+    padding: 5px 9px;
+
+    border-radius: var(--studio-radius-round);
+
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+
+.character-card-preview
+.character-card-status {
+    position: absolute;
+
+    top: 12px;
+    right: 12px;
+}
+
+
+.character-card-status.active {
+    color: #052e16;
+    background: var(--studio-success);
+}
+
+
+.character-card-status.planned {
+    color: #bae6fd;
+
+    border: 1px solid rgba(56, 189, 248, 0.22);
+
+    background: rgba(14, 116, 144, 0.20);
+}
+
+
+/* ==========================================================
+   CHARACTER CARD BODY
+   ========================================================== */
+
+.character-card-body {
+    display: flex;
+    flex-direction: column;
+
+    flex: 1;
+
+    gap: 8px;
+
+    padding: 18px;
+}
+
+
+.character-card-body h2 {
+    margin: 0;
+
+    color: var(--studio-text);
+
+    font-size: 1.06rem;
+    line-height: 1.3;
+}
+
+
+.character-card-body p {
+    margin: 0;
+
+    color: var(--studio-text-light);
+
+    font-size: 0.87rem;
+    line-height: 1.55;
+}
+
+
+.character-card-type {
+    color: var(--studio-secondary);
+
+    font-size: 0.69rem;
+    font-weight: 800;
+
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+
+.character-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 8px;
+
+    margin-top: auto;
+
+    padding-top: 10px;
+}
+
+
+.character-card-meta span {
+    padding: 5px 8px;
+
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 7px;
+
+    color: rgba(203, 213, 225, 0.72);
+
+    font-size: 0.69rem;
+
+    background: rgba(15, 23, 42, 0.44);
+}
+
+
+.character-card-placeholder
+.character-card-body {
+    justify-content: flex-start;
+}
+
+
+.character-card-placeholder
+.character-card-status {
+    margin-top: auto;
+}
+
+
+/* ==========================================================
+   CHARACTER DETAILS LAYOUT
+   ========================================================== */
+
+.character-details-layout {
+    display: grid;
+
+    grid-template-columns:
+        minmax(280px, 420px)
+        minmax(0, 1fr);
+
+    gap: 24px;
+
+    align-items: start;
+}
+
+
+.character-left,
+.character-right {
+    min-width: 0;
+}
+
+
+.character-right {
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+}
+
+
+/* ==========================================================
+   CHARACTER DETAIL PREVIEW
+   ========================================================== */
+
+.character-detail-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+
+    min-height: 360px;
+
+    overflow: hidden;
+
+    border-radius: 14px;
+
+    background:
+        radial-gradient(
+            circle at 50% 25%,
+            rgba(22, 167, 255, 0.13),
+            transparent 58%
+        ),
+        rgba(2, 7, 18, 0.94);
+}
+
+
+.reference-image {
+    display: block;
+
+    width: 100%;
+    max-height: 520px;
+
+    object-fit: contain;
+    object-position: center;
+}
+
+
+/* ==========================================================
+   CHARACTER DETAIL ACTIONS
+   ========================================================== */
+
+.character-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 10px;
+
+    margin-top: 18px;
+}
+
+
+.character-detail-actions
+.studio-button {
+    flex: 1;
+
+    min-width: 120px;
+}
+
+
+/* ==========================================================
+   INFO CARD
+   ========================================================== */
+
+.info-card {
+    min-width: 0;
+}
+
+
+.info-card h2 {
+    margin: 0 0 16px;
+}
+
+
+.info-card .studio-table {
+    margin-top: 8px;
+}
+
+
+.info-card .studio-table th {
+    width: 190px;
+
+    color: var(--studio-secondary);
+}
+
+
+.info-card .studio-table td {
+    color: var(--studio-text-light);
+}
+
+
+/* ==========================================================
+   SECTION HEADER
+   ========================================================== */
+
+.character-section-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 16px;
+
+    margin-bottom: 18px;
+}
+
+
+.character-section-header h2 {
+    margin: 0;
+}
+
+
+.character-section-header p {
+    margin: 5px 0 0;
+
+    color: var(--studio-text-muted);
+
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+
+/* ==========================================================
+   CHARACTER FILE LIST
+   ========================================================== */
+
+.character-file-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 10px;
+}
+
+
+.character-file-item {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 14px;
+
+    padding: 12px 14px;
+
+    border: 1px solid var(--studio-border);
+    border-radius: 11px;
+
+    background: rgba(2, 7, 18, 0.30);
+
+    transition:
+        border-color var(--transition-fast),
+        background var(--transition-fast);
+}
+
+
+.character-file-item:hover {
+    border-color: var(--studio-border-hover);
+
+    background: rgba(22, 167, 255, 0.04);
+}
+
+
+.character-file-name {
+    min-width: 0;
+
+    overflow: hidden;
+
+    color: var(--studio-text-light);
+
+    font-family:
+        "Cascadia Code",
+        "SFMono-Regular",
+        Consolas,
+        monospace;
+
+    font-size: 0.80rem;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ==========================================================
+   GENERATED ASSET STATS
+   ========================================================== */
+
+.character-asset-stats {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 14px;
+
+    margin-bottom: 18px;
+}
+
+
+.character-asset-stat {
+    display: flex;
+    flex-direction: column;
+
+    gap: 7px;
+
+    padding: 18px;
+
+    border: 1px solid var(--studio-border);
+    border-radius: 12px;
+
+    background:
+        radial-gradient(
+            circle at 100% 0%,
+            rgba(22, 167, 255, 0.08),
+            transparent 55%
+        ),
+        rgba(2, 7, 18, 0.34);
+}
+
+
+.character-asset-value {
+    color: var(--studio-text);
+
+    font-size: 1.8rem;
+    font-weight: 800;
+
+    line-height: 1;
+}
+
+
+.character-asset-label {
+    color: var(--studio-text-muted);
+
+    font-size: 0.75rem;
+    font-weight: 700;
+
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+
+/* ==========================================================
+   CHARACTER DETAIL BADGES
+   ========================================================== */
+
+.info-card .badge {
+    vertical-align: middle;
+}
+
+
+/* ==========================================================
+   LINK BUTTON FIX
+   ========================================================== */
+
+.character-detail-actions a.studio-button,
+.info-card a.studio-button {
+    color: var(--studio-text);
+
+    text-decoration: none;
+}
+
+
+/* ==========================================================
+   TABLE RESPONSIVENESS
+   ========================================================== */
+
+.info-card {
+    overflow-x: auto;
+}
+
+
+.info-card .studio-table {
+    min-width: 420px;
+}
+
+
+/* ==========================================================
+   TABLET
+   ========================================================== */
+
+@media (max-width: 1100px) {
+
+    .character-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+
+    .character-details-layout {
+        grid-template-columns:
+            340px minmax(0, 1fr);
+    }
+
+}
+
+
+/* ==========================================================
+   SMALL TABLET
+   ========================================================== */
+
+@media (max-width: 900px) {
+
+    .character-details-layout {
+        grid-template-columns: 1fr;
+    }
+
+
+    .character-left {
+        max-width: 600px;
+    }
+
+
+    .character-detail-preview {
+        min-height: 300px;
+    }
+
+
+    .reference-image {
+        max-height: 480px;
+    }
+
+}
+
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media (max-width: 680px) {
+
+    .character-grid {
+        grid-template-columns: 1fr;
+
+        gap: 16px;
+    }
+
+
+    .character-card {
+        border-radius: 14px;
+    }
+
+
+    .character-card-body {
+        padding: 16px;
+    }
+
+
+    .character-detail-actions {
+        flex-direction: column;
+    }
+
+
+    .character-detail-actions
+    .studio-button {
+        width: 100%;
+
+        flex: none;
+    }
+
+
+    .character-asset-stats {
+        grid-template-columns: 1fr;
+    }
+
+
+    .character-file-item {
+        align-items: flex-start;
+
+        flex-direction: column;
+    }
+
+
+    .info-card .studio-table {
+        min-width: 360px;
+    }
+
+}
+
+
+/* ==========================================================
+   VERY SMALL MOBILE
+   ========================================================== */
+
+@media (max-width: 420px) {
+
+    .character-detail-preview {
+        min-height: 240px;
+    }
+
+
+    .character-asset-value {
+        font-size: 1.55rem;
+    }
+
+}
+
+a.character-card:focus-visible {
+    outline: 3px solid #67e8f9;
+    outline-offset: 3px;
+}
