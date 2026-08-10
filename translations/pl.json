@@ -607,6 +607,10 @@
   "mission.pulse": "Puls",
   "mission.quality": "Jakość",
   "mission.raw_empty": "Wybierz sesję, a następnie załaduj analizę albo wygeneruj raport wellness.",
+  "mission.technical_diagnostics": "Szczegóły techniczne",
+  "mission.technical_diagnostics_help": "Dane diagnostyczne tylko dla administratora. Identyfikatory i wersje zachowano dla śledzalności; nie są interpretacją dla klienta.",
+  "mission.technical_details": "Szczegóły techniczne",
+  "mission.fact_sheet_version": "Wersja arkusza faktów",
   "mission.refresh_trace": "Odśwież historię",
   "mission.report_export": "Eksport raportu",
   "mission.review": "Przegląd",
@@ -1174,6 +1178,12 @@
   ,"report.warning_sensor_alignment_warning": "Ostrzeżenie dotyczące zgodności sensorów"
   ,"report.warning_low_coverage": "Niskie pokrycie sensorów"
   ,"report.warning_sync_quality_warning": "Ostrzeżenie jakości synchronizacji"
+  ,"report.warning_missing_hrv_or_rr": "Brak danych HRV lub RR"
+  ,"report.warning_time_alignment_uncertain": "Niepewne wyrównanie znaczników czasu"
+  ,"report.warning_heart_rate_source_unknown": "Nieznane źródło częstości serca"
+  ,"report.warning_insufficient_rr_for_hrv": "Za mało odstępów RR do analizy HRV"
+  ,"report.warning_unapproved_rr_source": "Źródło RR nie jest zatwierdzone do analizy HRV"
+  ,"report.warning_unclassified": "Występuje niesklasyfikowane ostrzeżenie jakości danych"
   ,"report.warning_spo2_range_warning": "Ostrzeżenie zakresu SpO2"
   ,"report.label_date": "Data"
   ,"report.label_program": "Program"
@@ -1299,5 +1309,49 @@
   ,"mission.recovery_summary_complete": "Zapisano oba okna follow-up regeneracji; są gotowe do porównania."
   ,"mission.recovery_summary_recorded": "Zapisano jeden follow-up regeneracji; drugie okno pozostaje dostępne."
   ,"mission.recovery_summary_pending": "Brak danych follow-up regeneracji dla tej sesji."
+  ,"mission.session_response": "Odpowiedź sesyjna"
+  ,"mission.session_response_help": "Zaobserwowane dane PRE, W TRAKCIE i POST sesji. Nie jest to wniosek o skutku terapii."
+  ,"mission.session_response_empty": "Wczytaj przeanalizowaną sesję, aby zobaczyć dane odpowiedzi."
+  ,"mission.session_response_not_available": "Brak danych odpowiedzi dla tej części sesji."
+  ,"mission.session_response_no_limitations": "Nie zgłoszono ograniczeń specyficznych dla odpowiedzi."
+  ,"mission.session_response_before": "Przed sesją"
+  ,"mission.session_response_during": "Podczas sesji"
+  ,"mission.session_response_after": "Po sesji"
+  ,"mission.session_response_change": "Zmiana PRE-POST"
+  ,"mission.session_response_self_reported": "Kontekst zgłoszony przez użytkownika"
+  ,"mission.session_response_data": "Kompletność i pewność"
+  ,"mission.session_response_completeness": "Kompletność porównania"
+  ,"mission.session_response_confidence": "Pewność danych odpowiedzi"
+  ,"report.session_response": "Odpowiedź sesyjna"
+  ,"report.response_before": "Przed sesją"
+  ,"report.response_during": "Podczas sesji"
+  ,"report.response_after": "Po sesji"
+  ,"report.response_change": "Zmiana PRE-POST"
+  ,"report.response_objective_measurements": "Pomiary obiektywne"
+  ,"report.response_self_reported": "Kontekst zgłoszony przez użytkownika"
+  ,"report.response_completeness": "Kompletność porównania"
+  ,"report.response_completeness_value": "Dostępne {available} z {possible} porównań obiektywnych"
+  ,"report.response_data_confidence": "Pewność danych odpowiedzi"
+  ,"report.response_confidence_insufficient": "Niewystarczająca"
+  ,"report.response_confidence_limited": "Ograniczona"
+  ,"report.response_confidence_medium": "Średnia"
+  ,"report.response_confidence_high": "Wysoka"
+  ,"report.response_metric_spo2": "SpO2"
+  ,"report.response_metric_hr": "Częstość serca"
+  ,"report.response_metric_hrv": "HRV (RMSSD)"
+  ,"report.response_avg_spo2": "Średnie SpO2"
+  ,"report.response_min_spo2": "Minimalne SpO2"
+  ,"report.response_pulse": "Puls"
+  ,"report.response_not_available": "Brak danych"
+  ,"report.response_comparison_unavailable_metric": "Porównanie PRE/POST dla {metric} jest niedostępne, ponieważ nie zarejestrowano wymaganego pomiaru."
+  ,"report.response_no_objective_comparison": "Brak wystarczających danych PRE/POST do obiektywnego porównania."
+  ,"report.response_observation_higher": "Po sesji wartość {metric} była o {value} wyższa od dostępnej wartości przed sesją."
+  ,"report.response_observation_lower": "Po sesji wartość {metric} była o {value} niższa od dostępnej wartości przed sesją."
+  ,"report.response_observation_unchanged": "Po sesji wartość {metric} nie zmieniła się względem dostępnej wartości przed sesją ({value})."
+  ,"report.response_limitation_pre_measurements_unavailable": "Nie zarejestrowano pomiarów PRE."
+  ,"report.response_limitation_post_measurements_unavailable": "Nie zarejestrowano pomiarów POST."
+  ,"report.response_limitation_sensor_mismatch": "Zgodność sensorów wymaga weryfikacji."
+  ,"report.response_limitation_sensor_alignment_warning": "Zgodność sensorów wymaga weryfikacji."
+  ,"report.response_limitation_quality_warning": "Ostrzeżenie dotyczące jakości danych ogranicza interpretację odpowiedzi."
 }
 

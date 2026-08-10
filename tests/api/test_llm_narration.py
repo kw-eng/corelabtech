@@ -133,6 +133,7 @@ class LlmNarrationTests(unittest.TestCase):
 
         self.assertIn("Data limitations", english)
         self.assertIn("Summary", english)
+        self.assertIn("Wellness and educational insight only", english)
         self.assertNotIn("Ograniczenia danych", english)
         self.assertIn("Ograniczenia danych", polish)
         self.assertIn("Podsumowanie", polish)

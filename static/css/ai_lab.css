@@ -1150,6 +1150,65 @@ MISSION CONTROL
     color:#b6c5d6;
 }
 
+.mission-response-panel{
+    color:#dbeafe;
+}
+
+.mission-response-grid{
+    display:grid;
+    gap:12px;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+}
+
+.mission-response-secondary{
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    margin-top:12px;
+}
+
+.mission-response-grid section{
+    background:#07111f;
+    border:1px solid #18324a;
+    border-radius:8px;
+    min-width:0;
+    padding:14px;
+}
+
+.mission-response-grid h3{
+    color:#67e8f9;
+    font-size:12px;
+    margin:0 0 10px;
+    text-transform:uppercase;
+}
+
+.mission-response-list{
+    margin:0;
+}
+
+.mission-response-list > div{
+    align-items:baseline;
+    border-bottom:1px solid #12263a;
+    display:flex;
+    gap:8px;
+    justify-content:space-between;
+    padding:7px 0;
+}
+
+.mission-response-list > div:last-child{
+    border-bottom:0;
+}
+
+.mission-response-list dt{
+    color:#94a3b8;
+    font-size:12px;
+}
+
+.mission-response-list dd{
+    color:#f8fafc;
+    font-size:13px;
+    margin:0;
+    text-align:right;
+}
+
 .mission-hero p{
     font-size:17px;
     line-height:1.55;
@@ -1926,6 +1985,11 @@ MISSION CONTROL
         grid-template-columns:1fr;
     }
 
+    .mission-response-grid,
+    .mission-response-secondary{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
     .mission-recovery-windows{
         grid-template-columns:1fr;
     }
@@ -1952,6 +2016,11 @@ MISSION CONTROL
     .mission-metric-grid,
     .mission-live-grid,
     .mission-series-summary{
+        grid-template-columns:1fr;
+    }
+
+    .mission-response-grid,
+    .mission-response-secondary{
         grid-template-columns:1fr;
     }
 
