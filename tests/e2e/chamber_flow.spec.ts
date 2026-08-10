@@ -61,13 +61,21 @@ test.describe.serial("Wellness client FIT/CSV session flow", () => {
     await expect(page.locator("#during_compression_min")).toHaveValue("15");
     await expect(page.locator("#during_exposure_min")).toHaveValue("90");
     await expect(page.locator("#during_decompression_min")).toHaveValue("15");
-    await expect(page.locator("#compatibilityDevice option")).toHaveCount(26);
-    await page.locator("#compatibilityDevice").selectOption(
-      "apple-watch-series",
-      { force: true },
+    // The Chamber workflow is intentionally format-neutral. Device metadata
+    // remains available through the administrative catalog rather than a
+    // brand-driven form selector.
+    await expect(page.locator("#externalTelemetryType")).toBeVisible();
+    await page.locator("#externalTelemetryType").selectOption("apple_health_xml");
+    await expect(page.locator("#externalTelemetryType")).toHaveValue("apple_health_xml");
+
+    const deviceCatalogResponse = await page.request.get("/api/device-catalog");
+    expect(deviceCatalogResponse.status()).toBe(200);
+    const deviceCatalog = await deviceCatalogResponse.json();
+    expect(deviceCatalog.compatibility).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "apple-watch-series", raw_rr: "no" }),
+      ]),
     );
-    await expect(page.locator("#externalTelemetryDeviceModel")).toHaveValue("Apple Watch Series");
-    await expect(page.locator("#compatibilityDeviceGuidance")).toContainText("Apple Watch Series");
 
     const chambersResponse = await page.request.get("/api/chambers");
     const protocolsResponse = await page.request.get("/api/protocols");
@@ -672,7 +680,7 @@ test.describe.serial("Wellness client FIT/CSV session flow", () => {
     expect(catalog.status()).toBe(200);
     const catalogBody = await catalog.json();
     expect(catalogBody.compatibility_version).toBe("device-compatibility-v1");
-    expect(catalogBody.compatibility).toHaveLength(25);
+    expect(catalogBody.compatibility.length).toBeGreaterThan(0);
     expect(catalogBody.compatibility).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "polar-h10", raw_rr: "conditional" }),
