@@ -40,6 +40,8 @@ MIGRATIONS = [
     ROOT / "migrations" / "026_create_llm_observability_events.py",
     ROOT / "migrations" / "027_create_generated_media.py",
     ROOT / "migrations" / "028_add_session_report_export_audit_index.py",
+    ROOT / "migrations" / "029_create_public_media_assets.py",
+    ROOT / "migrations" / "030_harden_public_media_assets.py",
 ]
 
 

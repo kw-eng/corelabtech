@@ -1,0 +1,19 @@
+{% macro render(role, fallback, fallback_alt, eager=false) -%}
+    {% set asset = public_media(role) %}
+    {% if asset and asset.media_type == 'video' %}
+        <video class="public-media" controls playsinline preload="metadata" poster="{{ asset.poster_url or url_for('static', filename=fallback) }}">
+            <source src="{{ asset.url }}"{% if asset.mime_type %} type="{{ asset.mime_type }}"{% endif %}>
+            {{ asset.alt_text }}
+        </video>
+    {% else %}
+        <img
+            class="public-media"
+            src="{{ asset.url if asset else url_for('static', filename=fallback) }}"
+            alt="{{ asset.alt_text if asset else fallback_alt }}"
+            {% if asset and asset.width %}width="{{ asset.width }}"{% endif %}
+            {% if asset and asset.height %}height="{{ asset.height }}"{% endif %}
+            loading="{{ 'eager' if eager else 'lazy' }}"
+            {% if eager %}fetchpriority="high"{% endif %}
+        >
+    {% endif %}
+{%- endmacro %}

@@ -8,6 +8,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/public_media.html" import render as render_public_media with context %}
 
 <div class="technology-page">
 
@@ -18,24 +19,17 @@
             <p>{{ t('public.tech.hero') }}</p>
 
             <div class="technology-actions">
-                <a href="/platform" class="technology-primary-action">
-                    {{ t('public.home.research_platform') }}
+                <a href="{{ url_for('main.wellness_start') }}" class="technology-primary-action">
+                    {{ t('public.home.explore_workflow') }}
                 </a>
-                <a href="/ai_lab" class="technology-secondary-action">
-                    {{ t('public.home.open_ai_lab') }}
+                <a href="{{ url_for('pub.publications') }}" class="technology-secondary-action">
+                    {{ t('public.home.explore_research') }}
                 </a>
             </div>
         </div>
 
         <div class="technology-hero-visual">
-            <img
-                src="{{ url_for('static', filename='img/flow.png') }}"
-                alt="{{ t('public.tech.alt') }}"
-                width="1536"
-                height="1024"
-                loading="eager"
-                fetchpriority="high"
-            >
+            {{ render_public_media('technology.hero', 'img/flow.png', t('public.tech.alt'), true) }}
         </div>
     </section>
 
@@ -83,7 +77,7 @@
                     </article>
 
                     <article>
-                        <img src="{{ url_for('static', filename='img/garm_puls.svg') }}" alt="">
+                        <img src="{{ url_for('static', filename='img/heart.png') }}" alt="">
                         <span>{{ t('public.tech.step3') }}</span>
                         <h3>{{ t('public.tech.during') }}</h3>
                         <p>{{ t('public.tech.during_text') }}</p>

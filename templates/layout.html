@@ -54,7 +54,17 @@
 
     </div>
 
-    <nav class="main-nav" aria-label="{{ t('nav.primary') }}">
+    <button
+        class="mobile-nav-toggle"
+        type="button"
+        aria-controls="primary-navigation"
+        aria-expanded="false"
+    >
+        <span aria-hidden="true">☰</span>
+        <span>{{ t('nav.menu') }}</span>
+    </button>
+
+    <nav id="primary-navigation" class="main-nav" aria-label="{{ t('nav.primary') }}">
 
         <div class="nav-group">
             <a href="{{ url_for('main.home') }}">{{ t('nav.home') }}</a>
@@ -174,6 +184,8 @@
     </p>
     <p class="brand-disclaimer">{{ t('footer.compatibility') }}</p>
 </footer>
+
+<script src="{{ url_for('static', filename='js/public-navigation.js') }}?v=public-nav-20260811" defer></script>
 
 </body>
 

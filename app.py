@@ -28,6 +28,7 @@ from services.i18n_service import (
     normalize_locale,
     translate,
 )
+from services.public_media_service import resolve_public_media
 
 # =========================
 # BLUEPRINTS
@@ -43,6 +44,7 @@ from routes.telemetry_routes import telemetry_bp
 from routes.performance_routes import performance_bp
 from routes.health_routes import health_bp
 from routes.content_studio_routes import content_studio_bp
+from routes.public_media_routes import public_media_bp
 
 
 def ensure_runtime_directories():
@@ -138,6 +140,7 @@ app.register_blueprint(research_bp)
 app.register_blueprint(ai_bp)
 app.register_blueprint(pub_bp)
 app.register_blueprint(content_studio_bp)
+app.register_blueprint(public_media_bp)
 # app.register_blueprint(user_bp)
 app.register_blueprint(telemetry_bp)
 if app.config["INTERNAL_TOOLS_ENABLED"]:
@@ -204,11 +207,28 @@ def inject_i18n():
     """Expose translation helpers and frontend catalog to templates."""
 
     locale = current_locale()
+    def public_media(role: str, media_type: str | None = None):
+        media = resolve_public_media(role, locale, media_type)
+        if media is None:
+            return None
+        return {
+            "url": url_for("public_media.serve_public_media", role=role),
+            # Poster role support is intentionally deferred until a curated
+            # mapping model can reference a separately served public role.
+            "poster_url": None,
+            "media_type": media["media_type"],
+            "mime_type": media.get("mime_type"),
+            "alt_text": media["alt_text"],
+            "width": media.get("width"),
+            "height": media.get("height"),
+        }
+
     return {
         "t": translate,
         "current_locale": locale,
         "supported_locales": SUPPORTED_LOCALES,
         "i18n_catalog": catalog_for(locale),
+        "public_media": public_media,
     }
 
 

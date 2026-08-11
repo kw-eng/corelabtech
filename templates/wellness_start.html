@@ -1,41 +1,46 @@
 {% extends "layout.html" %}
+{% from "components/public_media.html" import render as render_public_media with context %}
+
 {% block content %}
+<div class="wellness-public-page">
+    <section class="wellness-public-hero">
+        <div>
+            <span class="page-eyebrow">{{ t('public.wellness.eyebrow') }}</span>
+            <h1>{{ t('public.wellness.title') }}</h1>
+            <p>{{ t('public.wellness.intro') }}</p>
+            <a class="button-link" href="{{ url_for('auth.login') }}">{{ t('public.wellness.access_workspace') }}</a>
+        </div>
+        <div class="wellness-public-media">
+            {{ render_public_media('wellness.hero', 'img/hero.png', t('public.wellness.hero_alt'), true) }}
+        </div>
+    </section>
 
-<section class="content-page">
-    <p class="page-eyebrow">{{ t('public.wellness.eyebrow') }}</p>
-    <h1>{{ t('public.wellness.title') }}</h1>
-    <p>{{ t('public.wellness.intro') }}</p>
+    <section class="wellness-public-story">
+        <div class="wellness-public-heading">
+            <h2>{{ t('public.wellness.story_title') }}</h2>
+            <p>{{ t('public.wellness.story_intro') }}</p>
+        </div>
+        <ol class="wellness-step-grid">
+            {% for step, title, copy in [
+                ('01', t('public.wellness.checkin'), t('public.wellness.step2_text')),
+                ('02', t('public.wellness.session'), t('public.wellness.step3_text')),
+                ('03', t('public.wellness.monitoring'), t('public.wellness.monitoring_text')),
+                ('04', t('public.wellness.checkout'), t('public.wellness.step4_text')),
+                ('05', t('public.wellness.response'), t('public.wellness.response_text')),
+                ('06', t('public.wellness.report'), t('public.wellness.step6_text'))
+            ] %}
+            <li>
+                <span>{{ step }}</span>
+                <h3>{{ title }}</h3>
+                <p>{{ copy }}</p>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
 
-    <div class="onboarding-grid">
-        <article>
-            <strong>{{ t('public.wellness.step1') }}</strong>
-            <p>{{ t('public.wellness.step1_text') }}</p>
-        </article>
-        <article>
-            <strong>{{ t('public.wellness.step2') }}</strong>
-            <p>{{ t('public.wellness.step2_text') }}</p>
-        </article>
-        <article>
-            <strong>{{ t('public.wellness.step3') }}</strong>
-            <p>{{ t('public.wellness.step3_text') }}</p>
-        </article>
-        <article>
-            <strong>{{ t('public.wellness.step4') }}</strong>
-            <p>{{ t('public.wellness.step4_text') }}</p>
-        </article>
-        <article>
-            <strong>{{ t('public.wellness.step5') }}</strong>
-            <p>{{ t('public.wellness.step5_text') }}</p>
-        </article>
-        <article>
-            <strong>{{ t('public.wellness.step6') }}</strong>
-            <p>{{ t('public.wellness.step6_text') }}</p>
-        </article>
-    </div>
-
-    {% if current_user.is_authenticated and current_user.role in ["operator", "researcher", "admin"] %}
-        <p><a class="button-link" href="{{ url_for('research.chamber_testing') }}">{{ t('public.wellness.open_session') }}</a></p>
-    {% endif %}
-</section>
-
+    <section class="wellness-public-note">
+        <strong>{{ t('public.wellness.research_note_title') }}</strong>
+        <p>{{ t('public.wellness.research_note') }}</p>
+    </section>
+</div>
 {% endblock %}

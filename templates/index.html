@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
+{% from "components/public_media.html" import render as render_public_media with context %}
 
 <div class="home-page">
 
@@ -13,30 +14,23 @@
             <p>{{ t('public.home.hero') }}</p>
 
             <div class="home-actions">
-                <a class="home-primary-action" href="/chamber">
-                    {{ t('public.home.start_session') }}
+                <a class="home-primary-action" href="{{ url_for('main.wellness_start') }}">
+                    {{ t('public.home.explore_workflow') }}
                 </a>
 
-                <a class="home-secondary-action" href="/ai_lab">
-                    {{ t('public.home.open_ai_lab') }}
+                <a class="home-secondary-action" href="{{ url_for('main.technology') }}">
+                    {{ t('public.home.explore_technology') }}
                 </a>
 
-                <a class="home-secondary-action" href="/platform">
-                    {{ t('public.home.research_platform') }}
+                <a class="home-secondary-action" href="{{ url_for('pub.publications') }}">
+                    {{ t('public.home.explore_research') }}
                 </a>
             </div>
         </div>
 
         <div class="home-hero-panel">
             <div class="home-hero-visual">
-                <img
-                    src="{{ url_for('static', filename='img/hero.png') }}"
-                    alt="CoreLabTech recovery analysis visualization with HR, HRV and SpO2 data"
-                    width="1536"
-                    height="1024"
-                    loading="eager"
-                    fetchpriority="high"
-                >
+                {{ render_public_media('home.hero', 'img/hero.png', t('public.home.hero_alt'), true) }}
             </div>
 
             <div class="home-signal-row">
@@ -85,51 +79,51 @@
     </section>
 
     <section class="home-section-header">
-        <h2>{{ t('public.home.core_modules') }}</h2>
-        <p>{{ t('public.home.modules_intro') }}</p>
+        <h2>{{ t('public.home.response_story_title') }}</h2>
+        <p>{{ t('public.home.response_story_intro') }}</p>
+    </section>
+
+    <section class="home-response-demo" aria-labelledby="response-demo-title">
+        <div class="home-response-demo-heading">
+            <span>{{ t('public.home.demo_label') }}</span>
+            <h3 id="response-demo-title">{{ t('public.home.demo_title') }}</h3>
+            <p>{{ t('public.home.demo_note') }}</p>
+        </div>
+        <ol class="home-response-flow">
+            <li><strong>PRE</strong><span>SpO2 · HR · HRV</span></li>
+            <li><strong>{{ t('public.home.during') }}</strong><span>{{ t('public.home.session_telemetry') }}</span></li>
+            <li><strong>POST</strong><span>SpO2 · HR · HRV</span></li>
+            <li><strong>{{ t('public.home.report') }}</strong><span>{{ t('public.home.longitudinal') }}</span></li>
+        </ol>
     </section>
 
     <section class="home-module-grid">
-        <a class="home-module-card featured" href="/chamber">
+        <a class="home-module-card featured" href="{{ url_for('main.wellness_start') }}">
             <span>01</span>
-            <h3>{{ t('public.home.session_input') }}</h3>
-            <p>{{ t('public.home.session_input_text') }}</p>
-            <strong>{{ t('public.home.start_session_short') }}</strong>
+            <h3>{{ t('public.home.wellness_card_title') }}</h3>
+            <p>{{ t('public.home.wellness_card_text') }}</p>
+            <strong>{{ t('public.home.explore_workflow') }}</strong>
         </a>
 
-        <a class="home-module-card" href="/research">
+        <a class="home-module-card" href="{{ url_for('main.technology') }}">
             <span>02</span>
-            <h3>{{ t('public.home.mission_control') }}</h3>
-            <p>{{ t('public.home.mission_control_text') }}</p>
-            <strong>{{ t('public.home.open_dashboard') }}</strong>
+            <h3>{{ t('public.home.technology_card_title') }}</h3>
+            <p>{{ t('public.home.technology_card_text') }}</p>
+            <strong>{{ t('public.home.explore_technology') }}</strong>
         </a>
 
-        <a class="home-module-card" href="/ai_lab">
+        <a class="home-module-card" href="{{ url_for('pub.publications') }}">
             <span>03</span>
-            <h3>AI Lab</h3>
-            <p>{{ t('public.home.ai_lab_text') }}</p>
-            <strong>{{ t('public.home.run_analysis') }}</strong>
+            <h3>{{ t('public.home.research_card_title') }}</h3>
+            <p>{{ t('public.home.research_card_text') }}</p>
+            <strong>{{ t('public.home.explore_research') }}</strong>
         </a>
 
-        <a class="home-module-card" href="/platform">
+        <a class="home-module-card" href="{{ url_for('main.about') }}">
             <span>04</span>
-            <h3>{{ t('public.home.research_platform') }}</h3>
-            <p>{{ t('public.home.research_platform_text') }}</p>
-            <strong>{{ t('public.home.open_platform') }}</strong>
-        </a>
-
-        <a class="home-module-card" href="/qa">
-            <span>05</span>
-            <h3>{{ t('public.home.software_qa_lab') }}</h3>
-            <p>{{ t('public.home.software_qa_text') }}</p>
-            <strong>{{ t('public.home.open_qa_lab') }}</strong>
-        </a>
-
-        <a class="home-module-card" href="/ai-qa-lab">
-            <span>06</span>
-            <h3>AI QA Lab</h3>
-            <p>{{ t('public.home.ai_qa_text') }}</p>
-            <strong>{{ t('public.home.open_ai_qa') }}</strong>
+            <h3>{{ t('public.home.trust_card_title') }}</h3>
+            <p>{{ t('public.home.trust_card_text') }}</p>
+            <strong>{{ t('nav.about') }}</strong>
         </a>
     </section>
 
