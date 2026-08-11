@@ -2,6 +2,8 @@ import json
 import unittest
 from pathlib import Path
 
+from services.session_service import localized_warning_list
+
 
 class SeriesReportLocalizationTests(unittest.TestCase):
     def test_polish_catalog_localizes_report_terms_and_findings(self):
@@ -68,6 +70,27 @@ class SeriesReportLocalizationTests(unittest.TestCase):
         self.assertIn("localized_operator_review(", source)
         self.assertIn("localized_warning_names(catalog, warnings)", source)
         self.assertNotIn('escape_text(analysis.get("summary"))', source)
+
+    def test_single_session_pdf_uses_shared_response_presentation_model(self):
+        source = Path("services/session_service.py").read_text(encoding="utf-8")
+        self.assertIn("build_localized_session_response", source)
+        self.assertIn("response_report_flowables", source)
+
+    def test_report_warning_codes_are_localized_without_leaking_i18n_keys(self):
+        warning_codes = [
+            "missing_hrv_or_rr",
+            "time_alignment_uncertain",
+            "heart_rate_source_unknown",
+            "insufficient_rr_for_hrv",
+            "unapproved_rr_source",
+        ]
+        for locale in ("en", "pl"):
+            catalog = json.loads(
+                Path(f"translations/{locale}.json").read_text(encoding="utf-8")
+            )
+            localized = localized_warning_list(catalog, warning_codes)
+            self.assertNotIn("report.warning_", localized)
+            self.assertNotIn("missing_hrv_or_rr", localized)
 
     def test_dashboard_forwards_active_locale_to_both_report_downloads(self):
         source = Path("templates/research_dashboard.html").read_text(encoding="utf-8")

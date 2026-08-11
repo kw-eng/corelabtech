@@ -9,9 +9,10 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from services.llm_observability import record_llm_event
+from services.wellness_response import build_session_response
 
 
-FACT_SHEET_VERSION = "wellness-fact-sheet-v2"
+FACT_SHEET_VERSION = "wellness-fact-sheet-v3"
 NARRATION_VERSION = "llm-narration-v2"
 DEFAULT_MODEL = "gpt-5-mini"
 MAX_NARRATION_CHARACTERS = 1200
@@ -64,6 +65,13 @@ def build_session_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
     )
     protocol = analysis.get("protocol") or {}
     timing = context.get("session_timing") or {}
+    session_response = analysis.get("session_response") or build_session_response(
+        session_context=context,
+        features=features,
+        data_quality_score=analysis.get("data_quality_score"),
+        analysis_confidence=analysis.get("analysis_confidence"),
+        quality_warnings=analysis.get("quality_warnings") or [],
+    )
     return {
         "schema_version": FACT_SHEET_VERSION,
         "analysis_model": {
@@ -94,6 +102,7 @@ def build_session_fact_sheet(analysis: dict[str, Any]) -> dict[str, Any]:
         },
         "check_in": pre_check_in,
         "check_out": post_check_out,
+        "session_response": session_response,
         "protocol": {
             "code": protocol.get("code"),
             "name": protocol.get("name"),
@@ -279,6 +288,17 @@ def localized_deterministic_summary(
         raw = str(value).strip().lower()
         return catalog.get(f"report.context_value_{raw}", str(value))
 
+    def warning(value: Any) -> str:
+        key = f"report.warning_{str(value).strip().lower()}"
+        return catalog.get(key) or text("report.warning_unclassified")
+
+    def wellness_status(value: Any) -> str:
+        raw = str(value or "unknown").strip().lower()
+        return catalog.get(
+            f"report.wellness_status_{raw}",
+            text("report.session_summary_unavailable"),
+        )
+
     def measurement(value: Any, unit: str = "") -> str:
         return f"{value}{unit}" if value not in (None, "") else ""
 
@@ -295,7 +315,7 @@ def localized_deterministic_summary(
     quality = fact_sheet.get("data_quality") or {}
     limitations = quality.get("limitations") or quality.get("quality_reasons") or []
     limitation_text = ", ".join(
-        catalog.get(f"report.warning_{item}", str(item)) for item in limitations
+        warning(item) for item in limitations
     ) or text("report.session_summary_no_limitations")
     check_in = context_values(
         fact_sheet.get("check_in") or {},
@@ -338,7 +358,7 @@ def localized_deterministic_summary(
         if timing.get(field) not in (None, ""):
             phases.append(f"{text(label_key)}: {measurement(timing[field], ' min')}")
     phase_text = "; ".join(phases) or text("report.session_summary_unavailable")
-    status = enum((fact_sheet.get("wellness") or {}).get("status"))
+    status = wellness_status((fact_sheet.get("wellness") or {}).get("status"))
     return "\n\n".join(
         (
             f"{text('report.session_summary_limitations')}\n{limitation_text}. "
@@ -350,7 +370,7 @@ def localized_deterministic_summary(
             f"{text('report.session_summary_check_out')}\n{check_out}",
             f"{text('report.session_summary_quality')}\n"
             f"{text('report.session_summary_signal_quality')}: {enum(quality.get('signal_quality'))}.",
-            str(fact_sheet.get("disclaimer") or ""),
+            text("analysis.wellness_educational_disclaimer"),
         )
     ).strip()
 

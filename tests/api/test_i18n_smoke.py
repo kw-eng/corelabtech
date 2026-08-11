@@ -59,6 +59,22 @@ class I18nSmokeTests(unittest.TestCase):
                 self.assertNotIn("public.", rendered_html)
                 self.assertNotIn("nav.", rendered_html)
 
+    def test_public_home_uses_localized_commercial_story_and_no_internal_lab_links(self):
+        response = self.client.get("/?lang=pl")
+        html = response.get_data(as_text=True)
+
+        self.assertIn("Widok odpowiedzi PRE, W TRAKCIE i POST", html)
+        self.assertNotIn('href="/ai_lab"', html)
+        self.assertNotIn('href="/qa"', html)
+
+    def test_public_wellness_page_is_localized_and_does_not_render_session_data(self):
+        response = self.client.get("/wellness-start?lang=pl")
+        html = response.get_data(as_text=True)
+
+        self.assertIn("Spójna historia sesji", html)
+        self.assertIn("lang=\"pl\"", html)
+        self.assertNotIn("data-session-id", html)
+
 
 if __name__ == "__main__":
     unittest.main()

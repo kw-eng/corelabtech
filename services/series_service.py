@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from database_postgres import db
+from services.wellness_response import build_session_response
 
 
 def get_user_series_trends(
@@ -163,6 +164,7 @@ def get_user_series_trends(
             aggregates["scores"],
             aggregates["data_quality_values"],
         ),
+        "response_intelligence": build_longitudinal_response_intelligence(analyses),
         "analyses": analyses,
         "timeline": analyses,
     }
@@ -269,9 +271,71 @@ def build_series_analyses(rows) -> tuple[list[dict[str, Any]], dict[str, list[fl
             ),
             "min_spo2": pick_feature(features, "min_spo2"),
             "created_at": row[7].isoformat() if row[7] else None,
+            "session_response": result_json.get("session_response")
+            or build_session_response(
+                session_context=session_context,
+                features=features,
+                data_quality_score=data_quality_score,
+                analysis_confidence=result_json.get("analysis_confidence"),
+                quality_warnings=quality_warnings,
+            ),
         })
 
     return analyses, aggregates
+
+
+def build_longitudinal_response_intelligence(analyses: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate only sessions with actual PRE/POST measurements."""
+
+    deltas = {"spo2_percentage_points": [], "heart_rate_bpm": [], "hrv_rmssd_ms": []}
+    subjective_counts = {
+        "higher_energy": 0,
+        "lower_fatigue": 0,
+        "discomfort_reported": 0,
+    }
+    subjective_coverage = {
+        "energy_level": 0,
+        "fatigue_level": 0,
+        "relaxation_level": 0,
+        "discomfort": 0,
+    }
+    objective_qualifying = 0
+    subjective_qualifying = 0
+    for analysis in analyses:
+        response = analysis.get("session_response") or {}
+        response_deltas = response.get("deltas") or {}
+        available = [value for value in response_deltas.values() if value is not None]
+        if available:
+            objective_qualifying += 1
+            for key in deltas:
+                value = response_deltas.get(key)
+                if value is not None:
+                    append_numeric(deltas[key], value)
+        post = (response.get("subjective_context") or {}).get("post") or {}
+        has_subjective_context = False
+        for key in subjective_coverage:
+            if post.get(key) not in (None, ""):
+                subjective_coverage[key] += 1
+                has_subjective_context = True
+        if has_subjective_context:
+            subjective_qualifying += 1
+        subjective_counts["higher_energy"] += post.get("energy_level") == "higher"
+        subjective_counts["lower_fatigue"] += post.get("fatigue_level") == "lower"
+        subjective_counts["discomfort_reported"] += post.get("discomfort") not in (None, "", "none")
+
+    return {
+        "version": "longitudinal-wellness-response-v1",
+        "total_sessions": len(analyses),
+        "qualifying_sessions": objective_qualifying,
+        "objective_qualifying_sessions": objective_qualifying,
+        "subjective_qualifying_sessions": subjective_qualifying,
+        "average_deltas": {key: average_or_none(values) for key, values in deltas.items()},
+        "metric_coverage": {key: len(values) for key, values in deltas.items()},
+        "self_reported_counts": subjective_counts,
+        "self_reported_coverage": subjective_coverage,
+        "evidence_level": series_evidence_level(objective_qualifying),
+        "available": objective_qualifying > 0,
+    }
 
 
 def pick_feature(features: dict, *keys: str):

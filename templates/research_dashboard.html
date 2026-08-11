@@ -105,6 +105,18 @@
         </article>
     </section>
 
+    <section class="mission-card" aria-labelledby="sessionResponseTitle">
+        <div class="mission-section-heading">
+            <div>
+                <h2 id="sessionResponseTitle">{{ t('mission.session_response') }}</h2>
+                <p>{{ t('mission.session_response_help') }}</p>
+            </div>
+        </div>
+        <div id="sessionResponsePanel" class="mission-response-panel" aria-live="polite">
+            {{ t('mission.session_response_empty') }}
+        </div>
+    </section>
+
     <section class="mission-card mission-recovery-card">
         <div class="mission-section-heading">
             <div>
@@ -213,15 +225,17 @@
         </div>
     </section>
 
+    {% if current_user.role == "admin" %}
     <section class="mission-card">
         <div class="mission-section-heading">
             <div>
-                <h2>{{ t('mission.output_report') }}</h2>
-                <p>{{ t('mission.output_help') }}</p>
+                <h2>{{ t('mission.technical_diagnostics') }}</h2>
+                <p>{{ t('mission.technical_diagnostics_help') }}</p>
             </div>
         </div>
-        <pre id="rawOutput" class="mission-raw">{{ t('mission.raw_empty') }}</pre>
+        <pre id="rawOutput" class="mission-raw" aria-label="{{ t('mission.technical_diagnostics') }}">{{ t('mission.raw_empty') }}</pre>
     </section>
+    {% endif %}
 
     {% if current_user.role == "admin" %}
     <section class="mission-card">
@@ -591,7 +605,7 @@ function renderRecoveryCoach(recoveryCoach){
     }
 
     const monitored = Array.isArray(recoveryCoach.monitor_before_next_session)
-        ? recoveryCoach.monitor_before_next_session.map(item => escapeHtml(item)).join(", ")
+        ? recoveryCoach.monitor_before_next_session.map(item => escapeHtml(translateMonitoringField(item))).join(", ")
         : "-"
     const limitations = Array.isArray(recoveryCoach.limitations)
         ? recoveryCoach.limitations.map(item => escapeHtml(translateMissionFinding(item))).join(", ")
@@ -982,15 +996,18 @@ function renderResearchSummary(summary){
     box.innerHTML = `
         <div class="mission-summary-heading">
             <h3>${escapeHtml(tr("mission.research_ai"))}</h3>
-            <span>${escapeHtml(summary.fact_sheet_version || "-")}</span>
-        </div>
-        <div class="mission-analysis-grid two">
-            <div><span>${escapeHtml(tr("mission.research_narration_source"))}</span><strong>${escapeHtml(narration.source || "-")}</strong></div>
-            <div><span>${escapeHtml(tr("mission.hrv_algorithm"))}</span><strong>${escapeHtml(methods.hrv_algorithm_version || "-")}</strong></div>
         </div>
         <p><strong>${escapeHtml(tr("mission.research_methods"))}</strong><br>${escapeHtml(sections.methods || "-")}</p>
         <p><strong>${escapeHtml(tr("mission.research_observations"))}</strong><br>${escapeHtml(sections.observations || "-")}</p>
         <p><strong>${escapeHtml(tr("mission.data_limitations"))}</strong><br>${escapeHtml(sections.limitations || "-")}</p>
+        <details class="mission-technical-details">
+            <summary>${escapeHtml(tr("mission.technical_details"))}</summary>
+            <div class="mission-analysis-grid two">
+                <div><span>${escapeHtml(tr("mission.research_narration_source"))}</span><strong>${escapeHtml(narration.source || "-")}</strong></div>
+                <div><span>${escapeHtml(tr("mission.hrv_algorithm"))}</span><strong>${escapeHtml(methods.hrv_algorithm_version || "-")}</strong></div>
+                <div><span>${escapeHtml(tr("mission.fact_sheet_version"))}</span><strong>${escapeHtml(summary.fact_sheet_version || "-")}</strong></div>
+            </div>
+        </details>
     `
 }
 
@@ -1213,6 +1230,7 @@ function resetDashboardState(message){
     alarm.innerText = message
 
     document.getElementById("ai").innerHTML = escapeHtml(message)
+    renderSessionResponse(null)
     renderRecoveryCoach(null)
     renderResearchSummary(null)
     renderDashboardChart([])
@@ -1221,12 +1239,57 @@ function resetDashboardState(message){
 function renderAnalysis(data){
     renderAIMetrics(data)
     renderAIText(data)
+    renderSessionResponse(data.session_response_presentation)
     renderRecoveryCoach(data.recovery_coach)
     renderDashboardChart(
         data.timeline || [],
         data.timeline_total || data.timeline_count || null
     )
     setText("analysisStatus", tr("mission.loaded"))
+}
+
+function renderSessionResponse(presentation){
+    const panel = document.getElementById("sessionResponsePanel")
+    if(!panel){
+        return
+    }
+    if(!presentation){
+        panel.innerHTML = `<p class="mission-muted">${escapeHtml(tr("mission.session_response_empty"))}</p>`
+        return
+    }
+
+    const rows = (items) => (Array.isArray(items) && items.length)
+        ? `<dl class="mission-response-list">${items.map(item => `
+            <div><dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.value)}</dd></div>
+        `).join("")}</dl>`
+        : `<p class="mission-muted">${escapeHtml(tr("mission.session_response_not_available"))}</p>`
+    const deltas = Array.isArray(presentation.deltas) && presentation.deltas.length
+        ? `<dl class="mission-response-list">${presentation.deltas.map(item => `
+            <div><dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.before)} → ${escapeHtml(item.after)} <strong>${escapeHtml(item.delta)}</strong></dd></div>
+        `).join("")}</dl>`
+        : `<p class="mission-muted">${escapeHtml(presentation.observations?.[0] || tr("mission.session_response_not_available"))}</p>`
+    const limitations = Array.isArray(presentation.limitations) && presentation.limitations.length
+        ? `<ul class="mission-list">${presentation.limitations.map(value => `<li>${escapeHtml(value)}</li>`).join("")}</ul>`
+        : `<p class="mission-muted">${escapeHtml(tr("mission.session_response_no_limitations"))}</p>`
+
+    panel.innerHTML = `
+        <div class="mission-response-grid">
+            <section><h3>${escapeHtml(presentation.pre_label || tr("mission.session_response_before"))}</h3>${rows(presentation.pre)}</section>
+            <section><h3>${escapeHtml(presentation.during_label || tr("mission.session_response_during"))}</h3>${rows(presentation.during)}</section>
+            <section><h3>${escapeHtml(presentation.post_label || tr("mission.session_response_after"))}</h3>${rows(presentation.post)}</section>
+            <section><h3>${escapeHtml(tr("mission.session_response_change"))}</h3>${deltas}</section>
+        </div>
+        <div class="mission-response-grid mission-response-secondary">
+            <section><h3>${escapeHtml(tr("mission.session_response_self_reported"))}</h3>${rows(presentation.subjective)}</section>
+            <section><h3>${escapeHtml(tr("mission.session_response_data"))}</h3>
+                <dl class="mission-response-list">
+                    <div><dt>${escapeHtml(tr("mission.session_response_completeness"))}</dt><dd>${escapeHtml(presentation.completeness)}</dd></div>
+                    <div><dt>${escapeHtml(tr("mission.session_response_confidence"))}</dt><dd>${escapeHtml(presentation.confidence)}</dd></div>
+                </dl>
+            </section>
+            <section><h3>${escapeHtml(tr("mission.data_limitations"))}</h3>${limitations}</section>
+        </div>
+    `
 }
 
 function renderAIMetrics(data){
@@ -1271,6 +1334,9 @@ function renderList(items, emptyText){
 
 function translateMissionFinding(value){
     let text = String(value || "")
+    if(/^[a-z0-9_]+$/.test(text)){
+        return translateDiagnosticCode(text)
+    }
     const known = {
         "SpO2 remained stable and within the expected range": "mission.finding_spo2_stable",
         "Notable discrepancy between wearable heart rate and pulse oximeter pulse": "mission.finding_hr_pulse_discrepancy",
@@ -1360,6 +1426,30 @@ function translateMissionFinding(value){
     return text
 }
 
+function translateDiagnosticCode(value){
+    const code = String(value || "").trim().toLowerCase()
+    const key = `report.warning_${code}`
+    const translated = tr(key)
+    return translated !== key ? translated : tr("report.warning_unclassified")
+}
+
+function translateMonitoringField(value){
+    const labels = {
+        energy_level: "report.context_energy_level",
+        fatigue_level: "report.context_fatigue_level",
+        sleep_quality: "report.context_sleep_quality",
+        stress_level: "report.context_stress_level",
+        training_load_24h: "report.context_training_load_24h"
+    }
+    return labels[value] ? tr(labels[value]) : translateDiagnosticCode(value)
+}
+
+function translateAnalysisConfidence(value){
+    const levels = {low: "report.confidence_low", medium: "report.confidence_medium", moderate: "report.confidence_medium", high: "report.confidence_high"}
+    const key = levels[String(value || "").toLowerCase()]
+    return key ? tr(key) : tr("report.session_summary_unavailable")
+}
+
 function translatePhysiologyDetails(value){
     return String(value || "")
         .replace(
@@ -1396,7 +1486,7 @@ function renderAIText(data){
         analysis_confidence: data.analysis_confidence,
         data_quality_score: data.data_quality_score,
         limitations: data.quality_warnings || [],
-        disclaimer: data.wellness_disclaimer || data.medical_disclaimer
+        disclaimer: tr("mission.wellness_disclaimer")
     }
 
     document.getElementById("ai").innerHTML = `
@@ -1426,7 +1516,7 @@ function renderAIText(data){
             </div>
             <p class="mission-summary-content">${escapeHtml(translateMissionFinding(sessionSummary.content || tr("mission.no_analysis_summary")))}</p>
             <p class="mission-summary-meta">
-                ${escapeHtml(tr("mission.analysis_confidence"))}: ${escapeHtml(sessionSummary.analysis_confidence || "-")}
+                ${escapeHtml(tr("mission.analysis_confidence"))}: ${escapeHtml(translateAnalysisConfidence(sessionSummary.analysis_confidence))}
                 · ${escapeHtml(tr("mission.data_quality"))}: ${escapeHtml(formatMetric(sessionSummary.data_quality_score, "/100", 0))}
             </p>
         </div>
@@ -1445,7 +1535,7 @@ function renderAIText(data){
         </div>
 
         <p class="mission-disclaimer">
-            ${escapeHtml(translateMissionFinding(sessionSummary.disclaimer || data.wellness_disclaimer || data.medical_disclaimer || tr("mission.wellness_disclaimer")))}
+            ${escapeHtml(sessionSummary.disclaimer || tr("mission.wellness_disclaimer"))}
         </p>
     `
 }

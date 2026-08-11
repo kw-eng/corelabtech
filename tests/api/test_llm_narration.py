@@ -71,8 +71,9 @@ class LlmNarrationTests(unittest.TestCase):
 
         self.assertNotIn("client_id", fact_sheet)
         self.assertNotIn("raw_payload", str(fact_sheet))
-        self.assertEqual(fact_sheet["schema_version"], "wellness-fact-sheet-v2")
+        self.assertEqual(fact_sheet["schema_version"], "wellness-fact-sheet-v3")
         self.assertEqual(fact_sheet["measurements"]["avg_spo2"], 98)
+        self.assertIn("session_response", fact_sheet)
 
     def test_disabled_provider_returns_deterministic_fallback(self):
         fact_sheet = build_session_fact_sheet(
@@ -132,6 +133,7 @@ class LlmNarrationTests(unittest.TestCase):
 
         self.assertIn("Data limitations", english)
         self.assertIn("Summary", english)
+        self.assertIn("Wellness and educational insight only", english)
         self.assertNotIn("Ograniczenia danych", english)
         self.assertIn("Ograniczenia danych", polish)
         self.assertIn("Podsumowanie", polish)

@@ -9,6 +9,9 @@ from services.llm_narration import (
     build_session_fact_sheet,
     localized_deterministic_summary,
 )
+from services.session_response_presentation import (
+    build_localized_session_response,
+)
 
 
 DASHBOARD_VIEW = "research_dashboard"
@@ -61,6 +64,10 @@ def build_research_dashboard_projection(
         analysis.get("timeline"), timeline_sample
     )
     features = analysis.get("features") or result.get("features") or {}
+    fact_sheet = build_session_fact_sheet(analysis)
+    session_response = analysis.get("session_response") or fact_sheet.get(
+        "session_response"
+    )
 
     return {
         "ai_result_id": result.get("ai_result_id"),
@@ -82,6 +89,12 @@ def build_research_dashboard_projection(
             for key in ("avg_spo2", "avg_csv_spo2", "avg_pulse", "avg_csv_pulse", "avg_hrv")
             if key in features
         },
+        "session_response": session_response,
+        "session_response_presentation": (
+            build_localized_session_response(session_response, catalog)
+            if catalog is not None
+            else None
+        ),
         "timeline": [dashboard_timeline_point(row) for row in sampled],
         "timeline_total": total,
         "timeline_sampled": sample_count,
@@ -91,13 +104,16 @@ def build_research_dashboard_projection(
         "session_summary": (
             {
                 "content": localized_deterministic_summary(
-                    build_session_fact_sheet(analysis), catalog
+                    fact_sheet, catalog
                 ),
                 "source": "deterministic_fallback",
                 "analysis_confidence": analysis.get("analysis_confidence"),
                 "data_quality_score": analysis.get("data_quality_score"),
                 "limitations": analysis.get("quality_warnings") or [],
-                "disclaimer": analysis.get("wellness_disclaimer"),
+                # Historical result JSON can contain narration in another
+                # locale. Render this customer-facing notice from the active
+                # catalog instead of forwarding persisted prose.
+                "disclaimer": catalog.get("mission.wellness_disclaimer"),
             }
             if catalog is not None
             else analysis.get("session_summary")
@@ -106,8 +122,6 @@ def build_research_dashboard_projection(
         "recovery_coach": analysis.get("recovery_coach"),
         "reasons": analysis.get("reasons") or [],
         "positive_findings": analysis.get("positive_findings") or [],
-        "wellness_disclaimer": analysis.get("wellness_disclaimer"),
-        "medical_disclaimer": analysis.get("medical_disclaimer"),
     }
 
 

@@ -107,3 +107,62 @@ class ResearchDashboardProjectionTests(unittest.TestCase):
         self.assertIn("Data limitations", projection["session_summary"]["content"])
         self.assertIn("Check-in\nSpO2: 97%; Pulse / HR: 70 bpm", projection["session_summary"]["content"])
         self.assertNotIn("Stale Polish text", projection["session_summary"]["content"])
+        self.assertEqual(
+            projection["session_response_presentation"]["completeness"],
+            "2 of 3 objective comparisons available",
+        )
+        self.assertNotIn("raw_rr", str(projection["session_response"]))
+
+    def test_projection_response_presentation_remains_small_and_localized(self):
+        result = result_with_timeline()
+        result["result"]["session_response"] = {
+            "pre": {"spo2": 97},
+            "during": {},
+            "post": {"spo2": 98},
+            "deltas": {"spo2_percentage_points": 1, "heart_rate_bpm": None, "hrv_rmssd_ms": None},
+            "availability": {"available_delta_count": 1, "possible_delta_count": 3},
+            "confidence": "medium",
+            "subjective_context": {"post": {}},
+            "limitations": [],
+        }
+        catalog = json.loads(Path("translations/en.json").read_text(encoding="utf-8"))
+
+        projection = build_research_dashboard_projection(
+            result, timeline_sample=2, catalog=catalog
+        )
+
+        self.assertEqual(projection["session_response_presentation"]["confidence"], "Medium")
+        self.assertEqual(len(projection["timeline"]), 2)
+
+    def test_polish_projection_uses_catalog_not_persisted_disclaimer_or_codes(self):
+        result = result_with_timeline()
+        result["result"].update({
+            "wellness_status": "data_quality_warning",
+            "quality_warnings": ["missing_hrv_or_rr", "unknown_future_code"],
+            "wellness_disclaimer": "Wellness and educational insight only.",
+            "medical_disclaimer": "Wellness and educational insight only.",
+        })
+        catalog = json.loads(Path("translations/pl.json").read_text(encoding="utf-8"))
+
+        projection = build_research_dashboard_projection(
+            result, timeline_sample=2, catalog=catalog
+        )
+
+        summary = projection["session_summary"]
+        self.assertEqual(summary["disclaimer"], catalog["mission.wellness_disclaimer"])
+        self.assertNotIn("Wellness and educational insight", summary["content"])
+        self.assertIn(catalog["report.warning_missing_hrv_or_rr"], summary["content"])
+        self.assertIn(catalog["report.warning_unclassified"], summary["content"])
+        self.assertIn(catalog["report.wellness_status_data_quality_warning"], summary["content"])
+        self.assertNotIn("missing_hrv_or_rr", summary["content"])
+        self.assertNotIn("unknown_future_code", summary["content"])
+        self.assertNotIn("wellness_disclaimer", projection)
+        self.assertNotIn("medical_disclaimer", projection)
+
+    def test_dashboard_template_separates_raw_diagnostics_from_normal_ui(self):
+        source = Path("templates/research_dashboard.html").read_text(encoding="utf-8")
+
+        self.assertIn('{% if current_user.role == "admin" %}', source)
+        self.assertIn("mission.technical_diagnostics", source)
+        self.assertIn("mission.technical_details", source)
+        self.assertIn("translateDiagnosticCode", source)

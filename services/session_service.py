@@ -37,7 +37,9 @@ from reportlab.platypus import (
     TableStyle,
 )
 from services.i18n_service import DEFAULT_LOCALE, catalog_for, normalize_locale
+from services.llm_narration import build_session_fact_sheet
 from services.research_summary import build_research_summary
+from services.session_response_presentation import build_localized_session_response
 
 SESSION_CLIENT_TABLES = (
     "tests",
@@ -807,7 +809,7 @@ def localized_warning_list(catalog: dict[str, str], values: Any) -> str:
     if not isinstance(values, (list, tuple, set)):
         values = [values]
     return "; ".join(
-        report_text(catalog, f"report.warning_{str(value)}")
+        localized_warning(catalog, value)
         for value in values
     )
 
@@ -816,8 +818,20 @@ def localized_warning_names(catalog: dict[str, str], warnings: dict[str, Any]) -
     """List translated warning names without exposing persistence codes."""
 
     return ", ".join(
-        report_text(catalog, f"report.warning_{str(code)}")
+        localized_warning(catalog, code)
         for code in warnings
+    )
+
+
+def localized_warning(catalog: dict[str, str], value: Any) -> str:
+    """Render a quality warning without exposing a missing i18n key."""
+
+    key = f"report.warning_{str(value)}"
+    translated = report_text(catalog, key)
+    return (
+        translated
+        if translated != key
+        else report_text(catalog, "report.warning_unclassified")
     )
 
 
@@ -851,6 +865,88 @@ def localized_operator_review(
     return report_text(catalog, "report.operator_review_clear")
 
 
+def build_session_response_from_analysis(
+    analysis: dict[str, Any], analysis_result: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Rebuild a response fact for historical result rows without persistence."""
+
+    facts = {
+        **analysis_result,
+        "features": analysis_result.get("features") or analysis.get("features") or {},
+        "data_quality_score": analysis_result.get("data_quality_score")
+        or analysis.get("data_quality_score"),
+    }
+    return build_session_fact_sheet(facts).get("session_response")
+
+
+def response_report_flowables(*, response_presentation, styles, catalog):
+    """Render the shared localized response model without recalculating deltas."""
+
+    if not response_presentation:
+        return []
+
+    flowables = [
+        Paragraph(response_presentation["title"], styles["ReportSection"]),
+        Paragraph(report_text(catalog, "report.response_objective_measurements"), styles["BodyText"]),
+    ]
+    objective_rows = []
+    for section_key, section_label in (
+        ("pre", "report.response_before"),
+        ("during", "report.response_during"),
+        ("post", "report.response_after"),
+    ):
+        for row in response_presentation.get(section_key) or []:
+            objective_rows.append((
+                f"{report_text(catalog, section_label)} - {row['label']}",
+                row["value"],
+            ))
+    if objective_rows:
+        flowables.append(make_table(objective_rows))
+
+    delta_rows = response_presentation.get("deltas") or []
+    if delta_rows:
+        flowables.extend([
+            Spacer(1, 4),
+            Paragraph(report_text(catalog, "report.response_change"), styles["BodyText"]),
+            make_table([
+                (
+                    row["label"],
+                    f"{row['before']} -> {row['after']} ({row['delta']})",
+                )
+                for row in delta_rows
+            ]),
+        ])
+
+    subjective_rows = response_presentation.get("subjective") or []
+    if subjective_rows:
+        flowables.extend([
+            Spacer(1, 4),
+            Paragraph(report_text(catalog, "report.response_self_reported"), styles["BodyText"]),
+            make_table([(row["label"], row["value"]) for row in subjective_rows]),
+        ])
+
+    flowables.extend([
+        Spacer(1, 4),
+        Paragraph(
+            f"{report_text(catalog, 'report.response_completeness')}: "
+            f"{response_presentation['completeness']}",
+            styles["NoticeText"],
+        ),
+        Paragraph(
+            f"{report_text(catalog, 'report.response_data_confidence')}: "
+            f"{response_presentation['confidence']}",
+            styles["NoticeText"],
+        ),
+    ])
+    if response_presentation.get("limitations"):
+        flowables.append(Paragraph(
+            f"{report_text(catalog, 'report.session_summary_limitations')}: "
+            f"{' ; '.join(response_presentation['limitations'])}",
+            styles["NoticeText"],
+        ))
+    return flowables
+
+
 def localized_phase(catalog: dict[str, str], value: Any) -> str:
     phase = str(value or "").strip().lower()
     return report_text(catalog, f"report.phase_{phase}")
@@ -880,7 +976,7 @@ def localized_warning_list(catalog: dict[str, str], values: Any) -> str:
     if not isinstance(values, (list, tuple, set)):
         values = [values]
     return "; ".join(
-        report_text(catalog, f"report.warning_{str(value)}")
+        localized_warning(catalog, value)
         for value in values
     )
 
@@ -1250,6 +1346,16 @@ def build_pdf_report(
         "model_version": analysis_result.get("model_version") or analysis.get("model_version"),
     }
     research_summary = build_research_summary(research_input, locale=locale) if analysis else None
+    session_response = (
+        analysis_result.get("session_response")
+        if analysis_result
+        else None
+    )
+    if analysis and not session_response:
+        session_response = build_session_response_from_analysis(analysis, analysis_result)
+    response_presentation = build_localized_session_response(
+        session_response, catalog
+    ) if session_response else None
     client_session_number = session_config.get("client_session_number") or "-"
     program_name = session_config.get("program_name") or report_text(catalog, "report.comparison_single")
     program_progress = (
@@ -1374,6 +1480,11 @@ def build_pdf_report(
                             styles["BodyText"],
                         ),
                     ]
+                ),
+                *response_report_flowables(
+                    response_presentation=response_presentation,
+                    styles=styles,
+                    catalog=catalog,
                 ),
                 KeepTogether(
                     [
