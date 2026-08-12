@@ -16,3 +16,4 @@ werkzeug
 gunicorn
 prometheus-flask-exporter
 openai
+pytest

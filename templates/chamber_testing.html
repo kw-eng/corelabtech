@@ -23,10 +23,20 @@
     </section>
 
     <section class="chamber-workflow-card">
+        <p class="phase-mapping-note" id="workflow-phase-map">{{ t('chamber.phase_mapping_note') }}</p>
         <div class="steps-wrapper">
-            <div id="step_pre" class="step active">{{ t('chamber.step_check_in') }}</div>
-            <div id="step_during" class="step locked">{{ t('chamber.step_session') }}</div>
-            <div id="step_post" class="step locked">{{ t('chamber.recovery') }}</div>
+            <div id="step_pre" class="step active">
+                <span class="step-label">{{ t('chamber.step_check_in') }}</span>
+                <span class="analysis-phase">PRE</span>
+            </div>
+            <div id="step_during" class="step locked">
+                <span class="step-label">{{ t('chamber.step_session') }}</span>
+                <span class="analysis-phase">DURING</span>
+            </div>
+            <div id="step_post" class="step locked">
+                <span class="step-label">{{ t('chamber.recovery') }}</span>
+                <span class="analysis-phase">POST</span>
+            </div>
         </div>
 
         <div class="progress-wrapper">

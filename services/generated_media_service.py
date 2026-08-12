@@ -29,6 +29,37 @@ ALLOWED_STATUSES = {
 }
 
 
+def generated_media_presentation(media: dict[str, Any]) -> dict[str, Any]:
+    """Return the browser-safe projection of an owned media record.
+
+    Prompts, storage paths, notes and ownership identifiers remain server-side.
+    The client receives only what is needed to render an accessible media card
+    and request its already-authorized file endpoint.
+    """
+
+    return {
+        key: media.get(key)
+        for key in (
+            "id",
+            "media_type",
+            "scene_id",
+            "character_id",
+            "version",
+            "ai_provider",
+            "file_name",
+            "mime_type",
+            "width",
+            "height",
+            "duration_seconds",
+            "file_size_bytes",
+            "status",
+            "is_final",
+            "created_at",
+            "updated_at",
+        )
+    }
+
+
 @dataclass(frozen=True)
 class GeneratedMediaInput:
     media_type: str

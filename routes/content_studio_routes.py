@@ -11,6 +11,7 @@ from flask import (
     send_file,
 )
 from flask_login import current_user, login_required
+from security.limiter import limiter
 
 from datetime import datetime, timezone
 
@@ -22,7 +23,9 @@ from services.generated_media_service import (
     create_mock_generated_media,
     resolve_media_path,
     update_generated_media_status,
+    generated_media_presentation,
 )
+from services.prompt_builder_service import build_generation_prompt
 from services.content_provider_capabilities import (
     public_provider_capabilities,
     supports_output_type,
@@ -166,6 +169,7 @@ def get_provider_capabilities():
     "/api/generation-jobs"
 )
 @login_required
+@limiter.limit("10 per hour")
 def create_generation_job():
     payload = request.get_json(
         silent=True
@@ -176,7 +180,6 @@ def create_generation_job():
         "output_type",
         "character_id",
         "scene_id",
-        "prompt",
     }
 
     missing_fields = sorted(
@@ -217,7 +220,11 @@ def create_generation_job():
                 character_id=payload["character_id"],
                 version="mock",
                 ai_provider="mock",
-                prompt=payload["prompt"],
+                prompt=build_generation_prompt(
+                    character_id=payload["character_id"],
+                    scene_id=payload["scene_id"],
+                    output_type=payload["output_type"],
+                ),
                 file_path="assets/athlete/generated/development/pending.svg",
                 created_by=getattr(current_user, "id", None),
             ),
@@ -253,7 +260,7 @@ def create_generation_job():
     return jsonify({
         "status": "success",
         "job": job,
-        "media": media,
+        "media": generated_media_presentation(media),
     }), 201
 
 # ==========================================================
@@ -291,7 +298,7 @@ def list_media():
         return jsonify({
             "status": "success",
             "count": len(media),
-            "media": media,
+            "media": [generated_media_presentation(item) for item in media],
         })
 
     except ValueError as error:
@@ -324,7 +331,6 @@ def create_media_record():
         "character_id",
         "version",
         "ai_provider",
-        "prompt",
         "file_path",
     }
 
@@ -341,6 +347,12 @@ def create_media_record():
             "fields": missing_fields,
         }), 400
 
+    if getattr(current_user, "role", None) != "admin":
+        return jsonify({
+            "status": "error",
+            "error": "Direct media registration is restricted to administrators.",
+        }), 403
+
     try:
         media = register_generated_media(
             GeneratedMediaInput(
@@ -349,7 +361,11 @@ def create_media_record():
                 character_id=payload["character_id"],
                 version=payload["version"],
                 ai_provider=payload["ai_provider"],
-                prompt=payload["prompt"],
+                prompt=build_generation_prompt(
+                    character_id=payload["character_id"],
+                    scene_id=payload["scene_id"],
+                    output_type=payload["media_type"],
+                ),
                 negative_prompt=payload.get(
                     "negative_prompt"
                 ),
@@ -389,7 +405,7 @@ def create_media_record():
 
         return jsonify({
             "status": "success",
-            "media": media,
+            "media": generated_media_presentation(media),
         }), 201
 
     except ValueError as error:
@@ -430,6 +446,14 @@ def update_media_record(
             "error": "status is required",
         }), 400
 
+    requested_final = payload.get("is_final")
+    privileged_lifecycle = status in {"approved", "published"} or requested_final is True
+    if privileged_lifecycle and getattr(current_user, "role", None) != "admin":
+        return jsonify({
+            "status": "error",
+            "error": "Only administrators can approve, publish, or finalize media.",
+        }), 403
+
     try:
         media = update_generated_media_status(
             media_id,
@@ -455,7 +479,7 @@ def update_media_record(
 
         return jsonify({
             "status": "success",
-            "media": media,
+            "media": generated_media_presentation(media),
         })
 
     except ValueError as error:

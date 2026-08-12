@@ -6,23 +6,40 @@ import json
 from werkzeug.security import generate_password_hash
 
 
+E2E_CREDENTIAL_PLACEHOLDERS = {
+    "change_me",
+    "change-me",
+    "dev-secret-change-me",
+    "corelabtech",
+}
+
+
+def validate_e2e_seed_credentials(
+    admin_password: str | None, researcher_password: str | None
+) -> None:
+    """Prevent test/demo seed accounts from being created with placeholders."""
+
+    credentials = (admin_password, researcher_password)
+    if any(not value or not value.strip() for value in credentials):
+        raise RuntimeError("Required E2E credential environment variable is missing or empty.")
+    if any(value.strip().lower() in E2E_CREDENTIAL_PLACEHOLDERS for value in credentials):
+        raise RuntimeError("Required E2E credential environment variable uses a placeholder value.")
+
+
 def seed_postgres_db():
 
-    admin_password = os.getenv(
-        "E2E_ADMIN_PASSWORD",
-        "CHANGE_ME_ADMIN_PASSWORD",
-    )
+    admin_password = os.getenv("E2E_ADMIN_PASSWORD")
 
-    researcher_password = os.getenv(
-        "E2E_RESEARCHER_PASSWORD",
-        "CHANGE_ME_RESEARCHER_PASSWORD",
-    )
+    researcher_password = os.getenv("E2E_RESEARCHER_PASSWORD")
+
+    validate_e2e_seed_credentials(admin_password, researcher_password)
 
     con = db()
     c = con.cursor()
 
     try:
         # =====================================================
+
         # DEFAULT ORGANIZATION / LOCATION
         # =====================================================
 

@@ -90,11 +90,48 @@
             <p>{{ t('public.home.demo_note') }}</p>
         </div>
         <ol class="home-response-flow">
-            <li><strong>PRE</strong><span>SpO2 · HR · HRV</span></li>
+            <li><strong>PRE</strong><span>SpO2 &middot; HR &middot; HRV</span></li>
             <li><strong>{{ t('public.home.during') }}</strong><span>{{ t('public.home.session_telemetry') }}</span></li>
-            <li><strong>POST</strong><span>SpO2 · HR · HRV</span></li>
+            <li><strong>POST</strong><span>SpO2 &middot; HR &middot; HRV</span></li>
             <li><strong>{{ t('public.home.report') }}</strong><span>{{ t('public.home.longitudinal') }}</span></li>
         </ol>
+    </section>
+
+    <section class="home-hbot-context" aria-labelledby="hbot-context-title">
+        <div class="home-hbot-media">
+            {{ render_public_media('home.hbot_session', 'img/chamber.svg', t('public.home.hbot_alt'), true) }}
+        </div>
+        <div class="home-hbot-copy">
+            <span>{{ t('public.home.hbot_label') }}</span>
+            <h2 id="hbot-context-title">{{ t('public.home.hbot_title') }}</h2>
+            <p>{{ t('public.home.hbot_copy') }}</p>
+            <ol class="home-phase-map">
+                <li><strong>{{ t('public.home.checkin') }}</strong><span>PRE</span></li>
+                <li><strong>{{ t('public.home.during') }}</strong><span>DURING</span></li>
+                <li><strong>{{ t('public.home.checkout') }}</strong><span>POST</span></li>
+            </ol>
+        </div>
+    </section>
+
+    <section class="home-report-preview" aria-labelledby="report-preview-title">
+        <div>
+            <span>{{ t('public.home.demo_label') }}</span>
+            <h2 id="report-preview-title">{{ t('public.home.report_preview_title') }}</h2>
+            <p>{{ t('public.home.report_preview_copy') }}</p>
+            <a class="home-secondary-action" href="{{ url_for('main.wellness_start') }}">
+                {{ t('public.home.report_preview_cta') }}
+            </a>
+        </div>
+        <div class="home-report-preview-sheet" aria-label="{{ t('public.home.report_preview_alt') }}">
+            <div class="home-report-preview-header"><strong>CORELABTECH</strong><span>{{ t('public.home.report') }}</span></div>
+            <div class="home-report-kpis">
+                <div><span>HR</span><strong>—</strong></div>
+                <div><span>HRV</span><strong>—</strong></div>
+                <div><span>SpO2</span><strong>—</strong></div>
+            </div>
+            <div class="home-report-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <small>{{ t('public.home.report_preview_placeholder') }}</small>
+        </div>
     </section>
 
     <section class="home-module-grid">

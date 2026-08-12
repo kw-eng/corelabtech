@@ -82,14 +82,34 @@ app.wsgi_app = ProxyFix(
 APP_ENV = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development")).lower()
 IS_PRODUCTION = APP_ENV == "production"
 
+PRODUCTION_SECRET_KEY_PLACEHOLDERS = {
+    "dev-secret-change-me",
+    "change-me",
+    "change_me",
+    "corelabtech",
+}
+
+
+def validate_secret_key_for_environment(
+    secret_key: str | None, *, is_production: bool
+) -> None:
+    """Fail closed for weak Flask signing keys in production only."""
+
+    if not is_production:
+        return
+
+    normalized_secret_key = (secret_key or "").strip()
+    if (
+        len(normalized_secret_key) < 32
+        or normalized_secret_key.lower() in PRODUCTION_SECRET_KEY_PLACEHOLDERS
+    ):
+        raise RuntimeError(
+            "SECRET_KEY must be set to a strong, non-default value in production."
+        )
+
+
 secret_key = os.getenv("SECRET_KEY")
-if IS_PRODUCTION and (
-    not secret_key
-    or secret_key in {"dev-secret-change-me", "change-me", "corelabtech"}
-):
-    raise RuntimeError(
-        "SECRET_KEY must be set to a strong, non-default value in production."
-    )
+validate_secret_key_for_environment(secret_key, is_production=IS_PRODUCTION)
 
 app.secret_key = secret_key or "dev-secret-change-me"
 app.config["DEBUG_ROUTES_ENABLED"] = (

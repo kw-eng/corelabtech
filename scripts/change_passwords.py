@@ -1,42 +1,15 @@
-import sys
-from pathlib import Path
+"""Quarantined legacy credential maintenance script.
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from werkzeug.security import generate_password_hash
-from database_postgres import db
+This utility is intentionally non-operational. Account rotation must use the
+approved operator process and environment-backed credential boundary.
+"""
 
 
-NEW_PASSWORDS = {
-    "admin@corelabtech.local": "JP2HoLAuTcBifqMUH5Of7UMZhfz0xBFa",
-    "researcher@corelabtech.local": "CJfgB1w519/THdaThvEm62wErg8liJoV",
-}
-
-
-con = db()
-c = con.cursor()
-
-for email, password in NEW_PASSWORDS.items():
-
-    hashed = generate_password_hash(password)
-
-    c.execute(
-        """
-        UPDATE users
-        SET password_hash = %s
-        WHERE email = %s
-        """,
-        (hashed, email)
+def main() -> None:
+    raise RuntimeError(
+        "This legacy credential-maintenance script is quarantined and cannot run."
     )
 
-    if c.rowcount == 0:
-        print(f"NOT FOUND: {email}")
-    else:
-        print(f"Updated password for: {email}")
 
-con.commit()
-
-c.close()
-con.close()
-
-print("DONE")
+if __name__ == "__main__":
+    main()

@@ -464,6 +464,7 @@
   "chamber.sport_support": "Sport support",
   "chamber.step_check_in": "Check-in",
   "chamber.step_session": "Session",
+  "chamber.phase_mapping_note": "Operator workflow mapped to physiological analysis phases.",
   "chamber.stress_today": "Stress today",
   "chamber.supported_csv": "Supported format: CSV from a pulse oximeter.",
   "chamber.supported_fit": "Supported format: FIT from a compatible wearable or HR strap.",
@@ -575,6 +576,41 @@
   "mission.load_session": "Load Session",
   "mission.loaded": "Loaded",
   "mission.loading": "Loading",
+  "mission.workflow_status": "Research workflow status",
+  "mission.workflow_session": "Single session",
+  "mission.workflow_series": "Session series",
+  "mission.workflow_select_session": "Select a session",
+  "mission.workflow_session_selected": "Session selected",
+  "mission.workflow_session_not_loaded": "Session not loaded",
+  "mission.workflow_session_loaded": "Session loaded",
+  "mission.workflow_analysis_pending": "Analysis pending",
+  "mission.workflow_analysis_completed": "Analysis completed",
+  "mission.workflow_report_not_generated": "Report not generated",
+  "mission.workflow_report_generated": "Session report generated",
+  "mission.workflow_select_range": "Select a range",
+  "mission.workflow_range_selected": "Range selected",
+  "mission.workflow_series_not_loaded": "Series not loaded",
+  "mission.workflow_series_loaded": "Session series loaded",
+  "mission.workflow_trend_pending": "Trend analysis pending",
+  "mission.workflow_trend_completed": "Trend analysis completed",
+  "mission.workflow_series_report_not_generated": "Series report not generated",
+  "mission.workflow_series_report_generated": "Series report generated",
+  "mission.analyze_session": "Analyze Session",
+  "mission.generate_session_report": "Generate Session Report",
+  "mission.generate_series_report": "Generate Series Report",
+  "mission.session_analysis_completed": "Session analysis completed.",
+  "mission.session_analysis_failed": "Unable to analyze session.",
+  "mission.loading_session": "Loading session...",
+  "mission.session_loaded": "Session loaded successfully.",
+  "mission.session_load_failed": "Unable to load session.",
+  "mission.series_loaded": "Session series loaded successfully.",
+  "mission.series_load_failed": "Unable to load session series.",
+  "mission.generating_session_report": "Generating report...",
+  "mission.generating_series_report": "Generating series report...",
+  "mission.session_report_generated": "Session report generated successfully.",
+  "mission.series_report_generated": "Session series report generated successfully.",
+  "mission.report_generation_failed": "Unable to generate report.",
+  "mission.dismiss_notification": "Dismiss notification",
   "mission.missing": "Missing",
   "mission.missing_samples": "Missing samples",
   "mission.no_analysis_summary": "No analysis summary available.",
@@ -1164,12 +1200,13 @@
   "report.trend_stable": "Stable",
   "report.trend_improving": "Improving",
   "report.trend_declining": "Declining",
+  "report.trend_unknown": "Unknown",
   "report.trend_insufficient": "Insufficient data",
   "report.comparison_single": "Single-session summary",
   "report.comparison_first_latest": "First available session vs latest available session",
   "report.comparison_first_last": "First {count} available sessions vs latest {count} available sessions",
   "report.quality_confidence": "Data quality indicates confidence in the measurements and calculations; it is not a health assessment.",
-  "report.finding_evidence": "{count} analyzed sessions are available; longitudinal evidence is {evidence}.",
+  "report.finding_evidence": "{sessions} analyzed sessions are available; longitudinal evidence is {evidence}.",
   "report.finding_stable": "The available wellness score is stable across the sessions; no clear improvement or decline is established. Review the measured HR, HRV and SpO2 comparison alongside data quality.",
   "report.finding_change": "A directional change is visible in the available measurements, but should be interpreted with the evidence level and data quality.",
   "report.finding_quality_warning": "Data-quality warnings affect confidence: {warnings}. Review sensor alignment and synchronization before drawing stronger conclusions.",
@@ -1249,8 +1286,8 @@
   ,"report.research_content_limitations": "Analysis confidence: {confidence}; signal quality: {signal_quality}; quality warnings: {warnings}."
   ,"report.research_content_future_data": "Additional sessions with comparable protocol and data quality are needed for longitudinal conclusions."
   ,"report.executive_summary": "Executive Summary"
-  ,"report.executive_summary_text": "{sessions} sessions are available and {analyzed} were analyzed. Evidence is {evidence}; the observed wellness-score direction is {trend}. Average data quality is {quality}. {limitation}"
-  ,"report.executive_summary_warning": "{count} data-quality warning(s) limit interpretation confidence."
+  ,"report.executive_summary_text": "Available: {sessions}; analyzed: {analyzed}. Evidence is {evidence}; the observed wellness-score direction is {trend}. Average data quality is {quality}. {limitation}"
+  ,"report.executive_summary_warning": "{warnings} limit interpretation confidence."
   ,"report.executive_summary_no_warning": "No repeated data-quality warnings were identified."
   ,"report.label_at": "at"
   ,"report.phase_compression": "Compression"
@@ -1343,6 +1380,14 @@
   ,"report.response_min_spo2": "Minimum SpO2"
   ,"report.response_pulse": "Pulse"
   ,"report.response_not_available": "Not available"
+  ,"report.response_not_recorded": "Not recorded"
+  ,"report.program_progress": "{completed} of {total} sessions"
+  ,"report.technical_appendix": "Technical Appendix"
+  ,"report.data_quality_confidence": "Data Quality & Confidence"
+  ,"report.longitudinal_view": "Longitudinal View"
+  ,"report.longitudinal_insufficient": "There are not enough comparable sessions to show a longitudinal trend."
+  ,"report.trend_score_chart": "Wellness response across available sessions"
+  ,"report.trend_chart_caption": "Session order is shown from earliest to latest ({count} comparable sessions)."
   ,"report.response_comparison_unavailable_metric": "{metric} PRE/POST comparison unavailable because one required measurement was not captured."
   ,"report.response_no_objective_comparison": "Not enough PRE/POST data is available for an objective comparison."
   ,"report.response_observation_higher": "Post-session {metric} was {value} higher than the available pre-session value."
@@ -1389,4 +1434,15 @@
   ,"public.wellness.report": "Report and longitudinal view"
   ,"public.wellness.research_note_title": "Wellness and research orientation"
   ,"public.wellness.research_note": "CoreLabTech supports documented wellness workflows and observational analysis. It does not provide medical diagnosis or treatment recommendations."
+  ,"public.home.hbot_label": "HBOT session context"
+  ,"public.home.hbot_title": "A chamber session, viewed as a documented physiology workflow"
+  ,"public.home.hbot_copy": "Check-in, in-session telemetry and recovery observations are mapped to PRE, DURING and POST analysis phases while keeping measured facts separate from interpretation."
+  ,"public.home.hbot_alt": "Vendor-neutral hyperbaric chamber session illustration"
+  ,"public.home.checkin": "Check-in"
+  ,"public.home.checkout": "Check-out"
+  ,"public.home.report_preview_title": "A clear report starts with traceable inputs"
+  ,"public.home.report_preview_copy": "This static preview illustrates the report hierarchy only. Live reports keep measured values, data quality and wellness interpretation distinct."
+  ,"public.home.report_preview_cta": "Explore the wellness workflow"
+  ,"public.home.report_preview_alt": "Illustrative CoreLabTech report layout without participant data"
+  ,"public.home.report_preview_placeholder": "Illustrative layout — no participant data"
 }

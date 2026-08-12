@@ -1,33 +1,4 @@
 import unittest
-import sys
-import types
-
-sys.modules.setdefault(
-    "database_postgres",
-    types.SimpleNamespace(db=lambda: None),
-)
-sys.modules.setdefault(
-    "repositories.analysis_repository",
-    types.SimpleNamespace(
-        complete_ai_result=lambda *args, **kwargs: None,
-        create_ai_result=lambda *args, **kwargs: 1,
-    ),
-)
-sys.modules.setdefault(
-    "repositories.merge_repository",
-    types.SimpleNamespace(
-        get_latest_completed_merge_job=lambda *args, **kwargs: None,
-        load_merged_measurements=lambda *args, **kwargs: [],
-    ),
-)
-sys.modules.setdefault(
-    "repositories.wellness_repository",
-    types.SimpleNamespace(
-        get_wellness_summary=lambda *args, **kwargs: {},
-        refresh_daily_baseline=lambda *args, **kwargs: None,
-        upsert_session_features=lambda *args, **kwargs: None,
-    ),
-)
 from services.analysis_service import (
     analyze_measurements,
     get_analysis_model_manifest,
@@ -117,8 +88,8 @@ class AnalysisSummaryTests(unittest.TestCase):
 
         summary = result["summary"]
 
-        self.assertIn("Pulse, wearable HR and HRV", summary)
-        self.assertIn("average HRV", summary)
+        self.assertIn("Pulse, wearable heart rate and HRV", summary)
+        self.assertIn("Average HRV", summary)
         self.assertIn("Check-in context", summary)
         self.assertIn("reduced sleep quality", summary)
         self.assertIn("higher recent activity load", summary)

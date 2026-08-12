@@ -59,6 +59,19 @@ load external URLs. Missing, ineligible, or unavailable videos fail closed and
 the page fallback remains usable. Poster-role serving is not enabled yet;
 invalid poster mappings do not expose a file or affect page rendering.
 
+## Current public-media recovery state
+
+The current database audit found no public-role mappings and no eligible final
+approved/published video asset. This is expected fail-closed behavior, not a
+public-page rendering fault. Public pages therefore use their named,
+vendor-neutral static fallback until a privileged operational assignment is
+available. Draft/mock Generated Media must not be promoted to a public role.
+
+The public home page is prepared for a future approved session visual and a
+short native video. A curated video should be assigned only after its media
+record is final, approved or published, has complete localized alt text, and
+has been reviewed against the public wellness/research claims boundary.
+
 ## Deferred
 
 - Protected administrator UI/API for assigning public roles.

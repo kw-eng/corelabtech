@@ -39,7 +39,7 @@ class ReportGeneratorServiceTests(unittest.TestCase):
             "pl",
         )
         self.assertEqual(export.path, report_path)
-        self.assertEqual(export.download_name, "corelabtech_SESSION_1_report.pdf")
+        self.assertEqual(export.download_name, "corelabtech_session_SESSION_1_PL.pdf")
         self.assertEqual(export.audit_action, "report.export")
         self.assertEqual(export.audit_entity_type, "session")
         self.assertEqual(export.audit_entity_id, "SESSION_1")
@@ -94,7 +94,7 @@ class ReportGeneratorServiceTests(unittest.TestCase):
         self.assertEqual(export.path, created_paths[0])
         self.assertEqual(
             export.download_name,
-            "corelabtech_CLIENT_1_series_10_report.pdf",
+            "corelabtech_series_CLIENT_1_last-10_PL.pdf",
         )
         self.assertEqual(export.audit_action, "series_report.export")
         self.assertEqual(export.audit_entity_type, "client_series")
@@ -118,6 +118,20 @@ class ReportGeneratorServiceTests(unittest.TestCase):
                     requesting_organization_id=1,
                     trend_limit=10,
                 )
+
+    def test_report_download_names_are_safe_and_include_type_identity_and_locale(self):
+        self.assertEqual(
+            report_generator.report_download_name(
+                report_type="session", identifier="S/1", locale="en"
+            ),
+            "corelabtech_session_S_1_EN.pdf",
+        )
+        self.assertEqual(
+            report_generator.report_download_name(
+                report_type="series", identifier="CLIENT 1", range_limit=25, locale="pl"
+            ),
+            "corelabtech_series_CLIENT_1_last-25_PL.pdf",
+        )
 
     def test_series_pdf_report_renders_with_polish_locale(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

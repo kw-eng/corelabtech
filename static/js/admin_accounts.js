@@ -16,6 +16,14 @@ async function parseAdminJson(res, label) {
     }
 }
 
+function authenticatedJsonHeaders() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+    return {
+        "Content-Type": "application/json",
+        ...(csrfToken ? {"X-CSRFToken": csrfToken} : {})
+    }
+}
+
 function accountsT(key, params = null) {
     if (typeof window.t === "function") {
         return window.t(key, params)
@@ -183,9 +191,7 @@ async function createAccount() {
     const res = await fetch("/api/admin/accounts", {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: authenticatedJsonHeaders(),
         body: JSON.stringify({
             email,
             password,
@@ -219,9 +225,7 @@ async function resetPassword(email) {
     const res = await fetch("/api/admin/accounts/reset_password", {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: authenticatedJsonHeaders(),
         body: JSON.stringify({
             email,
             password
@@ -243,9 +247,7 @@ async function updateRole(email, role) {
     const res = await fetch("/api/admin/accounts/update_role", {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: authenticatedJsonHeaders(),
         body: JSON.stringify({
             email,
             role
@@ -269,9 +271,7 @@ async function toggleActive(email, active) {
     const res = await fetch("/api/admin/accounts/toggle_active", {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: authenticatedJsonHeaders(),
         body: JSON.stringify({
             email,
             is_active: active

@@ -464,6 +464,7 @@
   "chamber.sport_support": "Wsparcie sportowe",
   "chamber.step_check_in": "Check-in",
   "chamber.step_session": "Sesja",
+  "chamber.phase_mapping_note": "Etapy pracy operatora odpowiadają fazom analizy fizjologicznej.",
   "chamber.stress_today": "Stres dzisiaj",
   "chamber.supported_csv": "Obsługiwany format: CSV z pulsoksymetru.",
   "chamber.supported_fit": "Obsługiwany format: FIT z kompatybilnego wearable albo pasa HR.",
@@ -575,6 +576,41 @@
   "mission.load_session": "Załaduj sesję",
   "mission.loaded": "Załadowano",
   "mission.loading": "Ładowanie",
+  "mission.workflow_status": "Status workflow badań",
+  "mission.workflow_session": "Pojedyncza sesja",
+  "mission.workflow_series": "Seria sesji",
+  "mission.workflow_select_session": "Wybierz sesję",
+  "mission.workflow_session_selected": "Sesja wybrana",
+  "mission.workflow_session_not_loaded": "Sesja nie została załadowana",
+  "mission.workflow_session_loaded": "Sesja załadowana",
+  "mission.workflow_analysis_pending": "Analiza oczekuje",
+  "mission.workflow_analysis_completed": "Analiza zakończona",
+  "mission.workflow_report_not_generated": "Raport nie został wygenerowany",
+  "mission.workflow_report_generated": "Raport sesji wygenerowany",
+  "mission.workflow_select_range": "Wybierz zakres",
+  "mission.workflow_range_selected": "Zakres wybrany",
+  "mission.workflow_series_not_loaded": "Seria nie została załadowana",
+  "mission.workflow_series_loaded": "Seria sesji załadowana",
+  "mission.workflow_trend_pending": "Analiza trendu oczekuje",
+  "mission.workflow_trend_completed": "Analiza trendu zakończona",
+  "mission.workflow_series_report_not_generated": "Raport serii nie został wygenerowany",
+  "mission.workflow_series_report_generated": "Raport serii wygenerowany",
+  "mission.analyze_session": "Analizuj sesję",
+  "mission.generate_session_report": "Generuj raport sesji",
+  "mission.generate_series_report": "Generuj raport serii",
+  "mission.session_analysis_completed": "Analiza sesji została zakończona.",
+  "mission.session_analysis_failed": "Nie udało się przeanalizować sesji.",
+  "mission.loading_session": "Ładowanie sesji...",
+  "mission.session_loaded": "Sesja została załadowana.",
+  "mission.session_load_failed": "Nie udało się załadować sesji.",
+  "mission.series_loaded": "Seria sesji została załadowana.",
+  "mission.series_load_failed": "Nie udało się załadować serii sesji.",
+  "mission.generating_session_report": "Generowanie raportu...",
+  "mission.generating_series_report": "Generowanie raportu serii...",
+  "mission.session_report_generated": "Raport sesji został wygenerowany.",
+  "mission.series_report_generated": "Raport serii sesji został wygenerowany.",
+  "mission.report_generation_failed": "Nie udało się wygenerować raportu.",
+  "mission.dismiss_notification": "Zamknij powiadomienie",
   "mission.missing": "Braki",
   "mission.missing_samples": "Brakujące próbki",
   "mission.no_analysis_summary": "Brak dostępnego podsumowania analizy.",
@@ -1164,12 +1200,13 @@
   "report.trend_stable": "Stabilny",
   "report.trend_improving": "Poprawa",
   "report.trend_declining": "Pogorszenie",
+  "report.trend_unknown": "Nieokreślony",
   "report.trend_insufficient": "Za mało danych",
   "report.comparison_single": "Podsumowanie pojedynczej sesji",
   "report.comparison_first_latest": "Pierwsza dostępna sesja vs najnowsza dostępna sesja",
   "report.comparison_first_last": "Pierwsze {count} dostępne sesje vs ostatnie {count} dostępne sesje",
   "report.quality_confidence": "Jakość danych określa pewność pomiarów i obliczeń; nie jest oceną zdrowia.",
-  "report.finding_evidence": "Dostępnych jest {count} przeanalizowanych sesji; dowody podłużne są na poziomie: {evidence}.",
+  "report.finding_evidence": "Dostępne są {sessions}; poziom dowodów podłużnych: {evidence}.",
   "report.finding_stable": "Dostępny wynik wellness jest stabilny w sesjach; nie ustalono wyraźnej poprawy ani pogorszenia. Porównanie zmierzonych HR, HRV i SpO2 należy oceniać razem z jakością danych.",
   "report.finding_change": "W dostępnych pomiarach widoczna jest zmiana kierunkowa, ale należy interpretować ją z uwzględnieniem poziomu dowodów i jakości danych.",
   "report.finding_quality_warning": "Ostrzeżenia dotyczące jakości danych ograniczają pewność: {warnings}. Przed mocniejszymi wnioskami sprawdź zgodność sensorów i synchronizację.",
@@ -1249,8 +1286,8 @@
   ,"report.research_content_limitations": "Pewność analizy: {confidence}; jakość sygnału: {signal_quality}; ostrzeżenia jakości danych: {warnings}."
   ,"report.research_content_future_data": "Dodatkowe sesje o porównywalnym protokole i jakości danych są potrzebne do wniosków podłużnych."
   ,"report.executive_summary": "Podsumowanie wykonawcze"
-  ,"report.executive_summary_text": "Dostępnych jest {sessions} sesji, z czego przeanalizowano {analyzed}. Poziom dowodów: {evidence}; zaobserwowany kierunek wyniku wellness: {trend}. Średnia jakość danych wynosi {quality}. {limitation}"
-  ,"report.executive_summary_warning": "{count} ostrzeżenie(a) jakości danych ogranicza pewność interpretacji."
+  ,"report.executive_summary_text": "Dostępne są {sessions}, z czego przeanalizowano {analyzed}. Poziom dowodów: {evidence}; zaobserwowany kierunek wyniku wellness: {trend}. Średnia jakość danych wynosi {quality}. {limitation}"
+  ,"report.executive_summary_warning": "{warnings} dotyczące jakości danych ograniczają pewność interpretacji."
   ,"report.executive_summary_no_warning": "Nie stwierdzono powtarzających się ostrzeżeń jakości danych."
   ,"report.label_at": "przy"
   ,"report.phase_compression": "Kompresja"
@@ -1343,6 +1380,14 @@
   ,"report.response_min_spo2": "Minimalne SpO2"
   ,"report.response_pulse": "Puls"
   ,"report.response_not_available": "Brak danych"
+  ,"report.response_not_recorded": "Nie zarejestrowano"
+  ,"report.program_progress": "{completed} z {total} sesji"
+  ,"report.technical_appendix": "Aneks techniczny"
+  ,"report.data_quality_confidence": "Jakość danych i pewność"
+  ,"report.longitudinal_view": "Widok podłużny"
+  ,"report.longitudinal_insufficient": "Brakuje porównywalnych sesji, aby pokazać trend podłużny."
+  ,"report.trend_score_chart": "Odpowiedź wellness w dostępnych sesjach"
+  ,"report.trend_chart_caption": "Kolejność sesji od najwcześniejszej do najnowszej ({count} porównywalne sesje)."
   ,"report.response_comparison_unavailable_metric": "Porównanie PRE/POST dla {metric} jest niedostępne, ponieważ nie zarejestrowano wymaganego pomiaru."
   ,"report.response_no_objective_comparison": "Brak wystarczających danych PRE/POST do obiektywnego porównania."
   ,"report.response_observation_higher": "Po sesji wartość {metric} była o {value} wyższa od dostępnej wartości przed sesją."
@@ -1389,5 +1434,16 @@
   ,"public.wellness.report": "Raport i widok długoterminowy"
   ,"public.wellness.research_note_title": "Perspektywa wellness i research"
   ,"public.wellness.research_note": "CoreLabTech wspiera dokumentowane workflow wellness i analizę obserwacyjną. Nie zapewnia diagnozy medycznej ani zaleceń terapeutycznych."
+  ,"public.home.hbot_label": "Kontekst sesji HBOT"
+  ,"public.home.hbot_title": "Sesja w komorze jako udokumentowany workflow fizjologiczny"
+  ,"public.home.hbot_copy": "Check-in, telemetria w trakcie sesji i obserwacje regeneracji są mapowane do faz analizy PRE, DURING i POST, przy wyraźnym oddzieleniu zmierzonych danych od interpretacji."
+  ,"public.home.hbot_alt": "Neutralna wobec producentów ilustracja sesji w komorze hiperbarycznej"
+  ,"public.home.checkin": "Check-in"
+  ,"public.home.checkout": "Check-out"
+  ,"public.home.report_preview_title": "Czytelny raport zaczyna się od identyfikowalnych danych wejściowych"
+  ,"public.home.report_preview_copy": "Ten statyczny podgląd pokazuje wyłącznie hierarchię raportu. Raporty na żywo oddzielają zmierzone wartości, jakość danych i interpretację wellness."
+  ,"public.home.report_preview_cta": "Poznaj workflow wellness"
+  ,"public.home.report_preview_alt": "Przykładowy układ raportu CoreLabTech bez danych uczestnika"
+  ,"public.home.report_preview_placeholder": "Układ przykładowy — bez danych uczestnika"
 }
 

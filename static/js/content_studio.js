@@ -313,15 +313,6 @@ const ContentStudio = (() => {
                         </div>
                     </dl>
 
-                    <details class="content-media-details">
-                        <summary>Generation details</summary>
-
-                        <p class="content-media-prompt">
-                            ${escapeHtml(item.prompt)}
-                        </p>
-
-                    </details>
-
                     <div class="content-media-actions">
                         <a
                             class="studio-button outline"
