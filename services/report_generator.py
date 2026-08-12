@@ -14,6 +14,7 @@ from typing import Any
 
 from auth.access_policy import can_access_client_record
 from services.i18n_service import current_locale
+from services.i18n_service import normalize_locale
 from services.series_service import get_user_series_trends
 from services.session_service import (
     build_series_pdf_report,
@@ -24,6 +25,18 @@ from services.session_service import (
 
 
 REPORTS_DIRECTORY = Path("reports/generated")
+
+
+def report_download_name(*, report_type: str, identifier: str, locale: str, range_limit: int | None = None) -> str:
+    """Return a safe, self-describing customer download filename."""
+
+    language = normalize_locale(locale).upper()
+    safe_identifier = safe_filename(identifier) or "client"
+    if report_type == "session":
+        return f"corelabtech_session_{safe_identifier}_{language}.pdf"
+    if report_type == "series":
+        return f"corelabtech_series_{safe_identifier}_last-{range_limit or 25}_{language}.pdf"
+    raise ValueError("unsupported report type")
 
 
 @dataclass(frozen=True)
@@ -70,7 +83,10 @@ def generate_report_for_session(
 
     return ReportExport(
         path=path,
-        download_name=f"corelabtech_{safe_filename(session_id)}_report.pdf",
+        download_name=report_download_name(
+            report_type="session", identifier=session_id,
+            locale=locale or current_locale(),
+        ),
         audit_action="report.export",
         audit_entity_type="session",
         audit_entity_id=session_id,
@@ -124,7 +140,10 @@ def generate_series_report_for_client(
 
     return ReportExport(
         path=path,
-        download_name=path.name,
+        download_name=report_download_name(
+            report_type="series", identifier=user_id,
+            range_limit=trend_limit, locale=locale or current_locale(),
+        ),
         audit_action="series_report.export",
         audit_entity_type="client_series",
         audit_entity_id=user_id,

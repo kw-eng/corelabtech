@@ -62,72 +62,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    // ======================================================
-    // PROMPT BUILDER
-    // ======================================================
-
-    function buildPrompt() {
-
-        const lines = [
-            "CoreLabTech AI Content Studio",
-            "",
-            "Character: " + character.value,
-            "Scene: " + scene.value,
-            "Output: " + outputType.value
-        ];
-
-
-        if (
-            storyboard &&
-            storyboard.value
-        ) {
-            lines.push(
-                "Storyboard: " + storyboard.value
-            );
-        }
-
-
-        lines.push(
-            "",
-            "Use the official CoreLabTech character reference.",
-            "",
-            "Preserve exactly:",
-            "- character identity",
-            "- facial features",
-            "- hairstyle",
-            "- body proportions",
-            "- clothing",
-            "- HR chest strap",
-            "- smartwatch",
-            "",
-            "Visual style:",
-            "- premium CoreLabTech commercial style",
-            "- dark navy environment",
-            "- electric blue accents",
-            "- cyan highlights",
-            "- professional cinematic lighting",
-            "- modern technology aesthetic",
-            "- realistic human proportions",
-            "",
-            "Do not include:",
-            "- commercial logos",
-            "- watermark",
-            "- distorted anatomy",
-            "- duplicated limbs",
-            "- extra fingers",
-            "- incorrect face",
-            "- different hairstyle"
-        );
-
-
-        return lines.join("\n");
-    }
-
-
     function refreshPrompt() {
-
         promptPreview.value =
-            buildPrompt();
+            "Generation instructions are assembled and protected on the CoreLabTech server.\n\n"
+            + "Character: " + character.value + "\n"
+            + "Scene: " + scene.value + "\n"
+            + "Output: " + outputType.value;
     }
 
 
@@ -432,15 +372,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         ? storyboard.value || null
                         : null,
 
-                prompt:
-                    promptPreview.value
             };
-
-
-            console.log(
-                "Starting generation job:",
-                payload
-            );
 
 
             try {

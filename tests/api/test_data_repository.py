@@ -7,6 +7,9 @@ psycopg2 = types.ModuleType("psycopg2")
 psycopg2_extras = types.ModuleType("psycopg2.extras")
 psycopg2_extras.execute_values = lambda *args, **kwargs: None
 psycopg2.extras = psycopg2_extras
+# Discovery can subsequently import the Flask application, whose route module
+# imports this exception. Keep the lightweight repository stub import-safe.
+psycopg2.IntegrityError = type("IntegrityError", (Exception,), {})
 sys.modules.setdefault("psycopg2", psycopg2)
 sys.modules.setdefault("psycopg2.extras", psycopg2_extras)
 

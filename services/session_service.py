@@ -27,6 +27,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.graphics.shapes import Drawing, Line, String
 from reportlab.platypus import (
     KeepTogether,
     PageBreak,
@@ -716,6 +717,26 @@ def report_text(catalog: dict[str, str], key: str, **params: Any) -> str:
     return text
 
 
+def localized_count(catalog: dict[str, str], value: Any, noun: str) -> str:
+    """Format the few Polish count forms used in customer report prose."""
+
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        count = 0
+    if noun == "session":
+        forms = ("sesja", "sesje", "sesji")
+    elif noun == "warning":
+        forms = ("ostrzeżenie", "ostrzeżenia", "ostrzeżeń")
+    else:
+        return str(count)
+    is_polish = catalog.get("report.label_client") == "Klient"
+    if not is_polish:
+        return f"{count} {noun}{'' if count == 1 else 's'}"
+    form = forms[0] if count == 1 else forms[1] if 2 <= count % 10 <= 4 and not 12 <= count % 100 <= 14 else forms[2]
+    return f"{count} {form}"
+
+
 def localized_series_comparison(catalog: dict[str, str], comparison: dict[str, Any]) -> str:
     """Render the structured comparison window in the selected report language."""
 
@@ -730,6 +751,15 @@ def localized_series_comparison(catalog: dict[str, str], comparison: dict[str, A
     )
 
 
+def localized_series_trend(catalog: dict[str, str], trend_direction: Any) -> str:
+    """Render a known trend label without exposing an internal i18n key."""
+
+    trend = str(trend_direction or "insufficient").strip().lower()
+    if trend not in {"stable", "improving", "declining", "insufficient", "unknown"}:
+        trend = "unknown"
+    return report_text(catalog, f"report.trend_{trend}")
+
+
 def localized_series_findings(
     catalog: dict[str, str], series_data: dict[str, Any], warnings: dict[str, Any]
 ) -> list[str]:
@@ -739,7 +769,7 @@ def localized_series_findings(
         catalog, f"report.evidence_{series_data.get('evidence_level') or 'insufficient'}"
     )
     findings = [report_text(
-        catalog, "report.finding_evidence", count=series_data.get("records", 0), evidence=evidence
+        catalog, "report.finding_evidence", sessions=localized_count(catalog, series_data.get("records", 0), "session"), evidence=evidence
     )]
     trend = str(series_data.get("trend_direction") or "insufficient")
     findings.append(report_text(
@@ -764,19 +794,17 @@ def localized_series_executive_summary(
     evidence = report_text(
         catalog, f"report.evidence_{series_data.get('evidence_level') or 'insufficient'}"
     )
-    trend = report_text(
-        catalog, f"report.trend_{series_data.get('trend_direction') or 'insufficient'}"
-    )
+    trend = localized_series_trend(catalog, series_data.get("trend_direction"))
     limitation = (
-        report_text(catalog, "report.executive_summary_warning", count=sum(warnings.values()))
+        report_text(catalog, "report.executive_summary_warning", warnings=localized_count(catalog, sum(warnings.values()), "warning"))
         if warnings
         else report_text(catalog, "report.executive_summary_no_warning")
     )
     return report_text(
         catalog,
         "report.executive_summary_text",
-        sessions=series_data.get("session_count", 0),
-        analyzed=series_data.get("records", 0),
+        sessions=localized_count(catalog, series_data.get("session_count", 0), "session"),
+        analyzed=localized_count(catalog, series_data.get("records", 0), "session"),
         evidence=evidence,
         trend=trend,
         quality=format_score(series_data.get("avg_data_quality")),
@@ -880,41 +908,23 @@ def build_session_response_from_analysis(
 
 
 def response_report_flowables(*, response_presentation, styles, catalog):
-    """Render the shared localized response model without recalculating deltas."""
+    """Render a concise PRE/DURING/POST view from the shared response facts."""
 
     if not response_presentation:
         return []
 
     flowables = [
         Paragraph(response_presentation["title"], styles["ReportSection"]),
-        Paragraph(report_text(catalog, "report.response_objective_measurements"), styles["BodyText"]),
+        Paragraph(report_text(catalog, "report.response_objective_measurements"), styles["NoticeText"]),
+        make_response_phase_table(response_presentation, styles=styles, catalog=catalog),
     ]
-    objective_rows = []
-    for section_key, section_label in (
-        ("pre", "report.response_before"),
-        ("during", "report.response_during"),
-        ("post", "report.response_after"),
-    ):
-        for row in response_presentation.get(section_key) or []:
-            objective_rows.append((
-                f"{report_text(catalog, section_label)} - {row['label']}",
-                row["value"],
-            ))
-    if objective_rows:
-        flowables.append(make_table(objective_rows))
 
     delta_rows = response_presentation.get("deltas") or []
     if delta_rows:
         flowables.extend([
             Spacer(1, 4),
-            Paragraph(report_text(catalog, "report.response_change"), styles["BodyText"]),
-            make_table([
-                (
-                    row["label"],
-                    f"{row['before']} -> {row['after']} ({row['delta']})",
-                )
-                for row in delta_rows
-            ]),
+            Paragraph(report_text(catalog, "report.response_change"), styles["ReportSubsection"]),
+            make_metric_strip([(row["label"], row["delta"]) for row in delta_rows], styles),
         ])
 
     subjective_rows = response_presentation.get("subjective") or []
@@ -927,24 +937,72 @@ def response_report_flowables(*, response_presentation, styles, catalog):
 
     flowables.extend([
         Spacer(1, 4),
-        Paragraph(
-            f"{report_text(catalog, 'report.response_completeness')}: "
-            f"{response_presentation['completeness']}",
-            styles["NoticeText"],
-        ),
-        Paragraph(
-            f"{report_text(catalog, 'report.response_data_confidence')}: "
-            f"{response_presentation['confidence']}",
-            styles["NoticeText"],
-        ),
+        make_metric_strip([
+            (report_text(catalog, "report.response_completeness"), response_presentation["completeness"]),
+            (report_text(catalog, "report.response_data_confidence"), response_presentation["confidence"]),
+        ], styles),
     ])
     if response_presentation.get("limitations"):
-        flowables.append(Paragraph(
-            f"{report_text(catalog, 'report.session_summary_limitations')}: "
-            f"{' ; '.join(response_presentation['limitations'])}",
-            styles["NoticeText"],
-        ))
+        flowables.extend([
+            Paragraph(report_text(catalog, "report.session_summary_limitations"), styles["ReportSubsection"]),
+            *[Paragraph("• " + escape_text(item), styles["NoticeText"])
+              for item in response_presentation["limitations"]],
+        ])
     return flowables
+
+
+def make_response_phase_table(response_presentation: dict[str, Any], *, styles, catalog: dict[str, str]) -> Table:
+    """Present the captured facts in three phases without inventing values."""
+
+    by_phase = {
+        phase: {row["label"]: row["value"] for row in response_presentation.get(phase) or []}
+        for phase in ("pre", "during", "post")
+    }
+    metric_order = []
+    for phase in ("pre", "during", "post"):
+        for label in by_phase[phase]:
+            if label not in metric_order:
+                metric_order.append(label)
+
+    body = ParagraphStyle("ResponsePhaseBody", parent=styles["BodyText"], fontSize=8.2, leading=10)
+    heading = ParagraphStyle("ResponsePhaseHeading", parent=body, textColor=colors.HexColor("#475569"), fontSize=7.3)
+    rows = [[
+        Paragraph(report_text(catalog, "report.table_metric"), heading),
+        Paragraph(report_text(catalog, "report.response_before"), heading),
+        Paragraph(report_text(catalog, "report.response_during"), heading),
+        Paragraph(report_text(catalog, "report.response_after"), heading),
+    ]]
+    not_recorded = report_text(catalog, "report.response_not_recorded")
+    for metric in metric_order or [report_text(catalog, "report.response_objective_measurements")]:
+        rows.append([
+            Paragraph(escape_text(metric), body),
+            Paragraph(escape_text(by_phase["pre"].get(metric, not_recorded)), body),
+            Paragraph(escape_text(by_phase["during"].get(metric, not_recorded)), body),
+            Paragraph(escape_text(by_phase["post"].get(metric, not_recorded)), body),
+        ])
+    table = Table(rows, colWidths=[120, 120, 120, 120], repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e9f5f3")),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#d6dee5")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    return table
+
+
+def localized_session_findings(
+    catalog: dict[str, str], analysis: dict[str, Any], response_presentation: dict[str, Any] | None
+) -> list[str]:
+    """Return a short customer-facing finding list from already calculated facts."""
+
+    findings = [localized_session_interpretation(catalog, analysis, analysis.get("result") or {})]
+    if response_presentation:
+        findings.extend(response_presentation.get("observations") or [])
+        findings.extend(response_presentation.get("limitations") or [])
+    return list(dict.fromkeys(findings))[:5]
 
 
 def localized_phase(catalog: dict[str, str], value: Any) -> str:
@@ -1290,6 +1348,17 @@ def build_pdf_report(
     )
     styles.add(
         ParagraphStyle(
+            name="ReportSubsection",
+            parent=styles["Heading2"],
+            fontSize=9,
+            leading=11,
+            textColor=colors.HexColor("#0f766e"),
+            spaceBefore=7,
+            spaceAfter=4,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
             name="MetricLabel",
             parent=styles["BodyText"],
             alignment=TA_CENTER,
@@ -1359,8 +1428,12 @@ def build_pdf_report(
     client_session_number = session_config.get("client_session_number") or "-"
     program_name = session_config.get("program_name") or report_text(catalog, "report.comparison_single")
     program_progress = (
-        f"{session_config.get('program_completed_sessions')} of "
-        f"{session_config.get('program_total_sessions')}"
+        report_text(
+            catalog,
+            "report.program_progress",
+            completed=session_config.get("program_completed_sessions"),
+            total=session_config.get("program_total_sessions"),
+        )
         if session_config.get("program_name")
         else "-"
     )
@@ -1405,58 +1478,15 @@ def build_pdf_report(
             styles,
         ),
         Spacer(1, 8),
-        KeepTogether(
-            [
-                Paragraph(
-                    report_text(catalog, "report.session_overview"),
-                    styles["ReportSection"],
-                ),
-                make_table(
-                    [
-                        (report_text(catalog, "report.label_client"), subject.get("user_id")),
-                        (
-                            report_text(catalog, "report.client_session"),
-                            report_text(catalog, "report.label_session_number", number=client_session_number),
-                        ),
-                        (report_text(catalog, "report.label_date"), format_report_datetime(session.get("created_at"), catalog=catalog)),
-                        (report_text(catalog, "report.label_program"), f"{program_name} - {program_progress}"),
-                        (report_text(catalog, "report.label_protocol"), session.get("protocol_name")),
-                        (
-                            report_text(catalog, "report.label_location"),
-                            " / ".join(
-                                value
-                                for value in (
-                                    session_config.get("location_name"),
-                                    session.get("chamber_name"),
-                                )
-                                if value
-                            ),
-                        ),
-                        (
-                            report_text(catalog, "report.label_pressure"),
-                            (
-                                f"{format_measurement(session.get('actual_ata'), ' ATA', 2)} "
-                                f"({report_text(catalog, 'report.label_target')} {format_measurement(session.get('target_ata'), ' ATA', 2)})"
-                            ),
-                        ),
-                        (
-                            report_text(catalog, "report.label_duration"),
-                            format_measurement(
-                                session.get("total_duration_min"),
-                                " min",
-                                0,
-                            ),
-                        ),
-                        (
-                            report_text(catalog, "report.session_status"),
-                            localized_report_status(catalog,
-                                session.get("execution_status")
-                                or session.get("status")
-                            ),
-                        ),
-                    ]
-                ),
-            ]
+        make_compact_overview(
+            session=session,
+            subject=subject,
+            session_config=session_config,
+            program_name=program_name,
+            program_progress=program_progress,
+            client_session_number=client_session_number,
+            styles=styles,
+            catalog=catalog,
         ),
     ]
 
@@ -1481,26 +1511,11 @@ def build_pdf_report(
                         ),
                     ]
                 ),
-                *response_report_flowables(
-                    response_presentation=response_presentation,
-                    styles=styles,
-                    catalog=catalog,
-                ),
-                KeepTogether(
-                    [
-                        Paragraph(
-                            report_text(catalog, "report.operator_review"),
-                            styles["ReportSection"],
-                        ),
-                        Spacer(1, 2),
-                        Paragraph(
-                            escape_text(localized_operator_review(
-                                catalog, quality_warnings
-                            )),
-                            styles["BodyText"],
-                        ),
-                    ]
-                ),
+                Paragraph(report_text(catalog, "report.key_findings"), styles["ReportSection"]),
+                *[
+                    Paragraph("• " + escape_text(finding), styles["BodyText"])
+                    for finding in localized_session_findings(catalog, analysis, response_presentation)
+                ],
             ]
         )
     else:
@@ -1516,6 +1531,18 @@ def build_pdf_report(
                 ),
             ]
         )
+
+    if response_presentation:
+        story.extend([
+            PageBreak(),
+            make_page_header(report_text(catalog, "report.session_response"), styles),
+            Spacer(1, 7),
+            *response_report_flowables(
+                response_presentation=response_presentation,
+                styles=styles,
+                catalog=catalog,
+            ),
+        ])
 
     story.append(
         KeepTogether(
@@ -1572,14 +1599,14 @@ def build_pdf_report(
         )
     )
 
+    technical_appendix = []
     if research_summary:
         research_facts = research_summary["fact_sheet"]
         research_sections = research_summary["sections"]
         research_narration = research_summary["narration"]
-        story.extend(
+        technical_appendix.extend(
             [
-                PageBreak(),
-                make_page_header(report_text(catalog, "report.research_ai"), styles),
+                make_page_header(report_text(catalog, "report.technical_appendix"), styles),
                 Spacer(1, 6),
                 KeepTogether(
                     [
@@ -1903,6 +1930,9 @@ def build_pdf_report(
         ]
     )
 
+    if technical_appendix:
+        story.extend([PageBreak(), *technical_appendix])
+
     doc.build(
         story,
         onFirstPage=lambda canvas, doc: draw_report_footer(
@@ -2084,9 +2114,8 @@ def build_series_pdf_report(
                 ),
                 (
                     report_text(catalog, "report.metric_trend"),
-                    report_text(
-                        catalog,
-                        f"report.trend_{series_data.get('trend_direction') or 'insufficient'}",
+                    localized_series_trend(
+                        catalog, series_data.get("trend_direction")
                     ),
                 ),
                 (
@@ -2137,6 +2166,7 @@ def build_series_pdf_report(
                 ),
             ]
         ),
+        *make_series_trend_flowables(analyses, styles=styles, catalog=catalog),
         KeepTogether(
             [
                 Paragraph(report_text(catalog, "report.key_findings"), styles["ReportSection"]),
@@ -2214,7 +2244,7 @@ def build_series_pdf_report(
         KeepTogether(
             [
                 Paragraph(
-                    report_text(catalog, "report.data_quality_engine"),
+                    report_text(catalog, "report.data_quality_confidence"),
                     styles["ReportSection"],
                 ),
                 make_table(
@@ -2332,6 +2362,100 @@ def make_report_header(
     return header
 
 
+def make_series_trend_flowables(analyses: list[dict[str, Any]], *, styles, catalog: dict[str, str]) -> list[Any]:
+    """Render a restrained score trend only when comparable session facts exist."""
+
+    points = []
+    for row in analyses:
+        score = row.get("overall_score")
+        try:
+            points.append(float(score))
+        except (TypeError, ValueError):
+            continue
+    if len(points) < 2:
+        return [
+            Paragraph(report_text(catalog, "report.longitudinal_view"), styles["ReportSection"]),
+            Paragraph(report_text(catalog, "report.longitudinal_insufficient"), styles["NoticeText"]),
+        ]
+
+    width, height, margin = 480, 132, 22
+    drawing = Drawing(width, height)
+    drawing.add(String(0, height - 4, report_text(catalog, "report.trend_score_chart"), fontName=register_report_font(), fontSize=8.5, fillColor=colors.HexColor("#475569")))
+    chart_height = height - 32
+    drawing.add(Line(margin, 18, width - 4, 18, strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.6))
+    drawing.add(Line(margin, 18, margin, chart_height, strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.6))
+    # Scores are bounded, but the chart scale follows the observed range so a
+    # genuine small change remains legible in print.
+    minimum = max(0.0, min(points) - 5)
+    maximum = min(100.0, max(points) + 5)
+    span = max(1.0, maximum - minimum)
+    previous = None
+    for index, value in enumerate(points):
+        x = margin + ((width - margin - 10) * index / max(1, len(points) - 1))
+        y = 18 + ((chart_height - 18) * (value - minimum) / span)
+        if previous:
+            drawing.add(Line(previous[0], previous[1], x, y, strokeColor=colors.HexColor("#0f9488"), strokeWidth=2))
+        drawing.add(Line(x, y - 2, x, y + 2, strokeColor=colors.HexColor("#0f9488"), strokeWidth=3))
+        drawing.add(String(x - 8, 5, str(index + 1), fontName=register_report_font(), fontSize=7, fillColor=colors.HexColor("#64748b")))
+        previous = (x, y)
+    drawing.add(String(0, chart_height - 2, f"{maximum:g}", fontName=register_report_font(), fontSize=6.5, fillColor=colors.HexColor("#64748b")))
+    drawing.add(String(0, 17, f"{minimum:g}", fontName=register_report_font(), fontSize=6.5, fillColor=colors.HexColor("#64748b")))
+    return [
+        Paragraph(report_text(catalog, "report.longitudinal_view"), styles["ReportSection"]),
+        drawing,
+        Paragraph(report_text(catalog, "report.trend_chart_caption", count=len(points)), styles["NoticeText"]),
+    ]
+
+
+def make_compact_overview(
+    *,
+    session: dict[str, Any],
+    subject: dict[str, Any],
+    session_config: dict[str, Any],
+    program_name: str,
+    program_progress: str,
+    client_session_number: Any,
+    styles,
+    catalog: dict[str, str],
+) -> Table:
+    """Keep executive metadata compact so the client insight leads page one."""
+
+    label_style = ParagraphStyle(
+        "OverviewLabel", parent=styles["MetricLabel"], alignment=0, fontSize=7.3
+    )
+    value_style = ParagraphStyle(
+        "OverviewValue", parent=styles["BodyText"], fontSize=8.7, leading=10.5
+    )
+    rows = [
+        (report_text(catalog, "report.label_client"), subject.get("user_id")),
+        (report_text(catalog, "report.client_session"), report_text(catalog, "report.label_session_number", number=client_session_number)),
+        (report_text(catalog, "report.label_date"), format_report_datetime(session.get("created_at"), catalog=catalog)),
+        (report_text(catalog, "report.label_protocol"), session.get("protocol_name")),
+        (report_text(catalog, "report.label_program"), f"{program_name} - {program_progress}"),
+        (report_text(catalog, "report.label_duration"), format_measurement(session.get("total_duration_min"), " min", 0)),
+    ]
+    cells = []
+    for index in range(0, len(rows), 2):
+        left_label, left_value = rows[index]
+        right_label, right_value = rows[index + 1]
+        cells.append([
+            Paragraph(escape_text(left_label), label_style),
+            Paragraph(escape_text(left_value), value_style),
+            Paragraph(escape_text(right_label), label_style),
+            Paragraph(escape_text(right_value), value_style),
+        ])
+    table = Table(cells, colWidths=[116, 124, 116, 124])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fbfdfd")),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.2, colors.HexColor("#dce8e6")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return table
+
+
 def make_metric_strip(
     metrics: list[tuple[str, Any]],
     styles,
@@ -2346,7 +2470,7 @@ def make_metric_strip(
         ]
         for label, value in metrics
     ]
-    table = Table([cells], colWidths=[120] * len(cells))
+    table = Table([cells], colWidths=[480 / max(1, len(cells))] * len(cells))
     table.setStyle(
         TableStyle(
             [

@@ -28,9 +28,14 @@ class ContentStudioUiContractTests(unittest.TestCase):
         self.assertIn("data.media?.id", self.generate_js)
 
     def test_media_cards_do_not_expose_internal_file_paths(self):
-        self.assertIn("Generation details", self.media_js)
-        self.assertNotIn("Prompt and path", self.media_js)
+        self.assertNotIn("Generation details", self.media_js)
+        self.assertNotIn("item.prompt", self.media_js)
         self.assertNotIn("${escapeHtml(item.file_path)}", self.media_js)
+
+    def test_browser_does_not_construct_provider_prompt_instructions(self):
+        self.assertIn("protected on the CoreLabTech server", self.generate_js)
+        self.assertNotIn("Use the official CoreLabTech character reference", self.generate_js)
+        self.assertNotIn("prompt:", self.generate_js)
 
     def test_media_library_has_loading_empty_and_error_states(self):
         for text in (

@@ -107,6 +107,7 @@ from services.traceability_service import get_session_traceability
 from services.i18n_service import catalog_for, current_locale
 from services.research_dashboard_projection import (
     DASHBOARD_VIEW,
+    build_analysis_presentation,
     build_research_dashboard_projection,
     serialized_field_sizes,
 )
@@ -371,6 +372,10 @@ def error_response(
     message: str,
     status_code: int,
 ):
+    # Exception details can include SQL, paths, provider configuration, or
+    # proprietary processing state. Keep those details in server logs only.
+    if status_code >= 500:
+        message = "An internal server error occurred."
     return jsonify({
         "status": "error",
         "error": message,
@@ -2497,9 +2502,12 @@ def run_analysis():
             session_id=session_id,
         )
 
-        result = {
-            **analysis.result,
-        }
+        result = build_analysis_presentation({
+            "ai_result_id": analysis.ai_result_id,
+            "merge_id": analysis.merge_id,
+            "session_id": analysis.session_id,
+            "result": analysis.result,
+        })
 
         score = result.get("overall_score")
 
@@ -2532,12 +2540,12 @@ def run_analysis():
         )
 
         return jsonify({
-            "status": "completed",
             "analysis_id": analysis.ai_result_id,
             "session_id": analysis.session_id,
             "client_id": result.get("client_id"),
             "merge_id": analysis.merge_id,
             **result,
+            "status": "completed",
         }), 201
 
     except AnalysisInputMissingError as exc:
@@ -2600,30 +2608,10 @@ def latest_analysis(session_id: str):
                 timeline_sample=timeline_sample,
                 catalog=catalog_for(current_locale()),
             )
-        elif timeline_sample and timeline_sample > 1:
-            payload = result
-            analysis_result = result.get("result") or {}
-            timeline = analysis_result.get("timeline")
-
-            if isinstance(timeline, list) and len(timeline) > timeline_sample:
-                last_index = len(timeline) - 1
-                sampled_timeline = [
-                    timeline[
-                        round(i * last_index / (timeline_sample - 1))
-                    ]
-                    for i in range(timeline_sample)
-                ]
-
-                result["timeline_total"] = len(timeline)
-                result["timeline_sampled"] = len(sampled_timeline)
-                result["result"] = {
-                    **analysis_result,
-                    "timeline": sampled_timeline,
-                    "timeline_total": len(timeline),
-                    "timeline_sampled": len(sampled_timeline),
-                }
         else:
-            payload = result
+            payload = build_analysis_presentation(
+                result, timeline_sample=timeline_sample
+            )
 
         response = jsonify({
             "status": "ok",
@@ -3021,7 +3009,6 @@ def report(session_id: str):
 # ADMIN COMPATIBILITY ROUTES
 # =========================================================
 
-@csrf.exempt
 @research_bp.route("/api/admin/accounts", methods=["GET"])
 @login_required
 @role_required("admin")
@@ -3056,7 +3043,6 @@ def admin_accounts_list():
         connection.close()
 
 
-@csrf.exempt
 @research_bp.route("/api/admin/accounts", methods=["POST"])
 @login_required
 @role_required("admin")
@@ -3125,7 +3111,6 @@ def admin_create_account():
         connection.close()
 
 
-@csrf.exempt
 @research_bp.route("/api/admin/accounts/reset_password", methods=["POST"])
 @login_required
 @role_required("admin")
@@ -3176,7 +3161,6 @@ def admin_reset_password():
         connection.close()
 
 
-@csrf.exempt
 @research_bp.route("/api/admin/accounts/update_role", methods=["POST"])
 @login_required
 @role_required("admin")
@@ -3233,7 +3217,6 @@ def admin_update_role():
         connection.close()
 
 
-@csrf.exempt
 @research_bp.route("/api/admin/accounts/toggle_active", methods=["POST"])
 @login_required
 @role_required("admin")
@@ -3544,6 +3527,8 @@ def error_response(
     message: str,
     status_code: int,
 ):
+    if status_code >= 500:
+        message = "An internal server error occurred."
     return jsonify({
         "status": "error",
         "error": message,

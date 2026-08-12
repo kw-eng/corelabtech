@@ -85,6 +85,13 @@ HBOT CHAMBER TESTING
     padding:16px;
 }
 
+.phase-mapping-note{
+    color:#9bb0c3;
+    font-size:13px;
+    line-height:1.45;
+    margin:0 0 10px;
+}
+
 .steps-wrapper{
     display:grid;
     gap:10px;
@@ -98,6 +105,10 @@ HBOT CHAMBER TESTING
     border-radius:8px;
     color:#94a3b8;
     cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    justify-content:center;
     font-size:13px;
     font-weight:800;
     min-height:44px;
@@ -105,6 +116,22 @@ HBOT CHAMBER TESTING
     position:relative;
     text-align:center;
     transition:0.2s;
+}
+
+.step-label{
+    display:block;
+}
+
+.analysis-phase{
+    color:#61d9d0;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:0.12em;
+    line-height:1;
+}
+
+.step.locked .analysis-phase{
+    color:#94a3b8;
 }
 
 .step.active{

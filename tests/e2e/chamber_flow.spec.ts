@@ -52,9 +52,12 @@ test.describe.serial("Wellness client FIT/CSV session flow", () => {
     );
     await expect(page.getByText("Client Profile")).toBeVisible();
     await expect(page.locator("#wellness_consent")).toBeVisible();
-    await expect(page.locator("#step_pre")).toHaveText("Check-in");
-    await expect(page.locator("#step_during")).toHaveText("Session");
-    await expect(page.locator("#step_post")).toHaveText("Recovery");
+    await expect(page.locator("#step_pre .step-label")).toHaveText("Check-in");
+    await expect(page.locator("#step_pre .analysis-phase")).toHaveText("PRE");
+    await expect(page.locator("#step_during .step-label")).toHaveText("Session");
+    await expect(page.locator("#step_during .analysis-phase")).toHaveText("DURING");
+    await expect(page.locator("#step_post .step-label")).toHaveText("Recovery");
+    await expect(page.locator("#step_post .analysis-phase")).toHaveText("POST");
     await expect(page.locator("#protocol_plan_preview")).toContainText(
       "120 min total",
     );
@@ -517,11 +520,25 @@ test.describe.serial("Wellness client FIT/CSV session flow", () => {
     expect(baseline.unique_sessions_30d).toBe(1);
 
     const reportResponse = await page.request.get(
-      `/report/${encodeURIComponent(SESSION_ID)}`,
+      `/report/${encodeURIComponent(SESSION_ID)}?lang=en`,
     );
     expect(reportResponse.status()).toBe(200);
     expect(reportResponse.headers()["content-type"]).toContain(
       "application/pdf",
+    );
+    expect(reportResponse.headers()["content-disposition"]).toMatch(
+      new RegExp(`corelabtech_session_${SESSION_ID}_EN\\.pdf`, "i"),
+    );
+
+    const seriesReportResponse = await page.request.get(
+      `/report/series/${encodeURIComponent(CLIENT_ID)}?limit=25&lang=en`,
+    );
+    expect(seriesReportResponse.status()).toBe(200);
+    expect(seriesReportResponse.headers()["content-type"]).toContain(
+      "application/pdf",
+    );
+    expect(seriesReportResponse.headers()["content-disposition"]).toMatch(
+      new RegExp(`corelabtech_series_${CLIENT_ID}_last-25_EN\\.pdf`, "i"),
     );
   });
 

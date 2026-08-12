@@ -1150,6 +1150,47 @@ MISSION CONTROL
     color:#b6c5d6;
 }
 
+.mission-notice{
+    align-items:center;
+    background:#ecfdf5;
+    border:1px solid #5eead4;
+    border-radius:10px;
+    box-shadow:0 14px 30px rgba(2, 6, 23, .18);
+    color:#064e3b;
+    display:flex;
+    gap:12px;
+    justify-content:space-between;
+    max-width:460px;
+    padding:12px 14px;
+    position:fixed;
+    right:24px;
+    top:24px;
+    z-index:1000;
+}
+.mission-notice[hidden]{ display:none; }
+.mission-notice-progress{ background:#eff6ff; border-color:#93c5fd; color:#1e3a8a; }
+.mission-notice-error{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
+.mission-notice button{ background:transparent; border:0; color:inherit; cursor:pointer; font-size:20px; line-height:1; padding:0 2px; }
+.mission-notice button:focus-visible{ outline:3px solid currentColor; outline-offset:3px; }
+
+.mission-workflow-status{
+    display:grid;
+    gap:18px;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    margin:20px 0;
+}
+.mission-workflow-status article{
+    background:#071b2a;
+    border:1px solid #183d53;
+    border-radius:12px;
+    padding:18px;
+}
+.mission-workflow-status h2{ color:#d8f5ee; font-size:15px; margin:0 0 10px; }
+.mission-workflow-status ul{ display:grid; gap:7px; list-style:none; margin:0; padding:0; }
+.mission-workflow-status li{ color:#8fa7b8; font-size:13px; }
+.mission-workflow-status li.is-complete{ color:#8ff0d7; }
+.mission-workflow-status li.is-complete::first-letter{ color:#2dd4bf; }
+
 .mission-response-panel{
     color:#dbeafe;
 }
@@ -2004,6 +2045,8 @@ MISSION CONTROL
 }
 
 @media(max-width:720px){
+    .mission-workflow-status{ grid-template-columns:1fr; }
+    .mission-notice{ left:16px; right:16px; top:16px; }
     .mission-hero,
     .mission-card{
         padding:22px;

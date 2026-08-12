@@ -8,6 +8,10 @@
 >
 
 <div class="mission-control-page">
+    <div id="missionNotice" class="mission-notice" role="status" aria-live="polite" hidden>
+        <span id="missionNoticeText"></span>
+        <button id="missionNoticeDismiss" type="button" aria-label="{{ t('mission.dismiss_notification') }}">×</button>
+    </div>
 
     <section class="mission-hero">
         <div>
@@ -21,11 +25,11 @@
                 <select id="sessionSelect" aria-label="{{ t('mission.select_session') }}"></select>
                 <button id="retrySessionLoad" type="button" hidden onclick="loadSessions()">Retry session loading</button>
                 <button type="button" onclick="loadDashboardSession()">{{ t('mission.load_session') }}</button>
-                <button type="button" onclick="runSelectedAI()">{{ t('mission.run_ai_analysis') }}</button>
+                <button type="button" onclick="runSelectedAI()">{{ t('mission.analyze_session') }}</button>
                 <button type="button" onclick="loadUserTrend()">{{ t('mission.load_series') }}</button>
-                <button type="button" onclick="generateSeriesReport(this)">{{ t('mission.series_report') }}</button>
+                <button type="button" onclick="generateSeriesReport(this)">{{ t('mission.generate_series_report') }}</button>
                 {% if current_user.role in ["researcher", "admin"] %}
-                <button type="button" onclick="generateResearchReport(this)">{{ t('mission.generate_report') }}</button>
+                <button type="button" onclick="generateResearchReport(this)">{{ t('mission.generate_session_report') }}</button>
                 {% endif %}
             </div>
         </div>
@@ -44,6 +48,27 @@
                 </div>
             </div>
         </div>
+    </section>
+
+    <section class="mission-workflow-status" aria-label="{{ t('mission.workflow_status') }}">
+        <article>
+            <h2>{{ t('mission.workflow_session') }}</h2>
+            <ul id="sessionWorkflowState">
+                <li data-state="selected">○ {{ t('mission.workflow_select_session') }}</li>
+                <li data-state="loaded">○ {{ t('mission.workflow_session_not_loaded') }}</li>
+                <li data-state="analyzed">○ {{ t('mission.workflow_analysis_pending') }}</li>
+                <li data-state="reported">○ {{ t('mission.workflow_report_not_generated') }}</li>
+            </ul>
+        </article>
+        <article>
+            <h2>{{ t('mission.workflow_series') }}</h2>
+            <ul id="seriesWorkflowState">
+                <li data-state="range">○ {{ t('mission.workflow_select_range') }}</li>
+                <li data-state="loaded">○ {{ t('mission.workflow_series_not_loaded') }}</li>
+                <li data-state="analyzed">○ {{ t('mission.workflow_trend_pending') }}</li>
+                <li data-state="reported">○ {{ t('mission.workflow_series_report_not_generated') }}</li>
+            </ul>
+        </article>
     </section>
 
     <section class="mission-metric-grid">
@@ -281,6 +306,42 @@ function tr(key, params = null){
     return key
 }
 
+let missionNoticeTimer = null
+const workflowState = {session: {selected:false, loaded:false, analyzed:false, reported:false}, series: {range:false, loaded:false, analyzed:false, reported:false}}
+function renderWorkflowState(){
+    const render = (id, state, labels) => {
+        const list = document.getElementById(id)
+        if(!list) return
+        for(const [key, complete] of Object.entries(state)){
+            const row = list.querySelector(`[data-state="${key}"]`)
+            if(!row) continue
+            row.classList.toggle("is-complete", Boolean(complete))
+            row.textContent = `${complete ? "✓" : "○"} ${tr(complete ? labels.complete[key] : labels.pending[key])}`
+        }
+    }
+    render("sessionWorkflowState", workflowState.session, {
+        pending: {selected:"mission.workflow_select_session", loaded:"mission.workflow_session_not_loaded", analyzed:"mission.workflow_analysis_pending", reported:"mission.workflow_report_not_generated"},
+        complete: {selected:"mission.workflow_session_selected", loaded:"mission.workflow_session_loaded", analyzed:"mission.workflow_analysis_completed", reported:"mission.workflow_report_generated"}
+    })
+    render("seriesWorkflowState", workflowState.series, {
+        pending: {range:"mission.workflow_select_range", loaded:"mission.workflow_series_not_loaded", analyzed:"mission.workflow_trend_pending", reported:"mission.workflow_series_report_not_generated"},
+        complete: {range:"mission.workflow_range_selected", loaded:"mission.workflow_series_loaded", analyzed:"mission.workflow_trend_completed", reported:"mission.workflow_series_report_generated"}
+    })
+}
+function showMissionNotice(message, type = "success"){
+    const notice = document.getElementById("missionNotice")
+    const text = document.getElementById("missionNoticeText")
+    if(!notice || !text) return
+    text.textContent = message
+    notice.className = `mission-notice mission-notice-${type}`
+    notice.hidden = false
+    window.clearTimeout(missionNoticeTimer)
+    missionNoticeTimer = window.setTimeout(() => { notice.hidden = true }, 6000)
+}
+document.getElementById("missionNoticeDismiss")?.addEventListener("click", () => {
+    document.getElementById("missionNotice").hidden = true
+})
+
 window.addEventListener("load", async () => {
     await loadSessions()
     if(document.getElementById("deviceCatalogBox")){
@@ -418,6 +479,13 @@ function formatWarningLabel(value){
     return warningKey
         .replaceAll("_", " ")
         .replace(/\b\w/g, letter => letter.toUpperCase())
+}
+
+function localizedTrend(value){
+    const normalized = String(value || "unknown").trim().toLowerCase()
+    const key = `report.trend_${normalized}`
+    const translated = tr(key)
+    return translated === key ? tr("report.trend_unknown") : translated
 }
 
 function getScore(data){
@@ -724,7 +792,8 @@ function formatSessionDate(value){
         return String(value)
     }
 
-    return new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat(
+        (window.CORELABTECH_LOCALE || "en").toLowerCase() === "pl" ? "pl-PL" : "en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
@@ -737,13 +806,16 @@ async function loadDashboardSession(){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
-        alert(tr("mission.select_session_alert"))
+        showMissionNotice(tr("mission.select_session_alert"), "error")
         return
     }
 
     updateSelectedSessionLabel()
+    workflowState.session.selected = true
+    renderWorkflowState()
     setText("analysisStatus", tr("mission.loading"))
     setText("timelineStatus", tr("mission.loading"))
+    showMissionNotice(tr("mission.loading_session"), "progress")
 
     try{
         const res = await fetch(
@@ -777,6 +849,7 @@ async function loadDashboardSession(){
             window.setTimeout(() => {
                 loadSessionTraceability()
             }, 0)
+            showMissionNotice(tr("mission.session_load_failed"), "error")
 
             return
         }
@@ -847,6 +920,11 @@ async function loadDashboardSession(){
                 updateRaw: false
             })
         ])
+        showMissionNotice(tr("mission.session_loaded"))
+        workflowState.session.loaded = true
+        workflowState.session.analyzed = true
+        workflowState.session.reported = false
+        renderWorkflowState()
 
     }catch(err){
         console.error(
@@ -862,6 +940,7 @@ async function loadDashboardSession(){
             "rawOutput",
             String(err)
         )
+        showMissionNotice(tr("mission.session_load_failed"), "error")
     }
 }
 
@@ -869,7 +948,7 @@ async function runSelectedAI(){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
-        alert(tr("mission.select_session_alert"))
+        showMissionNotice(tr("mission.select_session_alert"), "error")
         return
     }
 
@@ -922,12 +1001,18 @@ await new Promise(resolve =>
     requestAnimationFrame(resolve)
 )
 
-await Promise.allSettled([
+        await Promise.allSettled([
     loadSessionTraceability(),
     loadResearchSummary({
         updateRaw: false
     })
-])
+        ])
+        workflowState.session.selected = true
+        workflowState.session.loaded = true
+        workflowState.session.analyzed = true
+        workflowState.session.reported = false
+        renderWorkflowState()
+        showMissionNotice(tr("mission.session_analysis_completed"))
     }catch(err){
         console.error("runSelectedAI error:", err)
         document.getElementById("ai").innerHTML = `
@@ -937,6 +1022,7 @@ await Promise.allSettled([
         `
         setText("analysisStatus", tr("mission.crashed"))
         setText("rawOutput", String(err))
+        showMissionNotice(tr("mission.session_analysis_failed"), "error")
     }
 }
 
@@ -1969,6 +2055,11 @@ async function loadUserTrend(options = {}){
             <p class="mission-muted">${escapeHtml(tr("mission.series_loading"))}</p>
         `
     }
+    workflowState.series.loaded = false
+    workflowState.series.range = true
+    workflowState.series.analyzed = false
+    workflowState.series.reported = false
+    renderWorkflowState()
 
     try{
         const res = await fetch(`/api/user_trends/${encodeURIComponent(selected.user_id)}?limit=${limit}`, {
@@ -2040,7 +2131,7 @@ async function loadUserTrend(options = {}){
                 </div>
                 <div>
                     <span>${escapeHtml(tr("mission.trend"))}</span>
-                    <strong>${escapeHtml(data.trend_direction || "-")}</strong>
+                    <strong>${escapeHtml(localizedTrend(data.trend_direction))}</strong>
                 </div>
                 <div>
                     <span>${escapeHtml(tr("mission.avg_score"))}</span>
@@ -2107,7 +2198,7 @@ async function loadUserTrend(options = {}){
                     </div>
                     <div>
                         <span>${escapeHtml(tr("mission.data_quality_trend"))}</span>
-                        <strong>${escapeHtml(data.data_quality_trend || "-")}</strong>
+                        <strong>${escapeHtml(localizedTrend(data.data_quality_trend))}</strong>
                     </div>
                     <div>
                         <span>${escapeHtml(tr("mission.missing_samples"))}</span>
@@ -2169,6 +2260,10 @@ async function loadUserTrend(options = {}){
         if(options.updateRaw !== false){
             setText("rawOutput", prettyCompact(data))
         }
+        showMissionNotice(tr("mission.series_loaded"))
+        workflowState.series.loaded = true
+        workflowState.series.analyzed = true
+        renderWorkflowState()
     }catch(err){
         console.error("loadUserTrend error:", err)
         trendBox.innerHTML = `
@@ -2176,17 +2271,18 @@ async function loadUserTrend(options = {}){
                 ${escapeHtml(tr("mission.trend_load_failed", {error: err.message || err}))}
             </div>
         `
+        showMissionNotice(tr("mission.series_load_failed"), "error")
     }
 }
 
-async function downloadReport(url, button, pendingMessage){
+async function downloadReport(url, button, pendingMessage, successMessage, workflow){
     if(button?.disabled) return
 
     const originalLabel = button?.textContent
     if(button){
         button.disabled = true
         button.setAttribute("aria-busy", "true")
-        button.textContent = "Generating report..."
+        button.textContent = pendingMessage
     }
 
     setText("rawOutput", pendingMessage)
@@ -2227,9 +2323,15 @@ async function downloadReport(url, button, pendingMessage){
 
         const duration = response.headers.get("X-Report-Generation-Ms")
         setText("rawOutput", duration ? `Report ready to download (${duration} ms).` : "Report ready to download.")
+        showMissionNotice(successMessage)
+        if(workflow){
+            workflow.reported = true
+            renderWorkflowState()
+        }
     }catch(error){
         console.error("Report generation failed", error)
         setText("rawOutput", `Report generation failed: ${error.message || error}`)
+        showMissionNotice(tr("mission.report_generation_failed"), "error")
     }finally{
         if(button){
             button.disabled = false
@@ -2243,7 +2345,7 @@ async function generateResearchReport(button){
     const sessionId = getSelectedSessionId()
 
     if(!sessionId){
-        alert(tr("mission.select_session_first"))
+        showMissionNotice(tr("mission.select_session_first"), "error")
         return
     }
 
@@ -2252,7 +2354,9 @@ async function generateResearchReport(button){
     await downloadReport(
         `/report/${encodeURIComponent(sessionId)}?lang=${encodeURIComponent(window.CORELABTECH_LOCALE || "en")}`,
         button,
-        tr("mission.opening_pdf_report", {session: sessionId})
+        tr("mission.generating_session_report"),
+        tr("mission.session_report_generated"),
+        workflowState.session
     )
 }
 
@@ -2261,14 +2365,16 @@ async function generateSeriesReport(button){
     const limit = getSelectedTrendLimit()
 
     if(!selected || !selected.user_id){
-        alert(tr("mission.select_client_session_first"))
+        showMissionNotice(tr("mission.select_client_session_first"), "error")
         return
     }
 
     await downloadReport(
         `/report/series/${encodeURIComponent(selected.user_id)}?limit=${limit}&lang=${encodeURIComponent(window.CORELABTECH_LOCALE || "en")}`,
         button,
-        tr("mission.opening_series_report", {client: selected.user_id})
+        tr("mission.generating_series_report"),
+        tr("mission.series_report_generated"),
+        workflowState.series
     )
 }
 </script>

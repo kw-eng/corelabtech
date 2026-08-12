@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "components/public_media.html" import render as render_public_media with context %}
 
 {% block content %}
 
@@ -21,10 +22,7 @@
         </div>
 
         <div class="about-hero-media">
-            <img
-                src="{{ url_for('static', filename='img/flow.png') }}"
-                alt="{{ t('public.tech.alt') }}"
-            >
+            {{ render_public_media('about.research_workflow', 'img/tech.png', t('public.tech.alt'), true) }}
         </div>
     </section>
 

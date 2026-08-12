@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from services.research_dashboard_projection import (
+    build_analysis_presentation,
     build_research_dashboard_projection,
 )
 
@@ -58,6 +59,20 @@ def result_with_timeline(count=3):
 
 
 class ResearchDashboardProjectionTests(unittest.TestCase):
+    def test_legacy_analysis_presentation_keeps_required_fields_without_internal_payloads(self):
+        projection = build_analysis_presentation(result_with_timeline(), timeline_sample=2)
+
+        self.assertEqual(projection["overall_score"], 91)
+        self.assertEqual(projection["features"]["avg_spo2"], 98)
+        self.assertEqual(len(projection["timeline"]), 2)
+        self.assertEqual(projection["result"]["session_summary"]["content"], "summary")
+        self.assertNotIn("narration", projection)
+        self.assertNotIn("model_name", projection)
+        self.assertNotIn("user_id", projection)
+        self.assertNotIn("hrv_windows", projection["features"])
+        self.assertNotIn("rr_interval", projection["timeline"][0])
+        self.assertNotIn("raw_rr", str(projection))
+
     def test_timeline_sample_contract_limits_dashboard_timeline(self):
         result = result_with_timeline(1_000)
         projection = build_research_dashboard_projection(result, timeline_sample=700)
