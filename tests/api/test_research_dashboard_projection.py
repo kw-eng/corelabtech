@@ -147,6 +147,7 @@ class ResearchDashboardProjectionTests(unittest.TestCase):
         )
 
         self.assertEqual(projection["session_response_presentation"]["confidence"], "Medium")
+        self.assertEqual(projection["customer_insight"]["status"], "Available session insight")
         self.assertEqual(len(projection["timeline"]), 2)
 
     def test_polish_projection_uses_catalog_not_persisted_disclaimer_or_codes(self):

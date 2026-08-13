@@ -2,18 +2,43 @@ import { expect, test } from "@playwright/test";
 
 const publicPages = ["/", "/technology", "/wellness-start", "/about", "/contact", "/publications"];
 const widths = [390, 430, 768, 1024, 1440];
+const homeLocaleCopy = {
+  pl: "Sesja w komorze jako udokumentowany workflow fizjologiczny",
+  en: "A chamber session, viewed as a documented physiology workflow",
+};
 
 test.describe("Public website responsive contract", () => {
+  test("public home renders the HBOT and report-preview structural sections", async ({ page }) => {
+    for (const locale of ["pl", "en"] as const) {
+      const consoleErrors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") consoleErrors.push(message.text());
+      });
+      await page.goto(`/?lang=${locale}`);
+      await expect(page.locator(".home-hbot-context")).toBeVisible();
+      await expect(page.locator(".home-report-preview")).toBeVisible();
+      const hbotMedia = page.locator(".home-hbot-context .public-media");
+      await expect(hbotMedia).toBeVisible();
+      await expect.poll(
+        () => hbotMedia.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0),
+      ).toBe(true);
+      await expect(page.locator(".home-hbot-context")).toContainText(homeLocaleCopy[locale]);
+      expect(consoleErrors).toEqual([]);
+    }
+  });
+
   for (const width of widths) {
-    test(`public home has no horizontal overflow at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto("/?lang=pl");
-      const dimensions = await page.evaluate(() => ({
-        client: document.documentElement.clientWidth,
-        scroll: document.documentElement.scrollWidth,
-      }));
-      expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
-    });
+    for (const locale of ["pl", "en"] as const) {
+      test(`public ${locale.toUpperCase()} home has no horizontal overflow at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(`/?lang=${locale}`);
+        const dimensions = await page.evaluate(() => ({
+          client: document.documentElement.clientWidth,
+          scroll: document.documentElement.scrollWidth,
+        }));
+        expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
+      });
+    }
   }
 
   test("mobile menu is keyboard-operable and preserves public links", async ({ page }) => {

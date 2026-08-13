@@ -102,6 +102,7 @@ from services.report_generator import (
 )
 from services.series_service import get_user_series_trends
 from services.trend_narration import build_trend_ai_view
+from services.customer_wellness_insight import build_series_customer_insight
 from services.research_summary import build_research_summary
 from services.traceability_service import get_session_traceability
 from services.i18n_service import catalog_for, current_locale
@@ -2758,6 +2759,9 @@ def user_trends(user_id: str):
         )
         return jsonify({
             **series,
+            "customer_insight": build_series_customer_insight(
+                series_data=series, catalog=catalog_for(current_locale())
+            ),
             "trend_ai": build_trend_ai_view(series),
         })
 

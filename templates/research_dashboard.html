@@ -349,7 +349,11 @@ window.addEventListener("load", async () => {
     }
     document.getElementById("recoveryFollowUpForm")?.addEventListener("submit", saveRecoveryFollowUp)
 
-    if(getSelectedSessionId()){
+    // A regular dashboard visit starts in an intentional, user-driven state.
+    // Only an explicit deep link should load an existing analysis immediately;
+    // otherwise an unanalysed default session would cause an expected 404 to
+    // appear as a browser console error before the user chooses an action.
+    if(new URLSearchParams(window.location.search).get("session")){
         await loadDashboardSession()
     }
 })
@@ -980,38 +984,11 @@ async function runSelectedAI(){
             return
         }
 
-        renderAnalysis(data)
-
-const rawPreview = {
-    ...data,
-    timeline: Array.isArray(data.timeline)
-        ? {
-            omitted: true,
-            samples: data.timeline.length
-        }
-        : data.timeline
-}
-
-setText(
-    "rawOutput",
-    prettyCompact(rawPreview)
-)
-
-await new Promise(resolve =>
-    requestAnimationFrame(resolve)
-)
-
-        await Promise.allSettled([
-    loadSessionTraceability(),
-    loadResearchSummary({
-        updateRaw: false
-    })
-        ])
-        workflowState.session.selected = true
-        workflowState.session.loaded = true
-        workflowState.session.analyzed = true
-        workflowState.session.reported = false
-        renderWorkflowState()
+        // The mutation response intentionally remains the compact analysis
+        // contract. Reload the dashboard projection so the post-analysis UI
+        // uses the same localized, customer-safe presentation as a saved
+        // session loaded from the dashboard.
+        await loadDashboardSession()
         showMissionNotice(tr("mission.session_analysis_completed"))
     }catch(err){
         console.error("runSelectedAI error:", err)
@@ -1595,6 +1572,9 @@ function renderAIText(data){
             </div>
         </div>
 
+        ${renderCustomerSessionInsight(data.customer_insight)}
+        <details class="mission-technical-details">
+        <summary>${escapeHtml(tr("mission.technical_details"))}</summary>
         <div class="mission-analysis-block">
             <div class="mission-summary-heading">
                 <h3>${escapeHtml(tr("mission.session_summary_ai"))}</h3>
@@ -1623,6 +1603,32 @@ function renderAIText(data){
         <p class="mission-disclaimer">
             ${escapeHtml(sessionSummary.disclaimer || tr("mission.wellness_disclaimer"))}
         </p>
+        </details>
+    `
+}
+
+function renderCustomerSessionInsight(insight){
+    if(!insight){
+        return ""
+    }
+    const changes = Array.isArray(insight.changes) && insight.changes.length
+        ? `<dl class="mission-response-list">${insight.changes.map(item => `<div><dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.before)} → ${escapeHtml(item.after)} <strong>${escapeHtml(item.delta)}</strong></dd></div>`).join("")}</dl>`
+        : `<p class="mission-muted">${escapeHtml(tr("mission.session_response_not_available"))}</p>`
+    const watch = Array.isArray(insight.watch_items) && insight.watch_items.length
+        ? `<ul class="mission-list">${insight.watch_items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : ""
+    return `
+        <section class="mission-customer-insight">
+            <span class="mission-eyebrow">${escapeHtml(insight.headline)}</span>
+            <h3>${escapeHtml(insight.status)}</h3>
+            <p class="mission-summary-content">${escapeHtml(insight.summary)}</p>
+            <div class="mission-customer-grid">
+                <div><h4>${escapeHtml(tr("customer.what_changed"))}</h4>${changes}</div>
+                <div><h4>${escapeHtml(tr("customer.data_confidence"))}</h4><strong>${escapeHtml(insight.confidence)}</strong><p>${escapeHtml(insight.confidence_reason)}</p></div>
+            </div>
+            ${watch ? `<div><h4>${escapeHtml(tr("customer.what_to_watch"))}</h4>${watch}</div>` : ""}
+            <div><h4>${escapeHtml(tr("customer.next_step"))}</h4><p>${escapeHtml(insight.next_step)}</p></div>
+        </section>
     `
 }
 
@@ -2148,7 +2154,10 @@ async function loadUserTrend(options = {}){
                 <span>${escapeHtml(tr("mission.total_sessions_value", {count: data.session_count ?? "-"}))}</span>
                 <span>${escapeHtml(tr("mission.review_flags_value", {count: data.flagged_session_count ?? data.anomaly_count ?? 0}))}</span>
             </div>
-            ${renderTrendAI(data.trend_ai)}
+            ${renderCustomerSeriesInsight(data.customer_insight)}
+            <details class="mission-technical-details">
+                <summary>${escapeHtml(tr("mission.technical_details"))}</summary>
+                ${renderTrendAI(data.trend_ai)}
             <div class="mission-series-chart-panel">
                 <canvas id="seriesTrendChart"></canvas>
                 <div id="seriesTrendEmpty" class="mission-chart-empty">
@@ -2254,6 +2263,7 @@ async function loadUserTrend(options = {}){
                     </tbody>
                 </table>
             </div>
+            </details>
         `
         renderSeriesTrendChart(analyses)
 
@@ -2273,6 +2283,28 @@ async function loadUserTrend(options = {}){
         `
         showMissionNotice(tr("mission.series_load_failed"), "error")
     }
+}
+
+function renderCustomerSeriesInsight(insight){
+    if(!insight){
+        return ""
+    }
+    const watch = Array.isArray(insight.watch_items) && insight.watch_items.length
+        ? `<ul class="mission-list">${insight.watch_items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : ""
+    return `
+        <section class="mission-customer-insight">
+            <span class="mission-eyebrow">${escapeHtml(insight.headline)}</span>
+            <h3>${escapeHtml(insight.status)}</h3>
+            <p class="mission-summary-content">${escapeHtml(insight.summary)}</p>
+            <div class="mission-customer-grid">
+                <div><h4>${escapeHtml(tr("customer.personal_pattern"))}</h4><p>${escapeHtml(insight.pattern)}</p></div>
+                <div><h4>${escapeHtml(tr("customer.data_confidence"))}</h4><strong>${escapeHtml(insight.confidence)}</strong><p>${escapeHtml(tr("mission.analyzed"))}: ${escapeHtml(insight.sessions_analyzed)}</p></div>
+            </div>
+            ${watch ? `<div><h4>${escapeHtml(tr("customer.what_to_watch"))}</h4>${watch}</div>` : ""}
+            <div><h4>${escapeHtml(tr("customer.next_step"))}</h4><p>${escapeHtml(insight.next_step)}</p></div>
+        </section>
+    `
 }
 
 async function downloadReport(url, button, pendingMessage, successMessage, workflow){
