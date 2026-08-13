@@ -12,6 +12,7 @@ from services.llm_narration import (
 from services.session_response_presentation import (
     build_localized_session_response,
 )
+from services.customer_wellness_insight import build_session_customer_insight
 
 
 DASHBOARD_VIEW = "research_dashboard"
@@ -139,6 +140,11 @@ def build_research_dashboard_projection(
     session_response = analysis.get("session_response") or fact_sheet.get(
         "session_response"
     )
+    response_presentation = (
+        build_localized_session_response(session_response, catalog)
+        if catalog is not None
+        else None
+    )
 
     return {
         "ai_result_id": result.get("ai_result_id"),
@@ -161,10 +167,11 @@ def build_research_dashboard_projection(
             if key in features
         },
         "session_response": session_response,
-        "session_response_presentation": (
-            build_localized_session_response(session_response, catalog)
-            if catalog is not None
-            else None
+        "session_response_presentation": response_presentation,
+        "customer_insight": (
+            build_session_customer_insight(
+                analysis=analysis, response_presentation=response_presentation, catalog=catalog
+            ) if catalog is not None else None
         ),
         "timeline": [dashboard_timeline_point(row) for row in sampled],
         "timeline_total": total,

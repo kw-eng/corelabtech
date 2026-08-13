@@ -41,6 +41,10 @@ from services.i18n_service import DEFAULT_LOCALE, catalog_for, normalize_locale
 from services.llm_narration import build_session_fact_sheet
 from services.research_summary import build_research_summary
 from services.session_response_presentation import build_localized_session_response
+from services.customer_wellness_insight import (
+    build_series_customer_insight,
+    build_session_customer_insight,
+)
 
 SESSION_CLIENT_TABLES = (
     "tests",
@@ -951,6 +955,41 @@ def response_report_flowables(*, response_presentation, styles, catalog):
     return flowables
 
 
+def customer_insight_flowables(*, insight: dict[str, Any], styles, catalog: dict[str, str]) -> list[Any]:
+    """Keep customer actions and confidence ahead of detailed measurements."""
+
+    flowables: list[Any] = []
+    if insight.get("changes"):
+        flowables.extend([
+            Paragraph(report_text(catalog, "customer.what_changed"), styles["ReportSection"]),
+            make_metric_strip([
+                (row["label"], f"{row['before']} -> {row['after']} ({row['delta']})")
+                for row in insight["changes"]
+            ], styles),
+        ])
+    if insight.get("self_reported"):
+        flowables.extend([
+            Paragraph(report_text(catalog, "customer.how_you_felt"), styles["ReportSection"]),
+            make_table([(row["label"], row["value"]) for row in insight["self_reported"]]),
+        ])
+    if insight.get("watch_items"):
+        flowables.extend([
+            Paragraph(report_text(catalog, "customer.what_to_watch"), styles["ReportSection"]),
+            *[Paragraph("• " + escape_text(item), styles["NoticeText"])
+              for item in insight["watch_items"]],
+        ])
+    flowables.extend([
+        Paragraph(report_text(catalog, "customer.next_step"), styles["ReportSection"]),
+        Paragraph(escape_text(insight["next_step"]), styles["BodyText"]),
+        Spacer(1, 4),
+        make_metric_strip([
+            (report_text(catalog, "customer.data_confidence"), insight["confidence"]),
+        ], styles),
+        Paragraph(escape_text(insight["confidence_reason"]), styles["NoticeText"]),
+    ])
+    return flowables
+
+
 def make_response_phase_table(response_presentation: dict[str, Any], *, styles, catalog: dict[str, str]) -> Table:
     """Present the captured facts in three phases without inventing values."""
 
@@ -1425,6 +1464,11 @@ def build_pdf_report(
     response_presentation = build_localized_session_response(
         session_response, catalog
     ) if session_response else None
+    customer_insight = build_session_customer_insight(
+        analysis=analysis,
+        response_presentation=response_presentation,
+        catalog=catalog,
+    ) if analysis else None
     client_session_number = session_config.get("client_session_number") or "-"
     program_name = session_config.get("program_name") or report_text(catalog, "report.comparison_single")
     program_progress = (
@@ -1490,32 +1534,27 @@ def build_pdf_report(
         ),
     ]
 
-    if analysis:
+    if customer_insight:
         story.extend(
             [
                 KeepTogether(
                     [
                         Paragraph(
-                            report_text(
-                                catalog,
-                                "report.wellness_interpretation",
-                            ),
+                            escape_text(customer_insight["headline"]),
                             styles["ReportSection"],
                         ),
                         Spacer(1, 2),
                         Paragraph(
-                            escape_text(localized_session_interpretation(
-                                catalog, analysis, analysis_result
-                            )),
+                            escape_text(customer_insight["status"]),
+                            styles["ReportSubsection"],
+                        ),
+                        Paragraph(
+                            escape_text(customer_insight["summary"]),
                             styles["BodyText"],
                         ),
                     ]
                 ),
-                Paragraph(report_text(catalog, "report.key_findings"), styles["ReportSection"]),
-                *[
-                    Paragraph("• " + escape_text(finding), styles["BodyText"])
-                    for finding in localized_session_findings(catalog, analysis, response_presentation)
-                ],
+                *customer_insight_flowables(insight=customer_insight, styles=styles, catalog=catalog),
             ]
         )
     else:
@@ -2003,6 +2042,16 @@ def build_series_pdf_report(
     )
     styles.add(
         ParagraphStyle(
+            name="ReportSubsection",
+            parent=styles["Heading2"],
+            fontSize=9,
+            leading=11,
+            textColor=colors.HexColor("#0f766e"),
+            spaceAfter=3,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
             name="MetricLabel",
             parent=styles["BodyText"],
             alignment=TA_CENTER,
@@ -2049,6 +2098,10 @@ def build_series_pdf_report(
     quality_engine = series_data.get("data_quality_engine") or {}
     protocol = series_data.get("protocol") or {}
     warnings = quality_engine.get("warning_counts") or {}
+    customer_insight = build_series_customer_insight(
+        series_data=series_data,
+        catalog=catalog,
+    )
     warning_summary = localized_warning_summary(catalog, warnings)
     latest_session = analyses[-1] if analyses else {}
     flagged_sessions = series_data.get(
@@ -2110,13 +2163,11 @@ def build_series_pdf_report(
             [
                 (
                     report_text(catalog, "report.metric_analyzed"),
-                    series_data.get("records", 0),
+                    customer_insight["sessions_analyzed"],
                 ),
                 (
                     report_text(catalog, "report.metric_trend"),
-                    localized_series_trend(
-                        catalog, series_data.get("trend_direction")
-                    ),
+                    customer_insight["status"],
                 ),
                 (
                     report_text(catalog, "report.metric_avg_score"),
@@ -2132,10 +2183,7 @@ def build_series_pdf_report(
         Spacer(1, 8),
         KeepTogether(
             [
-                Paragraph(
-                    report_text(catalog, "report.series_overview"),
-                    styles["ReportSection"],
-                ),
+                Paragraph(customer_insight["headline"], styles["ReportSection"]),
                 make_table(
                     [
                         (report_text(catalog, "report.label_client"), series_data.get("user_id")),
@@ -2143,7 +2191,7 @@ def build_series_pdf_report(
                         (report_text(catalog, "report.label_protocol"), protocol.get("name") or protocol.get("code")),
                         (report_text(catalog, "report.label_total_sessions"), series_data.get("session_count")),
                         (report_text(catalog, "report.label_analyzed_sessions"), series_data.get("records")),
-                        (report_text(catalog, "report.label_evidence_level"), report_text(catalog, f"report.evidence_{series_data.get('evidence_level') or 'insufficient'}")),
+                        (report_text(catalog, "customer.data_confidence"), customer_insight["confidence"]),
                         (report_text(catalog, "report.label_review_flags"), flagged_sessions),
                         (
                             report_text(catalog, "report.label_latest_session"),
@@ -2159,21 +2207,34 @@ def build_series_pdf_report(
         ),
         KeepTogether(
             [
-                Paragraph(report_text(catalog, "report.executive_summary"), styles["ReportSection"]),
+                Paragraph(customer_insight["status"], styles["ReportSubsection"]),
                 Paragraph(
-                    escape_text(localized_series_executive_summary(catalog, series_data, warnings)),
+                    escape_text(customer_insight["summary"]),
                     styles["BodyText"],
                 ),
+                Paragraph(escape_text(customer_insight["pattern"]), styles["BodyText"]),
             ]
         ),
         *make_series_trend_flowables(analyses, styles=styles, catalog=catalog),
+        *(
+            [
+                KeepTogether(
+                    [
+                        Paragraph(report_text(catalog, "customer.what_to_watch"), styles["ReportSection"]),
+                        *[
+                            Paragraph("• " + escape_text(finding), styles["BodyText"])
+                            for finding in customer_insight["watch_items"]
+                        ],
+                    ]
+                )
+            ]
+            if customer_insight["watch_items"]
+            else []
+        ),
         KeepTogether(
             [
-                Paragraph(report_text(catalog, "report.key_findings"), styles["ReportSection"]),
-                *[
-                    Paragraph("• " + escape_text(finding), styles["BodyText"])
-                    for finding in localized_series_findings(catalog, series_data, warnings)
-                ],
+                Paragraph(report_text(catalog, "customer.next_step"), styles["ReportSection"]),
+                Paragraph(escape_text(customer_insight["next_step"]), styles["BodyText"]),
             ]
         ),
         KeepTogether(
@@ -2202,32 +2263,21 @@ def build_series_pdf_report(
                                         f" ({format_delta_text(comparison.get('data_quality_delta'))})"
                                     ),
                                 ),
-                                (
-                                    report_text(catalog, "report.label_average_hr"),
-                                    (
-                                        f"{format_measurement(comparison.get('first_avg_heart_rate'), ' bpm', 0)}"
-                                        f" -> {format_measurement(comparison.get('last_avg_heart_rate'), ' bpm', 0)}"
-                                        f" ({format_delta_text(comparison.get('heart_rate_delta'))})"
-                                    ),
-                                ),
-                                (
-                                    report_text(catalog, "report.label_average_hrv"),
-                                    (
-                                        f"{format_measurement(comparison.get('first_avg_hrv'), ' ms', 1)}"
-                                        f" -> {format_measurement(comparison.get('last_avg_hrv'), ' ms', 1)}"
-                                        f" ({format_delta_text(comparison.get('hrv_delta'))})"
-                                    ),
-                                ),
-                                (
-                                    report_text(catalog, "report.label_average_spo2"),
-                                    (
-                                        f"{format_measurement(comparison.get('first_avg_spo2'), '%', 1)}"
-                                        f" -> {format_measurement(comparison.get('last_avg_spo2'), '%', 1)}"
-                                        f" ({format_delta_text(comparison.get('spo2_delta'))})"
-                                    ),
-                                ),
+                                *series_comparison_measurement_rows(comparison, catalog),
                             ]
-                        )
+                        ),
+                        *(
+                            [Paragraph(report_text(catalog, "customer.comparison_measurement_unavailable"), styles["NoticeText"])]
+                            if any(
+                                comparison.get(field) in (None, "")
+                                for field in (
+                                    "first_avg_heart_rate", "last_avg_heart_rate",
+                                    "first_avg_hrv", "last_avg_hrv",
+                                    "first_avg_spo2", "last_avg_spo2",
+                                )
+                            )
+                            else []
+                        ),
                     ]
                     if comparison.get("available")
                     else [
@@ -2660,6 +2710,39 @@ def make_series_session_table(
         )
     )
     return table
+
+
+def series_comparison_measurement_rows(
+    comparison: dict[str, Any], catalog: dict[str, str]
+) -> list[tuple[str, str]]:
+    """Return only genuinely comparable physiological measurements.
+
+    A dash-to-dash row implies a comparison where neither end exists.  The
+    series report instead omits that row and adds one localized availability
+    note in the calling section.
+    """
+
+    definitions = (
+        ("report.label_average_hr", "first_avg_heart_rate", "last_avg_heart_rate", "heart_rate_delta", " bpm", 0),
+        ("report.label_average_hrv", "first_avg_hrv", "last_avg_hrv", "hrv_delta", " ms", 1),
+        ("report.label_average_spo2", "first_avg_spo2", "last_avg_spo2", "spo2_delta", "%", 1),
+    )
+    rows: list[tuple[str, str]] = []
+    for label_key, first_key, last_key, delta_key, suffix, decimals in definitions:
+        first, last = comparison.get(first_key), comparison.get(last_key)
+        if first in (None, "") or last in (None, ""):
+            continue
+        rows.append(
+            (
+                report_text(catalog, label_key),
+                (
+                    f"{format_measurement(first, suffix, decimals)}"
+                    f" -> {format_measurement(last, suffix, decimals)}"
+                    f" ({format_delta_text(comparison.get(delta_key))})"
+                ),
+            )
+        )
+    return rows
 
 
 def draw_report_footer(canvas, doc, *, catalog: dict[str, str]) -> None:
