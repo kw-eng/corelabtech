@@ -1244,7 +1244,7 @@
   ,"report.label_hr_hrv_samples": "Próbki HR / HRV"
   ,"report.label_spo2_pulse_samples": "Próbki SpO2 / pulsu"
   ,"report.label_synchronized_samples": "Zsynchronizowane próbki"
-  ,"report.label_baseline_status": "Status baseline"
+  ,"report.label_baseline_status": "Status poziomu bazowego"
   ,"report.label_sessions_last_30_days": "Sesje z ostatnich 30 dni"
   ,"report.label_rmssd_7_days": "RMSSD - 7 dni"
   ,"report.label_spo2_average": "Średnie SpO2"
@@ -1482,5 +1482,12 @@
   ,"customer.next_step": "Kolejny krok"
   ,"customer.data_confidence": "Pewność danych"
   ,"customer.personal_pattern": "Twój indywidualny wzorzec"
+  ,"report.response_check_in_snapshot": "Migawka check-in"
+  ,"report.response_during_telemetry": "Telemetria w trakcie sesji"
+  ,"report.response_recovery_snapshot": "Migawka regeneracji"
+  ,"report.response_limitation_validated_pre_measurements_unavailable": "Nie zarejestrowano zwalidowanego okna pomiarowego PRE."
+  ,"report.response_limitation_validated_post_measurements_unavailable": "Nie zarejestrowano zwalidowanego okna pomiarowego POST."
+  ,"report.response_limitation_check_in_snapshot_not_validated": "Migawka check-in jest pokazana jako kontekst i nie stanowi zwalidowanego pomiaru porównawczego PRE."
+  ,"report.response_limitation_recovery_snapshot_not_validated": "Migawka regeneracji jest pokazana jako kontekst i nie stanowi zwalidowanego pomiaru porównawczego POST."
 }
 

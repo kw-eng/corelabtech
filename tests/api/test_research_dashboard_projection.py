@@ -124,7 +124,7 @@ class ResearchDashboardProjectionTests(unittest.TestCase):
         self.assertNotIn("Stale Polish text", projection["session_summary"]["content"])
         self.assertEqual(
             projection["session_response_presentation"]["completeness"],
-            "2 of 3 objective comparisons available",
+            "0 of 3 objective comparisons available",
         )
         self.assertNotIn("raw_rr", str(projection["session_response"]))
 
@@ -146,7 +146,11 @@ class ResearchDashboardProjectionTests(unittest.TestCase):
             result, timeline_sample=2, catalog=catalog
         )
 
-        self.assertEqual(projection["session_response_presentation"]["confidence"], "Medium")
+        self.assertEqual(projection["session_response_presentation"]["confidence"], "Insufficient")
+        self.assertEqual(
+            projection["session_response_presentation"]["pre_label"],
+            "Check-in snapshot",
+        )
         self.assertEqual(projection["customer_insight"]["status"], "Available session insight")
         self.assertEqual(len(projection["timeline"]), 2)
 

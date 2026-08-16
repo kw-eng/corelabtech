@@ -10,6 +10,8 @@ class WellnessResponseTests(unittest.TestCase):
             session_context={
                 "pre_check_in": {"spo2": 97, "pulse": 70, "fatigue_level": "high"},
                 "post_check_out": {"spo2": 98, "pulse": 68, "fatigue_level": "lower", "energy_level": "higher"},
+                "validated_pre_measurements": {"spo2": 97, "pulse": 70},
+                "validated_post_measurements": {"spo2": 98, "pulse": 68},
             },
             features={"avg_spo2": 97.5, "avg_hrv": 42, "match_rate": 95},
             data_quality_score=88,
@@ -31,6 +33,8 @@ class WellnessResponseTests(unittest.TestCase):
             session_context={
                 "pre_check_in": {"spo2": 97},
                 "post_check_out": {"spo2": 98},
+                "validated_pre_measurements": {"spo2": 97},
+                "validated_post_measurements": {"spo2": 98},
             },
             features={},
             data_quality_score=95,
@@ -46,6 +50,8 @@ class WellnessResponseTests(unittest.TestCase):
             session_context={
                 "pre_check_in": {"spo2": "97", "pulse": "70"},
                 "post_check_out": {"spo2": "98", "pulse": "68"},
+                "validated_pre_measurements": {"spo2": "97", "pulse": "70"},
+                "validated_post_measurements": {"spo2": "98", "pulse": "68"},
             },
             features={},
             data_quality_score="85",
@@ -56,6 +62,8 @@ class WellnessResponseTests(unittest.TestCase):
             session_context={
                 "pre_check_in": {"spo2": "not-a-number"},
                 "post_check_out": {"spo2": "98"},
+                "validated_pre_measurements": {"spo2": "not-a-number"},
+                "validated_post_measurements": {"spo2": "98"},
             },
             features={},
             data_quality_score=85,
@@ -76,7 +84,23 @@ class WellnessResponseTests(unittest.TestCase):
 
         self.assertIsNone(response["deltas"]["spo2_percentage_points"])
         self.assertEqual(response["confidence"], "insufficient")
-        self.assertIn("post_measurements_unavailable", response["limitations"])
+        self.assertIn("validated_post_measurements_unavailable", response["limitations"])
+
+    def test_contextual_snapshots_do_not_create_a_validated_pre_post_comparison(self):
+        response = build_session_response(
+            session_context={
+                "pre_check_in": {"spo2": 97, "pulse": 70},
+                "post_check_out": {"spo2": 98, "pulse": 68},
+            },
+            features={}, data_quality_score=95, analysis_confidence="high", quality_warnings=[],
+        )
+
+        self.assertEqual(response["version"], "wellness-response-v2")
+        self.assertEqual(response["check_in_snapshot"]["spo2"], 97)
+        self.assertEqual(response["recovery_snapshot"]["spo2"], 98)
+        self.assertEqual(response["availability"]["available_delta_count"], 0)
+        self.assertEqual(response["confidence"], "insufficient")
+        self.assertIn("check_in_snapshot_not_validated", response["limitations"])
 
     def test_longitudinal_summary_tracks_metric_and_subjective_coverage(self):
         summary = build_longitudinal_response_intelligence([

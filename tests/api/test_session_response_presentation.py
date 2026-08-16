@@ -13,6 +13,7 @@ def catalog(locale):
 
 def complete_response():
     return {
+        "version": "wellness-response-v2",
         "pre": {"spo2": 97, "heart_rate_bpm": 70, "hrv_rmssd_ms": 40},
         "during": {"avg_spo2": 98, "min_spo2": 96, "avg_heart_rate_bpm": 68},
         "post": {"spo2": 98, "heart_rate_bpm": 68, "hrv_rmssd_ms": 45},
@@ -64,6 +65,20 @@ class SessionResponsePresentationTests(unittest.TestCase):
             "HRV (RMSSD) PRE/POST comparison unavailable" in value
             for value in presentation["limitations"]
         ))
+
+    def test_legacy_pre_post_values_are_presented_as_contextual_snapshots(self):
+        presentation = build_localized_session_response({
+            "pre": {"spo2": 97}, "during": {}, "post": {"spo2": 98},
+            "deltas": {"spo2_percentage_points": 1},
+            "availability": {"available_delta_count": 1, "possible_delta_count": 3},
+            "confidence": "high",
+            "limitations": [],
+        }, catalog("en"))
+
+        self.assertEqual(presentation["pre_label"], "Check-in snapshot")
+        self.assertEqual(presentation["post_label"], "Recovery snapshot")
+        self.assertEqual(presentation["deltas"], [])
+        self.assertEqual(presentation["confidence"], "Insufficient")
 
 
 if __name__ == "__main__":

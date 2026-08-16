@@ -7,6 +7,7 @@ session physiology signals, and persists an AI-style result for dashboards/repor
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass
 from datetime import date
 from statistics import mean
@@ -58,6 +59,7 @@ from repositories.recovery_repository import (
     load_latest_recovery_follow_ups,
     load_recovery_follow_up_history,
 )
+from repositories.personal_baseline_repository import refresh_personal_baselines
 
 from services.i18n_service import translate
 
@@ -75,12 +77,50 @@ FINDING_TRANSLATION_KEYS = {
     "hrv_below_threshold": "analysis.hrv_below_threshold",
     "heart_rate_high_threshold": "analysis.hr_high_threshold",
 }
+LOGGER = logging.getLogger(__name__)
 
 
 def translate_finding(code: str) -> str:
     """Render a stable deterministic finding code in the active locale."""
 
     return translate(FINDING_TRANSLATION_KEYS[code])
+
+
+def refresh_personal_baselines_safely(
+    cursor,
+    *,
+    user_id: str,
+    protocol_id: int,
+    target_ata: float | None,
+    baseline_date: date,
+) -> None:
+    """Materialize a baseline without invalidating authoritative analysis.
+
+    Personal Baseline is a derived, refreshable record.  A database savepoint
+    keeps a transient baseline-persistence fault from rolling back a completed
+    session analysis and its legacy aggregates.  The fault is logged for an
+    operator to retry; no baseline claim is returned as a fallback.
+    """
+
+    cursor.execute("SAVEPOINT personal_baseline_refresh")
+    try:
+        refresh_personal_baselines(
+            cursor,
+            user_id=user_id,
+            protocol_id=protocol_id,
+            target_ata=target_ata,
+            baseline_date=baseline_date,
+        )
+    except Exception:
+        cursor.execute("ROLLBACK TO SAVEPOINT personal_baseline_refresh")
+        LOGGER.exception(
+            "personal_baseline_refresh_failed user=%s protocol=%s date=%s",
+            user_id,
+            protocol_id,
+            baseline_date,
+        )
+    else:
+        cursor.execute("RELEASE SAVEPOINT personal_baseline_refresh")
 
 
 def get_analysis_model_manifest() -> dict[str, Any]:
@@ -297,6 +337,17 @@ def run_session_analysis(
             cursor,
             user_id=final_user_id,
             protocol_id=session_context["protocol_id"],
+            baseline_date=(
+                result["features"].get("window_start").date()
+                if result["features"].get("window_start")
+                else date.today()
+            ),
+        )
+        refresh_personal_baselines_safely(
+            cursor,
+            user_id=final_user_id,
+            protocol_id=session_context["protocol_id"],
+            target_ata=session_context.get("target_ata"),
             baseline_date=(
                 result["features"].get("window_start").date()
                 if result["features"].get("window_start")
