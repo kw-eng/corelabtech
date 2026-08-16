@@ -1007,9 +1007,9 @@ def make_response_phase_table(response_presentation: dict[str, Any], *, styles, 
     heading = ParagraphStyle("ResponsePhaseHeading", parent=body, textColor=colors.HexColor("#475569"), fontSize=7.3)
     rows = [[
         Paragraph(report_text(catalog, "report.table_metric"), heading),
-        Paragraph(report_text(catalog, "report.response_before"), heading),
-        Paragraph(report_text(catalog, "report.response_during"), heading),
-        Paragraph(report_text(catalog, "report.response_after"), heading),
+        Paragraph(escape_text(response_presentation.get("pre_label") or report_text(catalog, "report.response_before")), heading),
+        Paragraph(escape_text(response_presentation.get("during_label") or report_text(catalog, "report.response_during")), heading),
+        Paragraph(escape_text(response_presentation.get("post_label") or report_text(catalog, "report.response_after")), heading),
     ]]
     not_recorded = report_text(catalog, "report.response_not_recorded")
     for metric in metric_order or [report_text(catalog, "report.response_objective_measurements")]:
@@ -1751,7 +1751,7 @@ def build_pdf_report(
                                 ),
                             ),
                             (
-                                "Pulse / HR",
+                                report_text(catalog, "report.context_pulse_hr"),
                                 format_measurement(
                                     phase_metric(
                                         session.get("pre"),
@@ -2195,7 +2195,9 @@ def build_series_pdf_report(
                         (report_text(catalog, "report.label_review_flags"), flagged_sessions),
                         (
                             report_text(catalog, "report.label_latest_session"),
-                            latest_session.get("session_id") or "-",
+                            format_report_datetime(
+                                latest_session.get("created_at"), catalog=catalog
+                            ) if latest_session else "-",
                         ),
                         (
                             report_text(catalog, "report.label_latest_score"),
@@ -2651,8 +2653,7 @@ def make_series_session_table(
             [
                 Paragraph(
                     escape_text(
-                        f"{report_text(catalog, 'report.table_session')} {index}\n"
-                        f"ID: {row.get('session_id') or '-'}"
+                        f"{report_text(catalog, 'report.table_session')} {index}"
                     ),
                     body_style,
                 ),

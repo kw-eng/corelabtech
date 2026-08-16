@@ -62,6 +62,7 @@ class SeriesReportLocalizationTests(unittest.TestCase):
                 self.assertIn(key, catalog)
                 self.assertFalse(catalog[key].startswith("report."))
         self.assertEqual(pl["report.context_pulse_hr"], "Puls / HR")
+        self.assertEqual(pl["report.label_baseline_status"], "Status poziomu bazowego")
         self.assertEqual(pl["report.context_value_recovery"], "Regeneracja")
 
     def test_report_builder_localizes_baseline_and_context_values(self):
@@ -69,6 +70,7 @@ class SeriesReportLocalizationTests(unittest.TestCase):
         self.assertIn('"report.wellness_status",', source)
         self.assertIn('localized_report_enum(catalog, "report.context_value", item)', source)
         self.assertIn('report_text(catalog, f"report.context_{key}")', source)
+        self.assertIn('report_text(catalog, "report.context_pulse_hr")', source)
 
     def test_report_builder_uses_localized_deterministic_text_not_stored_narration(self):
         source = Path("services/session_service.py").read_text(encoding="utf-8")
@@ -81,6 +83,17 @@ class SeriesReportLocalizationTests(unittest.TestCase):
         source = Path("services/session_service.py").read_text(encoding="utf-8")
         self.assertIn("build_localized_session_response", source)
         self.assertIn("response_report_flowables", source)
+
+    def test_customer_series_table_does_not_expose_internal_session_identifiers(self):
+        source = Path("services/session_service.py").read_text(encoding="utf-8")
+        table_source = source[source.index("def make_series_session_table("):]
+        self.assertNotIn('f"ID: {row.get(\'session_id\')', table_source)
+
+    def test_customer_series_overview_uses_latest_session_date_not_identifier(self):
+        source = Path("services/session_service.py").read_text(encoding="utf-8")
+        overview = source[source.index("def build_series_pdf_report("):source.index("def make_series_session_table(")]
+        self.assertIn("format_report_datetime(", overview)
+        self.assertNotIn('latest_session.get("session_id")', overview)
 
     def test_report_warning_codes_are_localized_without_leaking_i18n_keys(self):
         warning_codes = [

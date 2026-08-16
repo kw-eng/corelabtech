@@ -1482,4 +1482,11 @@
   ,"customer.next_step": "Next Step"
   ,"customer.data_confidence": "Data Confidence"
   ,"customer.personal_pattern": "Your Personal Pattern"
+  ,"report.response_check_in_snapshot": "Check-in snapshot"
+  ,"report.response_during_telemetry": "During-session telemetry"
+  ,"report.response_recovery_snapshot": "Recovery snapshot"
+  ,"report.response_limitation_validated_pre_measurements_unavailable": "A validated PRE measurement window was not recorded."
+  ,"report.response_limitation_validated_post_measurements_unavailable": "A validated POST measurement window was not recorded."
+  ,"report.response_limitation_check_in_snapshot_not_validated": "The check-in snapshot is shown as context and is not a validated PRE comparison measurement."
+  ,"report.response_limitation_recovery_snapshot_not_validated": "The recovery snapshot is shown as context and is not a validated POST comparison measurement."
 }

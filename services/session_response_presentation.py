@@ -22,6 +22,12 @@ def build_localized_session_response(
     delta_availability = availability.get("deltas") or {}
     pre = response.get("pre") or {}
     post = response.get("post") or {}
+    # v1 persisted check-in/recovery values in ``pre``/``post``.  Treat those
+    # historical rows as contextual snapshots, never as validated comparison
+    # measurements, until a validated PRE/POST contract is recorded.
+    is_validated_contract = response.get("version") == "wellness-response-v2"
+    check_in = response.get("check_in_snapshot") or ({} if is_validated_contract else pre)
+    recovery = response.get("recovery_snapshot") or ({} if is_validated_contract else post)
     during = response.get("during") or {}
     deltas = response.get("deltas") or {}
     subjective = (response.get("subjective_context") or {}).get("post") or {}
@@ -40,7 +46,7 @@ def build_localized_session_response(
     observations = []
     for delta_key, measure_key, label_key, unit, delta_unit in METRICS:
         label = text(label_key)
-        delta = deltas.get(delta_key)
+        delta = deltas.get(delta_key) if is_validated_contract else None
         if delta is None or not delta_availability.get(delta_key, delta is not None):
             unavailable.append(text("report.response_comparison_unavailable_metric", metric=label))
             continue
@@ -62,7 +68,9 @@ def build_localized_session_response(
 
     available_count = availability.get("available_delta_count")
     possible_count = availability.get("possible_delta_count")
-    if not isinstance(available_count, int):
+    if not is_validated_contract:
+        available_count = 0
+    elif not isinstance(available_count, int):
         available_count = len(delta_rows)
     if not isinstance(possible_count, int):
         possible_count = len(METRICS)
@@ -95,7 +103,7 @@ def build_localized_session_response(
 
     return {
         "title": text("report.session_response"),
-        "pre": response_rows(pre, (
+        "pre": response_rows(check_in, (
             ("spo2", "report.response_metric_spo2", "%"),
             ("heart_rate_bpm", "report.response_metric_hr", "bpm"),
             ("hrv_rmssd_ms", "report.response_metric_hrv", "ms"),
@@ -109,7 +117,7 @@ def build_localized_session_response(
             ("duration_min", "report.label_duration", "min"),
             ("synchronization_percent", "report.label_sync_quality", "%"),
         ), text),
-        "post": response_rows(post, (
+        "post": response_rows(recovery, (
             ("spo2", "report.response_metric_spo2", "%"),
             ("heart_rate_bpm", "report.response_metric_hr", "bpm"),
             ("hrv_rmssd_ms", "report.response_metric_hrv", "ms"),
@@ -122,8 +130,11 @@ def build_localized_session_response(
             possible=possible_count,
         ),
         "confidence": text(
-            f"report.response_confidence_{response.get('confidence') or 'insufficient'}"
+            f"report.response_confidence_{response.get('confidence') if is_validated_contract else 'insufficient'}"
         ),
+        "pre_label": text("report.response_check_in_snapshot"),
+        "during_label": text("report.response_during_telemetry"),
+        "post_label": text("report.response_recovery_snapshot"),
         "observations": observations or [text("report.response_no_objective_comparison")],
         "limitations": list(dict.fromkeys(limitations)),
     }

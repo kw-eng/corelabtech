@@ -1,4 +1,4 @@
-"""Deterministic PRE/DURING/POST wellness-response facts.
+"""Deterministic session-response facts with explicit comparison eligibility.
 
 This module deliberately does not alter ``wellness-rules-v2`` scores.  It
 describes only measurements and self-reported context already captured by the
@@ -11,7 +11,7 @@ from math import isfinite
 from typing import Any
 
 
-RESPONSE_MODEL_VERSION = "wellness-response-v1"
+RESPONSE_MODEL_VERSION = "wellness-response-v2"
 
 
 def build_session_response(
@@ -26,8 +26,14 @@ def build_session_response(
 
     context = session_context or {}
     values = features or {}
-    pre_source = context.get("pre_check_in") or {}
-    post_source = context.get("post_check_out") or {}
+    # Check-in and recovery are useful contextual snapshots, but are not
+    # automatically eligible PRE/POST physiological measurements.  A caller
+    # must explicitly provide the validated measurement contract before the
+    # response model produces an objective comparison.
+    check_in_snapshot = context.get("pre_check_in") or {}
+    recovery_snapshot = context.get("post_check_out") or {}
+    pre_source = context.get("validated_pre_measurements") or {}
+    post_source = context.get("validated_post_measurements") or {}
     warnings = list(quality_warnings or [])
     normalized_data_quality_score = numeric_value(data_quality_score)
 
@@ -84,14 +90,16 @@ def build_session_response(
             "available_delta_count": sum(delta_availability.values()),
             "possible_delta_count": len(deltas),
         },
+        "check_in_snapshot": snapshot_values(check_in_snapshot),
+        "recovery_snapshot": snapshot_values(recovery_snapshot),
         "subjective_context": {
             "pre": select_subjective(
-                pre_source,
+                check_in_snapshot,
                 "sleep_hours", "sleep_quality", "stress_level",
                 "training_load_24h", "fatigue_level", "session_goal",
             ),
             "post": select_subjective(
-                post_source,
+                recovery_snapshot,
                 "energy_level", "relaxation_level", "fatigue_level", "discomfort",
             ),
         },
@@ -109,6 +117,8 @@ def build_session_response(
         "limitations": response_limitations(
             pre=pre,
             post=post,
+            check_in_snapshot=check_in_snapshot,
+            recovery_snapshot=recovery_snapshot,
             warnings=warnings,
         ),
     }
@@ -154,6 +164,16 @@ def select_subjective(source: dict[str, Any], *keys: str) -> dict[str, Any]:
     }
 
 
+def snapshot_values(source: dict[str, Any]) -> dict[str, Any]:
+    """Return recorded snapshot measurements without marking them validated."""
+
+    return {
+        "spo2": value_for(source, "spo2", "avg_spo2"),
+        "heart_rate_bpm": value_for(source, "heart_rate_bpm", "heart_rate", "pulse"),
+        "hrv_rmssd_ms": value_for(source, "hrv_rmssd", "rmssd", "hrv"),
+    }
+
+
 def response_confidence(
     *,
     data_quality_score: float | int | None,
@@ -184,11 +204,17 @@ def response_limitations(
     *,
     pre: dict[str, Any],
     post: dict[str, Any],
+    check_in_snapshot: dict[str, Any],
+    recovery_snapshot: dict[str, Any],
     warnings: list[str],
 ) -> list[str]:
     limitations = list(warnings)
     if not any(value is not None for value in pre.values()):
-        limitations.append("pre_measurements_unavailable")
+        limitations.append("validated_pre_measurements_unavailable")
     if not any(value is not None for value in post.values()):
-        limitations.append("post_measurements_unavailable")
+        limitations.append("validated_post_measurements_unavailable")
+    if any(value not in (None, "") for value in check_in_snapshot.values()):
+        limitations.append("check_in_snapshot_not_validated")
+    if any(value not in (None, "") for value in recovery_snapshot.values()):
+        limitations.append("recovery_snapshot_not_validated")
     return limitations
